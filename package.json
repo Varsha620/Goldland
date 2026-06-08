@@ -1,0 +1,10 @@
+{
+  "name": "goldland-jewellery",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node --preserve-symlinks-main server.mjs",
+    "test": "node --preserve-symlinks-main tests/smoke.test.mjs"
+  }
+}
