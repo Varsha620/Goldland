@@ -12,7 +12,7 @@ for (const section of ["Dashboard", "Sales", "Purchase", "Transactions", "Stock"
 assert(app.includes("ACCESS_PASSWORD"), "Single password access is missing");
 assert(!app.includes("roleSelect"), "Role selector should not exist");
 
-for (const table of ["rate_history", "invoices", "stock_items", "scheme_collections", "journal_entries", "audit_logs", "employees", "account_masters", "dmd_return_invoices", "dmd_return_lines", "dmd_sales_wholesale_invoices", "dmd_sales_wholesale_lines", "dmd_sales_wholesale_stones", "sales_order_advances", "sales_order_advance_refunds", "smith_work_orders", "smith_work_order_lines", "cash_weight_smith_entries", "cash_weight_smith_lines", "jeweller_work_orders", "jeweller_work_order_lines", "cash_weight_jeweller_entries", "cash_weight_jeweller_lines", "stock_adjustments", "stock_adjustment_lines", "gold_deposits", "gold_deposit_lines", "sample_issues", "sample_issue_lines", "sample_returns", "sample_return_lines", "refinery_issues", "refinery_issue_lines", "refinery_returns", "refinery_return_lines", "refinery_final_returns", "refinery_final_return_lines", "melting_issues", "melting_issue_lines", "melting_returns", "melting_return_lines", "billwise_collections", "billwise_collection_lines", "billwise_payments", "billwise_payment_lines", "billwise_credit_note_discounts", "billwise_credit_note_discount_lines", "billwise_debit_note_discounts", "billwise_debit_note_discount_lines", "complimentary_item_stock", "complimentary_item_purchases", "complimentary_item_purchase_lines", "complimentary_item_issues", "complimentary_item_issue_lines"]) {
+for (const table of ["rate_history", "invoices", "stock_items", "scheme_collections", "journal_entries", "audit_logs", "employees", "account_masters", "dmd_return_invoices", "dmd_return_lines", "dmd_sales_wholesale_invoices", "dmd_sales_wholesale_lines", "dmd_sales_wholesale_stones", "sales_order_advances", "sales_order_advance_refunds", "smith_work_orders", "smith_work_order_lines", "cash_weight_smith_entries", "cash_weight_smith_lines", "jeweller_work_orders", "jeweller_work_order_lines", "cash_weight_jeweller_entries", "cash_weight_jeweller_lines", "stock_adjustments", "stock_adjustment_lines", "opening_stock_entries", "opening_stock_lines", "gold_deposits", "gold_deposit_lines", "sample_issues", "sample_issue_lines", "sample_returns", "sample_return_lines", "refinery_issues", "refinery_issue_lines", "refinery_returns", "refinery_return_lines", "refinery_final_returns", "refinery_final_return_lines", "melting_issues", "melting_issue_lines", "melting_returns", "melting_return_lines", "billwise_collections", "billwise_collection_lines", "billwise_payments", "billwise_payment_lines", "billwise_credit_note_discounts", "billwise_credit_note_discount_lines", "billwise_debit_note_discounts", "billwise_debit_note_discount_lines", "pdc_receipts", "pdc_receipt_lines", "pdc_issues", "pdc_issue_lines", "pdc_requests", "pdc_request_lines", "complimentary_item_stock", "complimentary_item_purchases", "complimentary_item_purchase_lines", "complimentary_item_issues", "complimentary_item_issue_lines"]) {
   assert(schema.includes(`create table ${table}`), `Missing table ${table}`);
 }
 
@@ -69,6 +69,8 @@ assert(app.includes("MC/Grm"), "Complete bill table should include MC/Grm");
 assert(app.includes("VA After Disc"), "Complete bill table should include VA after discount");
 assert(app.includes("data-bill-calc"), "Bill modal should show live calculated net and amount");
 assert(app.includes("appendEntryLine"), "Enter key should add the completed entry row to bill items");
+assert(app.includes("moveToNextBillField"), "Enter key should move to the next bill field before adding rows");
+assert(app.includes("setupBillEnterNavigation"), "Bill headers and transaction fields should support keyboard-only Enter navigation");
 assert(app.includes("deleteLineButton"), "Bill rows need a small delete option");
 assert(app.includes("openCardTransactionsModal"), "Card transaction split window is missing");
 assert(app.includes("data-card-transactions"), "Card (F8) should open transactions on double-click");
@@ -80,6 +82,24 @@ for (const billwiseFeature of ["billwiseTransactionScreen", "Billwise Collection
 }
 for (const billwiseField of ["Invoice No", "InvoiceType", "Invoice Date", "Bill Amount", "TotalReceived", "Old/CNote", "DND", "Received", "Discount", "Balance", "Auto Allocate"]) {
   assert(app.includes(billwiseField), `Missing billwise field ${billwiseField}`);
+}
+for (const pdcReceiptFeature of ["PDC Receipt", "pdcReceiptScreen", "pdcReceipts", "normalizePdcReceiptLine", "savePdcAction", "loadPdcReceipt"]) {
+  assert(app.includes(pdcReceiptFeature), `Missing PDC receipt feature ${pdcReceiptFeature}`);
+}
+for (const pdcReceiptField of ["Cheque No, Date", "Cheque Amount", "Party Name", "Received By", "CVrid", "Saved PDC Receipts"]) {
+  assert(app.includes(pdcReceiptField), `Missing PDC receipt field ${pdcReceiptField}`);
+}
+for (const pdcMenuItem of ["PDC Issue", "PDC Request", "PDC Receipt", "Bank Submission", "Cheque Bounce", "Cheque Represent"]) {
+  assert(app.includes(pdcMenuItem), `Missing PDC menu item ${pdcMenuItem}`);
+}
+for (const pdcFeature of ["pdcIssueScreen", "pdcRequestScreen", "pdcIssueRequestScreen", "pdcIssues", "pdcRequests", "pdcChequeRepresentScreen", "pdc-represent-header", "Reason for Represent", "Represent Bounced Cheque"]) {
+  assert(app.includes(pdcFeature), `Missing PDC feature ${pdcFeature}`);
+}
+for (const pdcIssueField of ["Bank Name", "Cheque No, Date", "Cheque Amount", "Received By", "CVrid", "pdcIssueTotalStrip"]) {
+  assert(app.includes(pdcIssueField), `Missing PDC issue field ${pdcIssueField}`);
+}
+for (const pdcRequestField of ["pdcRequestTotalStrip", "pdc-request-allocation-table", "pdc-request-allocation-header"]) {
+  assert(app.includes(pdcRequestField) || css.includes(pdcRequestField), `Missing PDC request field ${pdcRequestField}`);
 }
 for (const customVoucherFeature of ["customVoucherScreen", "saveCustomVoucher", "addCustomVoucherLine", "buildCustomVoucherLinesFromEntry", "setupCustomVoucherScreen", "searchCustomVoucher", "openCustomVoucher"]) {
   assert(app.includes(customVoucherFeature), `Missing custom voucher feature ${customVoucherFeature}`);
@@ -130,6 +150,10 @@ for (const customerColumn of ["customer_code", "opening_balance", "state_provinc
 }
 assert(app.includes("open-work-smith"), "Smith workflow action is missing");
 assert(app.includes("open-stock-adjustment"), "Stock adjustment action is missing");
+assert(app.includes("openOpeningStockEntry"), "Opening Stock Account Entry should have a real route handler");
+assert(app.includes("openingStockScreen"), "Opening Stock Account Entry screen is missing");
+assert(app.includes("opening-stock-grid"), "Opening Stock grid should render");
+assert(app.includes("save-opening-stock"), "Opening Stock save action is missing");
 assert(app.includes("open-work-cash-smith"), "Cash for Weight Smith workflow action is missing");
 assert(app.includes("open-work-jeweller"), "Jeweller workflow action is missing");
 assert(app.includes("open-work-cash-jeweller"), "Cash for Weight Jeweller workflow action is missing");
@@ -165,16 +189,36 @@ for (const sampleFeature of ["sampleWorkOrders", "sampleScreen", "readSampleEntr
 for (const sampleField of ["Sample Issue", "Sample Return", "Jeweller", "Show Rate", "Total Amount", "HMC"]) {
   assert(app.includes(sampleField), `Missing Sample workflow field ${sampleField}`);
 }
+for (const polishingFeature of ["polishingScreen", "setupPolishingScreen", "readPolishingEntryLine", "readPolishingStoneEntryLine", "savePolishing", "polishingFinancials", "appendPolishingLine", "appendPolishingStone"]) {
+  assert(app.includes(polishingFeature), `Missing polishing feature ${polishingFeature}`);
+}
+for (const polishingField of ["Party Name", "Net Wght", "Color Type", "Color Scale", "Seive", "Total Net Weight", "Stone Amount", "Polishing entry updated"]) {
+  assert(app.includes(polishingField), `Missing polishing field ${polishingField}`);
+}
+for (const polishingTable of ["create table polishing_entries", "create table polishing_lines", "create table polishing_stones"]) {
+  assert(schema.includes(polishingTable), `Missing schema table ${polishingTable}`);
+}
 assert(!app.includes('["Branch Transfer", "", "open-work-transfer"]'), "Branch Transfer should not be shown under Stock transfers");
 assert(!app.includes('["Location Transfer", "", "open-work-transfer"]'), "Location Transfer should not be shown under Stock transfers");
 for (const refineryFeature of ["refineryIssueScreen", "refineryReturnScreen", "refineryFinalReturnScreen", "readRefineryIssueEntryLine", "saveRefineryIssue", "saveRefineryReturn", "saveRefineryFinalReturn", "refineryIssueFinancials", "refineryReturnFinancials", "refineryFinalFinancials"]) {
   assert(app.includes(refineryFeature), `Missing refinery workflow feature ${refineryFeature}`);
+}
+for (const issuedDetailsFeature of ["data-refinery-return-view", "refineryIssuedDetails", "refineryIssuedColumns", "refineryIssuedRow"]) {
+  assert(app.includes(issuedDetailsFeature), `Missing refinery issued details feature ${issuedDetailsFeature}`);
+}
+assert(app.includes("readonlyEmployeeDropdown"), "Read-only Prepared By fields must use the existing staff dropdown");
+assert(!app.includes('refineryIssuedReadout("Prepared By"'), "Refinery detail Prepared By fields must not render as text inputs");
+for (const finalReturnTabFeature of ["data-refinery-final-view", "refineryFinalTestReturnDetails", "refineryFinalTestColumns", "refineryFinalTestRow", "selectedRefineryReturn"]) {
+  assert(app.includes(finalReturnTabFeature), `Missing refinery final return tab feature ${finalReturnTabFeature}`);
 }
 for (const refineryField of ["Expected Touch", "Refinary Pending", "Bottle Stock Weight", "Reissue Weight", "Aciding Loss", "Issued, Refined Amt", "Refiner charge"]) {
   assert(app.includes(refineryField), `Missing refinery workflow field ${refineryField}`);
 }
 for (const meltingFeature of ["meltingIssueScreen", "meltingReturnScreen", "readMeltingIssueEntryLine", "saveMeltingIssue", "saveMeltingReturn", "meltingIssueFinancials", "meltingReturnFinancials"]) {
   assert(app.includes(meltingFeature), `Missing melting workflow feature ${meltingFeature}`);
+}
+for (const meltingReturnIssueFeature of ["data-melting-return-view", "meltingReturnIssueDetails", "meltingReturnIssueColumns", "meltingReturnIssueRow"]) {
+  assert(app.includes(meltingReturnIssueFeature), `Missing melting return issue feature ${meltingReturnIssueFeature}`);
 }
 for (const meltingField of ["Melting Issue", "Melting Return", "Issue Type", "Pending", "Melting Loss", "Bottle Stock Weight"]) {
   assert(app.includes(meltingField), `Missing melting workflow field ${meltingField}`);
@@ -198,5 +242,34 @@ for (const masterField of ["GSTIN", "Fax", "Website", "Touch", "Conv. Touch", "W
 }
 assert(css.includes("backdrop-filter"), "Premium smooth UI treatment is missing");
 assert(css.includes("@media print"), "Print stylesheet is missing");
+assert(css.includes(".refinery-header .classic-fields"), "Work order headers need explicit non-overlapping field layout");
+assert(css.includes(".polishing-header .classic-fields"), "Polishing header fields need non-overlapping layout");
+assert(app.includes("DEMO_DATA_VERSION"), "Versioned demo-data migration is missing");
+assert(app.includes("ensureDemoData(state)"), "Demo data must install for existing browser profiles");
+for (const demoRecord of [
+  "DEMO-SMITH-001",
+  "DEMO-JEWELLER-001",
+  "DEMO-REF-ISSUE-001",
+  "DEMO-REF-RETURN-001",
+  "DEMO-REF-FINAL-001",
+  "DEMO-MELT-ISSUE-001",
+  "DEMO-MELT-RETURN-001",
+  "DEMO-SAMPLE-ISSUE-001",
+  "DEMO-SAMPLE-RETURN-001",
+  "DEMO-POLISH-001",
+  "DEMO-SERVICE-001",
+  "DEMO-SERVICE-CLOSE-001",
+  "DEMO-COMP-PURCHASE-001",
+  "DEMO-COMP-ISSUE-001",
+  "DEMO-BANK-DEPOSIT-001",
+  "DEMO-PDC-RECEIPT-001",
+  "DEMO-CASH-RECEIPT-001",
+  "DEMO-JOURNAL-001"
+]) {
+  assert(app.includes(demoRecord), `Missing demo record ${demoRecord}`);
+}
+assert((app.match(/pendingIssueId: "DEMO-REF-ISSUE-001"/g) || []).length === 2, "Refinery demo issue must link to test and final returns");
+assert(app.includes('pendingIssueId: "DEMO-MELT-ISSUE-001"'), "Melting demo return must link to its issue");
+assert(app.includes("rebuildComplimentaryStockForState(current)"), "Demo complimentary movements must rebuild stock");
 
 console.log("Goldland smoke tests passed.");

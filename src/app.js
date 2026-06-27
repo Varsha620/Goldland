@@ -1,5 +1,9 @@
 const ACCESS_PASSWORD = "goldland2026";
 const WORK_ORDER_ITEMS = ["Smith", "Jeweller", "Refining", "Sample", "Polishing", "Service / Job", "Complimentary Item"];
+const EXPANDABLE_NAVS = new Set(["Sales", "Purchase", "Stock", "Work Orders", "Accounts", "Management"]);
+const OPENING_STOCK_VIEW = "Opening Stock Account Entry";
+const STOCK_ITEMS = ["Stock Register", "Barcode Entry", OPENING_STOCK_VIEW, "Stock Adjustments", "Item Transfer", "Gold Deposit", "Gold Withdrawal"];
+const DEMO_DATA_VERSION = 1;
 
 const seed = {
   user: { name: "Goldland Staff" },
@@ -279,6 +283,19 @@ const seed = {
     { accountId: "G0087", accountName: "SHOP CASH", aliasName: "", subSchedule: "Cash", openingBalance: 0, balanceType: "Dr", opDate: "21/05/2026", status: "ACTIVE", costCenter: "Main shop", mobile: "", adminOnly: false },
     { accountId: "CNRB", accountName: "Canara Bank Edakkara", aliasName: "", subSchedule: "Bank", openingBalance: 154043, balanceType: "Cr", opDate: "21/05/2026", status: "ACTIVE", costCenter: "Main shop", mobile: "", adminOnly: false }
   ],
+  bankDeposits: [],
+  bankWithdrawals: [],
+  pdcBankSubmissions: [],
+  pdcIssues: [],
+  pdcRequests: [],
+  pdcReceipts: [],
+  pdcChequeBounces: [],
+  pdcChequeRequests: [],
+  cashReceipts: [],
+  cashPayments: [],
+  journalVouchers: [],
+  directEntries: [],
+  expenseEntries: [],
   customVouchers: [],
   audit: [
     audit("Updated 22K gold rate to Rs.9075/g", "13:20"),
@@ -289,7 +306,9 @@ const seed = {
 
 let state = null;
 state = loadState();
+state = ensureDemoData(state);
 let active = "Dashboard";
+let expandedNavGroups = new Set();
 let managementView = "Customers";
 let itemCategoryView = "Product";
 let miscellaneousView = "Agent";
@@ -309,26 +328,39 @@ let cashWeightSmithDraft = null;
 let jewellerWorkDraft = null;
 let cashWeightJewellerDraft = null;
 let stockAdjustmentDraft = null;
+let openingStockDraft = null;
 let goldDepositDraft = null;
 let goldWithdrawalDraft = null;
 let sampleWorkView = "Sample Issue";
 let sampleIssueDraft = null;
 let sampleReturnDraft = null;
+let polishingDraft = null;
 let serviceWorkView = "New Service / Job";
 let serviceNewDraft = null;
 let serviceCloseDraft = null;
 let refineryView = "Refinery Issue";
+let refineryReturnView = "Test Return";
+let refineryFinalView = "Final Return";
 let refineryIssueDraft = null;
 let refineryReturnDraft = null;
 let refineryFinalDraft = null;
 let meltingIssueDraft = null;
 let meltingReturnDraft = null;
+let meltingReturnView = "Final Return";
 let billwiseDrafts = {};
+let bankTransactionDrafts = {};
+let pdcView = "Bank Submission";
+let pdcDrafts = {};
+let cashVoucherDrafts = {};
+let journalVoucherDraft = null;
+let directEntryDraft = null;
+let expenseEntryDraft = null;
 let complimentaryView = "Complimentary Item Purchase";
 let complimentaryPurchaseDraft = null;
 let complimentaryIssueDraft = null;
 let complimentaryPurchaseSelectedRow = 0;
 let complimentaryIssueSelectedRow = 0;
+let existingRecordPickerItems = [];
 let customVoucherDraft = null;
 let customVoucherEntryDraft = null;
 let customVoucherConfirmDelete = true;
@@ -400,10 +432,12 @@ function loadState() {
     jewellerWorkOrders: (parsed.jewellerWorkOrders || []).map(normalizeJewellerWorkOrder),
     cashWeightJewellers: (parsed.cashWeightJewellers || []).map(normalizeCashWeightJeweller),
     stockAdjustments: (parsed.stockAdjustments || []).map(normalizeStockAdjustment),
+    openingStockEntries: (parsed.openingStockEntries || []).map(normalizeOpeningStockEntry),
     goldDeposits: (parsed.goldDeposits || []).map((item) => normalizeGoldDeposit(item, "Deposit")),
     goldWithdrawals: (parsed.goldWithdrawals || []).map((item) => normalizeGoldDeposit(item, "Withdrawal")),
     sampleIssues: (parsed.sampleIssues || []).map((item) => normalizeSample(item, "Issue")),
     sampleReturns: (parsed.sampleReturns || []).map((item) => normalizeSample(item, "Return")),
+    polishingEntries: (parsed.polishingEntries || []).map(normalizePolishingEntry),
     serviceJobs: (parsed.serviceJobs || []).map((item) => normalizeServiceJob(item, "New")),
     serviceClosures: (parsed.serviceClosures || []).map((item) => normalizeServiceJob(item, "Close")),
     refineryIssues: (parsed.refineryIssues || []).map(normalizeRefineryIssue),
@@ -418,10 +452,376 @@ function loadState() {
     billwisePayments: (parsed.billwisePayments || []).map((item) => normalizeBillwiseTransaction(item, "payment")),
     billwiseCreditDiscounts: (parsed.billwiseCreditDiscounts || []).map((item) => normalizeBillwiseTransaction(item, "credit")),
     billwiseDebitDiscounts: (parsed.billwiseDebitDiscounts || []).map((item) => normalizeBillwiseTransaction(item, "debit")),
+    bankDeposits: (parsed.bankDeposits || []).map((item) => normalizeBankTransaction(item, "deposit")),
+    bankWithdrawals: (parsed.bankWithdrawals || []).map((item) => normalizeBankTransaction(item, "withdrawal")),
+    pdcBankSubmissions: (parsed.pdcBankSubmissions || []).map((item) => normalizePdcRecord(item, "submission")),
+    pdcIssues: (parsed.pdcIssues || []).map((item) => normalizePdcRecord(item, "issue")),
+    pdcRequests: (parsed.pdcRequests || []).map((item) => normalizePdcRecord(item, "pdcRequest")),
+    pdcReceipts: (parsed.pdcReceipts || []).map((item) => normalizePdcRecord(item, "receipt")),
+    pdcChequeBounces: (parsed.pdcChequeBounces || []).map((item) => normalizePdcRecord(item, "bounce")),
+    pdcChequeRequests: (parsed.pdcChequeRequests || []).map((item) => normalizePdcRecord(item, "request")),
+    cashReceipts: (parsed.cashReceipts || []).map((item) => normalizeCashVoucher(item, "receipt")),
+    cashPayments: (parsed.cashPayments || []).map((item) => normalizeCashVoucher(item, "payment")),
+    journalVouchers: (parsed.journalVouchers || []).map(normalizeJournalVoucher),
+    directEntries: (parsed.directEntries || []).map(normalizeDirectEntry),
+    expenseEntries: (parsed.expenseEntries || []).map(normalizeExpenseEntry),
     customVouchers: (parsed.customVouchers || []).map(normalizeCustomVoucher),
     itemCategories: normalizeItemCategories(parsed.itemCategories || seed.itemCategories),
     miscellaneous: normalizeMiscellaneous(parsed.miscellaneous || seed.miscellaneous)
   };
+}
+
+function ensureDemoData(current) {
+  if (Number(current.demoDataVersion || 0) >= DEMO_DATA_VERSION) return current;
+  const addMissing = (collection, records, normalizer) => {
+    current[collection] ||= [];
+    records.forEach((record) => {
+      if (!current[collection].some((item) => item.id === record.id || (record.entryNo && item.entryNo === record.entryNo))) {
+        current[collection].push(normalizer(record));
+      }
+    });
+  };
+
+  addMissing("smithWorkOrders", [{
+    id: "DEMO-SMITH-001",
+    entryNo: "NR00006",
+    refNo: "DEMO-SMITH",
+    date: "24-06-2026",
+    time: "10:15",
+    paymentMode: "Credit",
+    transType: "Issue",
+    smithCode: "M0001",
+    smithName: "Ravi Smith",
+    preparedBy: "Akhil",
+    postOnlyMc: true,
+    skipStone: true,
+    remarks: "Demo chain work issued to smith",
+    lines: [
+      { id: "DEMO-SMITH-L1", barcode: "GL22-1042", itemName: "Chain", mode: "OUT", qty: 2, gross: 18.72, stone: 0, touch: 91.6, wastage: 0.45, smWeight: 18.72, mcGram: 780, rate: 9075 },
+      { id: "DEMO-SMITH-L2", barcode: "HUID-7K81", itemName: "Baby Ring", mode: "OUT", qty: 3, gross: 6.45, stone: 0.18, touch: 91.6, wastage: 0.3, smWeight: 6.27, mcGram: 650, rate: 9075 }
+    ]
+  }], normalizeSmithWorkOrder);
+
+  addMissing("jewellerWorkOrders", [{
+    id: "DEMO-JEWELLER-001",
+    entryNo: "AR00001",
+    refNo: "DEMO-JW",
+    date: "24-06-2026",
+    time: "10:35",
+    paymentMode: "Credit",
+    transType: "Normal Work",
+    jewellerCode: "",
+    jewellerName: "Babu Jeweller",
+    preparedBy: "Sajitha",
+    skipStone: true,
+    showRate: true,
+    remarks: "Demo bangle finishing work",
+    lines: [
+      { id: "DEMO-JW-L1", barcode: "HUID-1M22", itemName: "Bangle", mode: "OUT", qty: 4, gross: 42.5, stone: 0, touch: 91.6, wastage: 0.5, jwWeight: 42.5, mcGram: 720, vaPercent: 3.5, rate: 9075 }
+    ]
+  }], normalizeJewellerWorkOrder);
+
+  addMissing("refineryIssues", [{
+    id: "DEMO-REF-ISSUE-001",
+    entryNo: "NR00021",
+    refNo: "DEMO-RF",
+    date: "24-06-2026",
+    time: "11:00",
+    expectedTouch: 91.6,
+    metalType: "Gold",
+    refinerName: "Metro Refiner",
+    preparedBy: "Akhil",
+    remark: "Mixed old gold sent for refining",
+    lines: [
+      { id: "DEMO-RFI-L1", itemId: "OLD-GOLD", itemName: "Old Gold Lot A", qty: 12, gross: 37.1, stone: 1.2, net: 35.9, rate: 9075 },
+      { id: "DEMO-RFI-L2", itemId: "SCRAP", itemName: "Gold Scrap", qty: 8, gross: 18.65, stone: 0.35, net: 18.3, rate: 9075 }
+    ]
+  }], normalizeRefineryIssue);
+
+  addMissing("refineryReturns", [{
+    id: "DEMO-REF-RETURN-001",
+    entryNo: "RR00009",
+    refNo: "DEMO-RF-TEST",
+    date: "24-06-2026",
+    time: "14:10",
+    pendingIssueId: "DEMO-REF-ISSUE-001",
+    preparedBy: "Sajitha",
+    remark: "Test return received from Metro Refiner",
+    lines: [
+      { id: "DEMO-RFR-L1", itemName: "Old Gold Lot A", issuedWeight: 35.9, meltingLoss: 0.22, receivedWeight: 35.15, bottleStockWeight: 0.18, testWeight: 0.15, reissueWeight: 0.35 },
+      { id: "DEMO-RFR-L2", itemName: "Gold Scrap", issuedWeight: 18.3, meltingLoss: 0.12, receivedWeight: 17.91, bottleStockWeight: 0.08, testWeight: 0.09, reissueWeight: 0.19 }
+    ]
+  }], normalizeRefineryReturn);
+
+  addMissing("refineryFinalReturns", [{
+    id: "DEMO-REF-FINAL-001",
+    entryNo: "FR00004",
+    refNo: "DEMO-RF-FINAL",
+    date: "24-06-2026",
+    time: "16:05",
+    pendingIssueId: "DEMO-REF-ISSUE-001",
+    expectedTouch: 91.6,
+    preparedBy: "Nishad",
+    remark: "Final refined gold received",
+    refinerCharge: 1800,
+    addition: 0,
+    discount: 100,
+    cashPaid: 250000,
+    lines: [
+      { id: "DEMO-RFF-L1", itemName: "Refined Gold Bar A", receivedWeight: 35.15, acidingLoss: 0.12, testWeight: 35.03, touch: 99.5, bottleStockWeight: 0.18, rate: 9840 },
+      { id: "DEMO-RFF-L2", itemName: "Refined Gold Bar B", receivedWeight: 17.91, acidingLoss: 0.08, testWeight: 17.83, touch: 99.4, bottleStockWeight: 0.08, rate: 9840 }
+    ]
+  }], normalizeRefineryFinalReturn);
+
+  addMissing("meltingIssues", [{
+    id: "DEMO-MELT-ISSUE-001",
+    entryNo: "MI00005",
+    refNo: "DEMO-MELT",
+    date: "24-06-2026",
+    time: "11:30",
+    issueType: "Melting",
+    refinerName: "Metro Refiner",
+    preparedBy: "Akhil",
+    lines: [
+      { id: "DEMO-MI-L1", itemId: "22K-SCRAP", itemName: "22K Gold Scrap", qty: 15, gross: 28.4, stone: 0.6, net: 27.8, rate: 9075 }
+    ]
+  }], normalizeMeltingIssue);
+
+  addMissing("meltingReturns", [{
+    id: "DEMO-MELT-RETURN-001",
+    entryNo: "MR00001",
+    refNo: "DEMO-MELT-RET",
+    date: "24-06-2026",
+    time: "15:00",
+    pendingIssueId: "DEMO-MELT-ISSUE-001",
+    preparedBy: "Sajitha",
+    remark: "Melted bar received and tested",
+    refinerCharge: 950,
+    discount: 50,
+    cashPaid: 150000,
+    lines: [
+      { id: "DEMO-MR-L1", itemName: "Melted Gold Bar", issuedWeight: 27.8, meltingLoss: 0.18, testWeight: 27.5, receivedWeight: 27.62, touch: 91.7, rate: 9075, bottleStockWeight: 0.12 }
+    ]
+  }], normalizeMeltingReturn);
+
+  addMissing("sampleIssues", [{
+    id: "DEMO-SAMPLE-ISSUE-001",
+    type: "Issue",
+    entryNo: "SI00003",
+    refNo: "DEMO-SAMPLE",
+    date: "24-06-2026",
+    time: "12:05",
+    sampleCode: "SMP-CHAIN",
+    sampleLabel: "Sample Issue",
+    selectJeweller: true,
+    jewellerName: "Babu Jeweller",
+    preparedBy: "Sajitha",
+    remarks: "Customer selection samples",
+    showRate: true,
+    lines: [
+      { id: "DEMO-SI-L1", itemId: "R", barcode: "HUID-7K81", itemName: "Baby Ring", qty: 2, gross: 4.25, stone: 0.15, rate: 9075, hmc: 900, taxPct: 3 }
+    ]
+  }], (item) => normalizeSample(item, "Issue"));
+
+  addMissing("sampleReturns", [{
+    id: "DEMO-SAMPLE-RETURN-001",
+    type: "Return",
+    entryNo: "SR00002",
+    refNo: "DEMO-SAMPLE-RET",
+    date: "24-06-2026",
+    time: "17:10",
+    sampleCode: "SMP-CHAIN",
+    sampleLabel: "Sample Return",
+    selectJeweller: true,
+    jewellerName: "Babu Jeweller",
+    preparedBy: "Nishad",
+    remarks: "Samples returned in good condition",
+    lines: [
+      { id: "DEMO-SR-L1", itemId: "R", barcode: "HUID-7K81", itemName: "Baby Ring", qty: 2, gross: 4.25, stone: 0.15, rate: 9075, hmc: 900, taxPct: 3 }
+    ]
+  }], (item) => normalizeSample(item, "Return"));
+
+  addMissing("polishingEntries", [{
+    id: "DEMO-POLISH-001",
+    entryNo: "PL00002",
+    refNo: "DEMO-POLISH",
+    date: "24-06-2026",
+    time: "12:30",
+    hasParty: true,
+    partyName: "Babu Jeweller",
+    preparedBy: "Nishad",
+    remarks: "Diamond ring polishing and stone inspection",
+    lines: [
+      { id: "DEMO-PL-L1", itemId: "DBR", barcode: "DIA-4431", itemName: "Diamond Ring", qty: 1, gross: 5.85, stone: 0.42 }
+    ],
+    stones: [
+      { id: "DEMO-PL-S1", code: "DIA", barcode: "DIA-4431", colorType: "Diamond", colorScale: "EF", shape: "Round", cut: "Excellent", clarity: "VVS", sieveSize: "1.5 mm", caratCent: 0.32, ct: "Ct", pcs: 7, purchaseRate: 58000, sellingRate: 64000 }
+    ]
+  }], normalizePolishingEntry);
+
+  addMissing("serviceJobs", [{
+    id: "DEMO-SERVICE-001",
+    type: "New",
+    entryNo: "JB00005",
+    refNo: "DEMO-SERVICE",
+    date: "24-06-2026",
+    time: "13:00",
+    dueDays: 1,
+    dueDate: "25-06-2026",
+    salesMan: "Akhil",
+    jobStatus: "Pending",
+    partyAccount: "C0001",
+    partyName: "Rahul U M",
+    place: "Valikad",
+    contactNo: "8281900323",
+    remarks: "Resize ring and tighten stones",
+    approxAmount: 1800,
+    advance: 500,
+    lines: [
+      { id: "DEMO-SVC-L1", itemName: "Diamond Ring", description: "18K customer ring", nos: 1, gross: 5.85, stone: 0.42, complaint: "Ring size tight; one stone loose" }
+    ]
+  }], (item) => normalizeServiceJob(item, "New"));
+
+  addMissing("serviceClosures", [{
+    id: "DEMO-SERVICE-CLOSE-001",
+    type: "Close",
+    entryNo: "JBC00002",
+    refNo: "JB00005",
+    date: "25-06-2026",
+    time: "09:30",
+    dueDays: 0,
+    dueDate: "25-06-2026",
+    salesMan: "Akhil",
+    jobStatus: "Closed",
+    partyAccount: "C0001",
+    partyName: "Rahul U M",
+    place: "Valikad",
+    contactNo: "8281900323",
+    remarks: "Resized and stones secured",
+    approxAmount: 1800,
+    advance: 500,
+    lines: [
+      { id: "DEMO-SVCC-L1", itemName: "Diamond Ring", description: "18K customer ring", nos: 1, gross: 5.84, stone: 0.42, complaint: "Completed" }
+    ]
+  }], (item) => normalizeServiceJob(item, "Close"));
+
+  addMissing("complimentaryPurchases", [{
+    id: "DEMO-COMP-PURCHASE-001",
+    entryNo: "CP00003",
+    refNo: "DEMO-GIFT",
+    date: "24-06-2026",
+    time: "13:20:00",
+    mode: "Credit",
+    partyId: "S0014",
+    partyName: "AJAYA KUMAR",
+    address: "PADIKKAL [H]",
+    preparedBy: "ABDUL SALAM AP",
+    addition: 100,
+    discount: 50,
+    lines: [
+      { id: "DEMO-CP-L1", itemId: "GBX", itemName: "Gift Box", quantity: 25, unit: "Nos", foc: 2, price: 65 },
+      { id: "DEMO-CP-L2", itemId: "CBG", itemName: "Carry Bag", quantity: 50, unit: "Nos", foc: 5, price: 18 }
+    ]
+  }], normalizeComplimentaryPurchase);
+
+  addMissing("complimentaryIssues", [{
+    id: "DEMO-COMP-ISSUE-001",
+    entryNo: "CI00004",
+    refNo: "DEMO-GIFT-OUT",
+    date: "24-06-2026",
+    time: "14:00:00",
+    issueType: "Sales / Issue",
+    invoiceNo: "C02033",
+    preparedBy: "Akhil",
+    remarks: "Packing issued with demo invoice",
+    lines: [
+      { id: "DEMO-CI-L1", itemId: "GBX", itemName: "Gift Box", quantity: 1, unit: "Nos" },
+      { id: "DEMO-CI-L2", itemId: "CBG", itemName: "Carry Bag", quantity: 1, unit: "Nos" }
+    ]
+  }], normalizeComplimentaryIssue);
+
+  addMissing("bankDeposits", [{
+    id: "DEMO-BANK-DEPOSIT-001",
+    type: "deposit",
+    voucherNo: "BD00018",
+    refNo: "DEMO-BANK",
+    date: "2026-06-24",
+    time: "15:20:00",
+    preparedBy: "ABDUL SALAM AP",
+    costCenter: "cost1",
+    bankAccount: "Canara Bank Edakkara",
+    handledBy: "Akhil",
+    narration: "Daily cash deposited to bank",
+    lines: [
+      { id: "DEMO-BD-L1", headId: "G0087", accountHead: "SHOP CASH", amount: 125000, remarks: "Counter collection", voucherNo: "CASH-24", voucherDate: "2026-06-24" }
+    ]
+  }], (item) => normalizeBankTransaction(item, "deposit"));
+
+  addMissing("pdcReceipts", [{
+    id: "DEMO-PDC-RECEIPT-001",
+    type: "receipt",
+    entryNo: "PR00012",
+    refNo: "DEMO-PDC",
+    date: "2026-06-24",
+    time: "15:40:00",
+    preparedBy: "ABDUL SALAM AP",
+    receivedBy: "Akhil",
+    partyCode: "C0001",
+    partyName: "Rahul U M",
+    chequeNo: "458921",
+    chequeDate: "2026-06-28",
+    chequeAmount: 28540,
+    bankName: "Canara Bank Edakkara",
+    remark: "Balance cheque against invoice C02033",
+    lines: [
+      { id: "DEMO-PDC-L1", invoiceNo: "C02033", invoiceType: "Sales", invoiceDate: "2025-08-30", billAmount: 128540, paid: 100000, received: 28540, remark: "Full balance", cvRid: "C02033" }
+    ]
+  }], (item) => normalizePdcRecord(item, "receipt"));
+
+  addMissing("cashReceipts", [{
+    id: "DEMO-CASH-RECEIPT-001",
+    type: "receipt",
+    voucherNo: "CR00031",
+    refNo: "DEMO-CASH",
+    date: "2026-06-24",
+    time: "16:00:00",
+    preparedBy: "ABDUL SALAM AP",
+    costCenter: "cost1",
+    cashAccount: "SHOP CASH",
+    handledBy: "Sajitha",
+    narration: "Scheme collection received",
+    lines: [
+      { id: "DEMO-CR-L1", headId: "H1910", accountHead: "Anaida - MT Suvarna", amount: 5000, discount: 0, remarks: "June installment", voucherNo: "SC-24430", voucherDate: "2026-06-24" }
+    ]
+  }], (item) => normalizeCashVoucher(item, "receipt"));
+
+  addMissing("journalVouchers", [{
+    id: "DEMO-JOURNAL-001",
+    voucherNo: "JV00008",
+    refNo: "DEMO-JV",
+    date: "2026-06-24",
+    time: "16:20:00",
+    costCenter: "cost1",
+    preparedBy: "ABDUL SALAM AP",
+    narration: "Demo refiner charge posting",
+    lines: [
+      { id: "DEMO-JV-L1", accountId: "REF-CHG", accountHead: "Refining Charges", debit: 1800, credit: 0, remark: "Metro Refiner charge" },
+      { id: "DEMO-JV-L2", accountId: "CNRB", accountHead: "Canara Bank Edakkara", debit: 0, credit: 1800, remark: "Payment adjustment" }
+    ]
+  }], normalizeJournalVoucher);
+
+  current.demoDataVersion = DEMO_DATA_VERSION;
+  rebuildComplimentaryStockForState(current);
+  localStorage.setItem("goldland-state", JSON.stringify(current));
+  return current;
+}
+
+function rebuildComplimentaryStockForState(targetState) {
+  const previousState = state;
+  state = targetState;
+  rebuildComplimentaryStock();
+  targetState.complimentaryStock = state.complimentaryStock;
+  state = previousState;
 }
 
 function normalizeItemCategories(categories = {}) {
@@ -677,6 +1077,8 @@ function normalizePaymentBreakup(paymentBreakup = {}) {
 
 function normalizeOrderAdvanceRecord(record = {}, type = "advance") {
   const isRefund = type === "refund" || record.type === "refund";
+  const advanceAmount = Number(record.advanceAmount || record.totalAmount || 0);
+  const refundAmount = Number(record.refundAmount || 0);
   return {
     id: record.id || crypto.randomUUID(),
     type: isRefund ? "refund" : "advance",
@@ -692,14 +1094,14 @@ function normalizeOrderAdvanceRecord(record = {}, type = "advance") {
     preparedBy: record.preparedBy || state?.staffs?.[0]?.name || seed.staffs?.[0]?.name || "",
     paymentMode: record.paymentMode || "Cash",
     cashBank: record.cashBank || "Cash in Hand",
-    advanceAmount: Number(record.advanceAmount || 0),
-    advanceWeight: Number(record.advanceWeight || 0),
-    exchangeAmount: Number(record.exchangeAmount || 0),
-    exchangeWeight: Number(record.exchangeWeight || 0),
-    totalAmount: Number(record.totalAmount || (Number(record.advanceAmount || 0) + Number(record.exchangeAmount || 0))),
-    totalWeight: Number(record.totalWeight || (Number(record.advanceWeight || 0) + Number(record.exchangeWeight || 0))),
-    refundAmount: Number(record.refundAmount || 0),
-    refundWeight: Number(record.refundWeight || 0),
+    advanceAmount: isRefund ? 0 : advanceAmount,
+    advanceWeight: 0,
+    exchangeAmount: 0,
+    exchangeWeight: 0,
+    totalAmount: isRefund ? 0 : advanceAmount,
+    totalWeight: 0,
+    refundAmount,
+    refundWeight: 0,
     remark: record.remark || ""
   };
 }
@@ -890,13 +1292,13 @@ function normalizeDmdReturnBill(bill = {}) {
     nos: line.qty || 1,
     gross: line.gross || 0,
     stone: line.diamondWtCent || 0,
-    stonePrice: line.crtCentRate || latestDiamondRate(),
+    stonePrice: line.crtCentRate || 0,
     va: 0,
     goldType: "22K",
     salesType: "Weight",
     goldRate: line.rateRtgs || activeGoldRate(),
     dmdWgt: line.diamondWtCent || 0,
-    stnSPrice: line.crtCentRate || latestDiamondRate(),
+    stnSPrice: 0,
     purMc: line.mcGrm || 0,
     salesMc: line.mcGrm || 0
   }));
@@ -921,7 +1323,7 @@ function normalizeDmdReturnBill(bill = {}) {
     partyName: bill.partyName || "",
     addToStock: bill.addToStock !== false,
     lines: legacyLines,
-    ornamentLines: ornamentSource.map(normalizeDmdWholesaleLine),
+    ornamentLines: ornamentSource.map((line) => normalizeDmdWholesaleLine(line, { returnMode: true })),
     diamondLines: (bill.diamondLines || []).map(normalizeDmdStoneLine)
   };
 }
@@ -1116,6 +1518,8 @@ function normalizeDirectPurchaseLine(line = {}) {
     rate: Number(line.rate || activeGoldRate()),
     stoneCharge: Number(line.stoneCharge || line.stnCharge || 0),
     mcPerGm: Number(line.mcPerGm || line.mcGrm || 0),
+    totalMc: Number(line.totalMc || line.makingCharge || 0),
+    _editedField: line._editedField || "",
     taxPct: Number(line.taxPct || 0),
     cessPct: Number(line.cessPct || line.cessPerc || 0)
   };
@@ -1125,12 +1529,13 @@ function normalizeDirectPurchaseLine(line = {}) {
 function calculateDirectPurchaseLine(line = {}) {
   const net = Math.max(0, Number(line.gross || 0) - Number(line.stone || 0));
   const metalValue = net * Number(line.rate || 0);
-  const totalMc = net * Number(line.mcPerGm || 0);
+  const manualMc = resolveMakingChargePair(line, net, line.rate, 0, "direct");
+  const totalMc = manualMc.makingCharge;
   const taxable = Math.max(0, metalValue + Number(line.stoneCharge || 0) + totalMc);
   const tax = taxable * (Number(line.taxPct || 0) / 100);
   const cessAmount = taxable * (Number(line.cessPct || 0) / 100);
   const amount = Math.round(taxable + tax + cessAmount);
-  return { ...line, net, metalValue, totalMc, tax, cessAmount, amount, itemTotal: amount };
+  return { ...line, mcPerGm: manualMc.mcPerGm, net, metalValue, totalMc, tax, cessAmount, amount, itemTotal: amount };
 }
 
 function normalizeDiamondPurchaseReturnLine(line = {}) {
@@ -1163,7 +1568,7 @@ function calculateDiamondPurchaseReturnLine(line = {}) {
   return { ...line, netWeight, goldAmount, stoneAmount, diamondAmount, purchaseMaking, total, amount: total, salesAmt: total };
 }
 
-function normalizeDmdWholesaleLine(line = {}) {
+function normalizeDmdWholesaleLine(line = {}, options = {}) {
   const normalized = {
     id: line.id || crypto.randomUUID(),
     itemId: line.itemId || line.item || "",
@@ -1183,10 +1588,10 @@ function normalizeDmdWholesaleLine(line = {}) {
     purMc: Number(line.purMc || 0),
     salesMc: Number(line.salesMc || 0)
   };
-  return calculateDmdWholesaleLine(normalized);
+  return calculateDmdWholesaleLine(normalized, options);
 }
 
-function calculateDmdWholesaleLine(line = {}) {
+function calculateDmdWholesaleLine(line = {}, options = {}) {
   const netWeight = Math.max(0, Number(line.gross || 0) - Number(line.stone || 0));
   const goldBasis = line.salesType === "Nos" ? Number(line.nos || 0) : netWeight;
   const goldAmount = goldBasis * Number(line.goldRate || 0);
@@ -1195,6 +1600,10 @@ function calculateDmdWholesaleLine(line = {}) {
   const diamondAmount = Number(line.dmdWgt || 0) * Number(line.stnSPrice || 0);
   const purchaseMaking = netWeight * Number(line.purMc || 0);
   const salesMaking = netWeight * Number(line.salesMc || 0);
+  if (options.returnMode) {
+    const total = Math.round(goldAmount + vaAmount + stoneAmount + diamondAmount + purchaseMaking);
+    return { ...line, netWeight, goldAmount, vaAmount, stoneAmount, diamondAmount, purchaseMaking, salesMaking, total, salesAmt: 0, amount: total };
+  }
   const salesAmt = Math.round(goldAmount + vaAmount + stoneAmount + diamondAmount + salesMaking);
   return { ...line, netWeight, goldAmount, vaAmount, stoneAmount, diamondAmount, purchaseMaking, salesMaking, total: salesAmt, salesAmt, amount: salesAmt };
 }
@@ -1248,7 +1657,8 @@ function calculateBillLine(line, sectionKey = "sales", fallbackAmount = 0) {
   const rate = Number(line.rate || 0);
   const metalValue = net * rate;
   const makingChargeWeight = calculateMakingChargeWeight(net, line.va, sectionKey);
-  const makingCharge = calculateMakingChargeAmount(makingChargeWeight, rate);
+  const manualMc = resolveMakingChargePair(line, net, rate, makingChargeWeight, sectionKey);
+  const makingCharge = manualMc.makingCharge;
   const vaAmount = makingCharge;
   const vaAfterDiscount = Math.max(0, vaAmount - (vaAmount * (Number(line.vaDiscountPct || 0) / 100)));
   const rateLess = (sectionKey === "exchange" || sectionKey === "purchase") ? metalValue * (Number(line.rateLessPct || 0) / 100) : 0;
@@ -1265,6 +1675,7 @@ function calculateBillLine(line, sectionKey = "sales", fallbackAmount = 0) {
     net,
     metalValue,
     makingChargeWeight,
+    mcPerGm: manualMc.mcPerGm,
     vaAmount,
     vaAfterDiscount,
     makingCharge,
@@ -1282,7 +1693,44 @@ function calculateMakingChargeWeight(netWeight, vaPercent, sectionKey = "sales")
 }
 
 function calculateMakingChargeAmount(makingChargeWeight, rate) {
-  return Number(makingChargeWeight || 0) * Number(rate || 0);
+  return Number((Number(makingChargeWeight || 0) * Number(rate || 0)).toFixed(2));
+}
+
+function resolveMakingChargePair(line, netWeight, rate, makingChargeWeight, sectionKey = "sales") {
+  if (sectionKey === "exchange" || sectionKey === "purchase") return { mcPerGm: 0, makingCharge: 0 };
+  const net = Number(netWeight || 0);
+  if (["sales", "order", "return"].includes(sectionKey)) {
+    const makingCharge = calculateMakingChargeAmount(makingChargeWeight, rate);
+    return {
+      mcPerGm: net > 0 ? makingCharge / net : 0,
+      makingCharge
+    };
+  }
+  const editedField = line._editedField || "";
+  const enteredMcPerGm = Number(line.mcPerGm || 0);
+  const enteredTotalMc = Number(line.makingCharge || line.totalMc || 0);
+  if (editedField === "makingCharge" || editedField === "totalMc") {
+    return {
+      mcPerGm: net > 0 ? enteredTotalMc / net : enteredMcPerGm,
+      makingCharge: enteredTotalMc
+    };
+  }
+  if (enteredMcPerGm > 0) {
+    return {
+      mcPerGm: enteredMcPerGm,
+      makingCharge: net * enteredMcPerGm
+    };
+  }
+  if (enteredTotalMc > 0) {
+    return {
+      mcPerGm: net > 0 ? enteredTotalMc / net : 0,
+      makingCharge: enteredTotalMc
+    };
+  }
+  return {
+    mcPerGm: enteredMcPerGm,
+    makingCharge: calculateMakingChargeAmount(makingChargeWeight, rate)
+  };
 }
 
 
@@ -1700,6 +2148,97 @@ function normalizeStock(item) {
   };
 }
 
+const OPENING_STOCK_DESCRIPTIONS = [
+  "Gold Ornaments",
+  "Pure Gold",
+  "Old Gold",
+  "Diamond 18Ct",
+  "Diamond Nos Item",
+  "Diamond Ct",
+  "Silver",
+  "Old Silver",
+  "Other",
+  "Watch",
+  "Stone",
+  "Jeweller",
+  "Smith",
+  "Refiner"
+];
+
+function financialYearOpeningDate() {
+  const now = new Date();
+  const year = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+  return `${year}-04-01`;
+}
+
+function financialYear(dateValue = financialYearOpeningDate()) {
+  const date = new Date(dateValue);
+  const fallback = new Date(financialYearOpeningDate());
+  const safeDate = Number.isNaN(date.getTime()) ? fallback : date;
+  const startYear = safeDate.getMonth() >= 3 ? safeDate.getFullYear() : safeDate.getFullYear() - 1;
+  return `${startYear}-${startYear + 1}`;
+}
+
+function normalizeOpeningStockLine(line = {}) {
+  const weight = Number(line.weight || 0);
+  const stone = Number(line.stone || 0);
+  const netWeight = Number(line.netWeight ?? Math.max(0, weight - stone));
+  const rate = Number(line.rate || 0);
+  const percent = Number(line.percent ?? line.purityPercent ?? 0);
+  const amount = Number(line.amount ?? netWeight * rate);
+  const pureWeight = Number(line.pureWeight ?? (netWeight * percent) / 100);
+  return {
+    id: line.id || crypto.randomUUID(),
+    description: line.description || "",
+    weight,
+    stone,
+    netWeight,
+    rate,
+    amount,
+    percent,
+    pureWeight,
+    active: line.active !== false
+  };
+}
+
+function normalizeOpeningStockEntry(record = {}) {
+  const openingDate = record.openingDate || financialYearOpeningDate();
+  const existing = new Map((record.lines || []).map((line) => [line.description, line]));
+  return {
+    id: record.id || crypto.randomUUID(),
+    openingDate,
+    financialYear: record.financialYear || financialYear(openingDate),
+    lines: OPENING_STOCK_DESCRIPTIONS.map((description) => normalizeOpeningStockLine({ description, ...(existing.get(description) || {}) }))
+  };
+}
+
+function defaultOpeningStockEntry(date = financialYearOpeningDate()) {
+  return normalizeOpeningStockEntry({ openingDate: date });
+}
+
+function openingStockTotals(record = {}) {
+  const lines = (record.lines || []).map(normalizeOpeningStockLine);
+  return {
+    weight: sumField(lines, "weight"),
+    stone: sumField(lines, "stone"),
+    netWeight: sumField(lines, "netWeight"),
+    amount: sumField(lines, "amount"),
+    pureWeight: sumField(lines, "pureWeight")
+  };
+}
+
+function recalculateOpeningStockLine(line = {}) {
+  const next = { ...line };
+  next.weight = Number(next.weight || 0);
+  next.stone = Number(next.stone || 0);
+  next.netWeight = Math.max(0, next.weight - next.stone);
+  next.rate = Number(next.rate || 0);
+  next.percent = Number(next.percent || 0);
+  next.amount = next.netWeight * next.rate;
+  next.pureWeight = (next.netWeight * next.percent) / 100;
+  return normalizeOpeningStockLine(next);
+}
+
 function defaultStockAdjustmentLine() {
   return normalizeStockAdjustmentLine({
     type: "Barcode Only",
@@ -1954,6 +2493,121 @@ function sampleFinancials(record = {}) {
   };
 }
 
+function defaultPolishingLine() {
+  return normalizePolishingLine({
+    qty: 1,
+    gross: 0,
+    stone: 0
+  });
+}
+
+function normalizePolishingLine(line = {}) {
+  const qty = Number(line.qty ?? line.nos ?? 1);
+  const gross = Number(line.gross ?? line.grossWeight ?? 0);
+  const stone = Number(line.stone ?? line.stoneWeight ?? 0);
+  const net = Math.max(0, Number(line.net ?? line.netWeight ?? gross - stone));
+  return {
+    id: line.id || crypto.randomUUID(),
+    itemId: line.itemId || line.idCode || line.itemCode || "",
+    barcode: line.barcode || "",
+    itemName: line.itemName || "",
+    qty,
+    gross,
+    stone,
+    net,
+    active: line.active !== false
+  };
+}
+
+function defaultPolishingStoneLine() {
+  return normalizePolishingStoneLine({
+    ct: "Cnt",
+    pcs: 0,
+    purchaseRate: 0,
+    sellingRate: 0
+  });
+}
+
+function normalizePolishingStoneLine(line = {}) {
+  const caratCent = Number(line.caratCent ?? line.carat ?? 0);
+  const pcs = Number(line.pcs ?? 0);
+  const purchaseRate = Number(line.purchaseRate ?? line.pRate ?? 0);
+  const sellingRate = Number(line.sellingRate ?? line.sRate ?? 0);
+  const computedAmount = (caratCent > 0 ? caratCent : pcs) * sellingRate;
+  return {
+    id: line.id || crypto.randomUUID(),
+    code: line.code || line.iCode || "",
+    barcode: line.barcode || "",
+    colorType: line.colorType || "",
+    colorScale: line.colorScale || "",
+    shape: line.shape || "",
+    cut: line.cut || "",
+    clarity: line.clarity || "",
+    sieveSize: line.sieveSize || line.seiveSize || "",
+    caratCent,
+    ct: line.ct || "Cnt",
+    pcs,
+    purchaseRate,
+    sellingRate,
+    amount: Number(line.amount ?? computedAmount),
+    active: line.active !== false
+  };
+}
+
+function defaultPolishingEntry() {
+  const source = state?.polishingEntries || [];
+  return normalizePolishingEntry({
+    entryNo: `PL${String((source.length || 0) + 1).padStart(5, "0")}`,
+    refNo: "",
+    date: new Date().toLocaleDateString("en-GB"),
+    time: nowTime(),
+    hasParty: false,
+    partyName: "",
+    preparedBy: state?.staffs?.[0]?.name || seed.staffs[0]?.name || "",
+    remarks: "",
+    lines: [],
+    stones: []
+  });
+}
+
+function normalizePolishingEntry(record = {}) {
+  const lines = (record.lines || []).map(normalizePolishingLine);
+  const stones = (record.stones || record.stoneLines || []).map(normalizePolishingStoneLine);
+  const totals = polishingFinancials({ lines, stones });
+  return {
+    id: record.id || crypto.randomUUID(),
+    entryNo: record.entryNo || "PL00001",
+    refNo: record.refNo || "",
+    date: record.date || new Date().toLocaleDateString("en-GB"),
+    time: record.time || nowTime(),
+    hasParty: Boolean(record.hasParty),
+    partyName: record.partyName || "",
+    preparedBy: record.preparedBy || state?.staffs?.[0]?.name || seed.staffs[0]?.name || "",
+    remarks: record.remarks || "",
+    totalQty: totals.qty,
+    totalGross: totals.gross,
+    totalStone: totals.stone,
+    totalNet: totals.net,
+    stoneAmount: totals.stoneAmount,
+    totalAmount: totals.totalAmount,
+    lines,
+    stones
+  };
+}
+
+function polishingFinancials(record = {}) {
+  const lines = (record.lines || []).map(normalizePolishingLine).filter((line) => line.active !== false);
+  const stones = (record.stones || []).map(normalizePolishingStoneLine).filter((line) => line.active !== false);
+  return {
+    qty: sumField(lines, "qty"),
+    gross: sumField(lines, "gross"),
+    stone: sumField(lines, "stone"),
+    net: sumField(lines, "net"),
+    stoneAmount: sumField(stones, "amount"),
+    totalAmount: sumField(stones, "amount")
+  };
+}
+
 function defaultServiceLine() {
   return normalizeServiceLine({
     nos: 0,
@@ -2138,6 +2792,15 @@ function refineryPendingOptions() {
 
 function selectedRefineryIssue(issueId) {
   return (state?.refineryIssues || []).find((issue) => issue.id === issueId || issue.entryNo === issueId) || null;
+}
+
+function selectedRefineryReturn(issueId) {
+  const issue = selectedRefineryIssue(issueId);
+  return (state?.refineryReturns || []).find((record) =>
+    record.pendingIssueId === issueId ||
+    record.pendingIssueId === issue?.id ||
+    record.pendingIssueId === issue?.entryNo
+  ) || null;
 }
 
 function defaultRefineryReturnLine(source = {}) {
@@ -2946,10 +3609,11 @@ function sidebar() {
   const nav = ["Dashboard", "Schemes", "Reports"];
   const salesItems = ["Sales Invoice", "Sales Return", "DMD Return/DMD OP", "DMD Sales WholeSales", "Sales Order", "Additional Order Advance", "Order Advance Refund"];
   const purchaseItems = ["Purchase Invoice", "Purchase Return", "Diamond Purchase", "Diamond Purchase Return", "Direct Purchase", "Direct Purchase Return", "DMD Stone Purchase"];
-  const stockItems = ["Stock Register", "Barcode Entry", "Opening Stock Entry", "Stock Adjustments", "Item Transfer", "Gold Deposit", "Gold Withdrawal"];
+  const stockItems = STOCK_ITEMS;
   const workItems = WORK_ORDER_ITEMS;
   const accountItems = ["Account Ledger", "Cash Receipt", "Cash Payment", "Bank Deposit", "Bank Withdrawal", "Journal Voucher", "PDC Transactions", "Direct Entry", "Expense Entry", "Bill Wise Collection", "Bill Wise Payment", "Discount in Credit Note", "Discount in Debit Note", "Custom Voucher"];
   const managementItems = ["Customers", "Suppliers", "Smiths", "Refiners", "Employees", "Item Category", "Miscellaneous", "Item Creation", "Account Creation"];
+  const isGroupOpen = (name) => expandedNavGroups.has(name);
   return `
     <aside class="sidebar">
       <div class="brand">
@@ -2961,37 +3625,37 @@ function sidebar() {
       </div>
       <nav>
         <button class="nav ${active === "Dashboard" ? "active" : ""}" data-nav="Dashboard">${icon("Dashboard")}<span>Dashboard</span></button>
-        <div class="nav-group ${active === "Sales" ? "open" : ""}">
+        <div class="nav-group ${isGroupOpen("Sales") ? "open" : ""}">
           <button class="nav ${active === "Sales" ? "active" : ""}" data-nav="Sales">${icon("Billing")}<span>Sales</span><span class="chevron">⌄</span></button>
           <div class="subnav">
             ${salesItems.map((item) => `<button class="subnav-item ${active === "Sales" && salesView === item ? "active" : ""}" data-sales-section="${item}">${item}</button>`).join("")}
           </div>
         </div>
-        <div class="nav-group ${active === "Purchase" ? "open" : ""}">
+        <div class="nav-group ${isGroupOpen("Purchase") ? "open" : ""}">
           <button class="nav ${active === "Purchase" ? "active" : ""}" data-nav="Purchase">${icon("Transactions")}<span>Purchase</span><span class="chevron">⌄</span></button>
           <div class="subnav">
             ${purchaseItems.map((item) => `<button class="subnav-item ${active === "Purchase" && purchaseView === item ? "active" : ""}" data-purchase-section="${item}">${item}</button>`).join("")}
           </div>
         </div>
-        <div class="nav-group ${active === "Stock" ? "open" : ""}">
+        <div class="nav-group ${isGroupOpen("Stock") ? "open" : ""}">
           <button class="nav ${active === "Stock" ? "active" : ""}" data-nav="Stock">${icon("Stock")}<span>Stock</span><span class="chevron">v</span></button>
           <div class="subnav">
             ${stockItems.map((item) => `<button class="subnav-item ${active === "Stock" && stockView === item ? "active" : ""}" data-stock-section="${item}">${item}</button>`).join("")}
           </div>
         </div>
-        <div class="nav-group ${active === "Work Orders" ? "open" : ""}">
+        <div class="nav-group ${isGroupOpen("Work Orders") ? "open" : ""}">
           <button class="nav ${active === "Work Orders" ? "active" : ""}" data-nav="Work Orders">${icon("Work Orders")}<span>Work Orders</span><span class="chevron">v</span></button>
           <div class="subnav">
             ${workItems.map((item) => `<button class="subnav-item ${active === "Work Orders" && workOrderView === item ? "active" : ""}" data-work-section="${item}">${item}</button>`).join("")}
           </div>
         </div>
-        <div class="nav-group ${active === "Accounts" ? "open" : ""}">
+        <div class="nav-group ${isGroupOpen("Accounts") ? "open" : ""}">
           <button class="nav ${active === "Accounts" ? "active" : ""}" data-nav="Accounts">${icon("Accounts")}<span>Accounts</span><span class="chevron">v</span></button>
           <div class="subnav">
             ${accountItems.map((item) => `<button class="subnav-item ${active === "Accounts" && accountView === item ? "active" : ""}" data-account-section="${item}">${item}</button>`).join("")}
           </div>
         </div>
-        <div class="nav-group ${active === "Management" ? "open" : ""}">
+        <div class="nav-group ${isGroupOpen("Management") ? "open" : ""}">
           <button class="nav ${active === "Management" ? "active" : ""}" data-nav="Management">${icon("Management")}<span>Management</span><span class="chevron">⌄</span></button>
           <div class="subnav">
             ${managementItems.map((item) => `<button class="subnav-item ${active === "Management" && managementView === item ? "active" : ""}" data-management="${item}">${item}</button>`).join("")}
@@ -3168,10 +3832,9 @@ function orderAdvanceEntryPanel(type, draft, summary) {
         ${orderAdvanceSelectField(type, "Prepared By", "preparedBy", draft.preparedBy, staffNameOptions())}
         ${isRefund ? "" : orderAdvanceSelectField(type, "Payment Mode", "paymentMode", draft.paymentMode, ["Cash", "Credit", "Bank", "Mixed"])}
         ${isRefund ? "" : orderAdvanceSelectField(type, "Cash/Bank", "cashBank", draft.cashBank, cashBankOptions())}
-        ${isRefund ? orderAdvanceDualField(type, "Refund Amount", "refundAmount", "refundWeight", draft.refundAmount, draft.refundWeight) : ""}
-        ${isRefund ? "" : orderAdvanceDualField(type, "Advance Amount", "advanceAmount", "advanceWeight", draft.advanceAmount, draft.advanceWeight)}
-        ${isRefund ? "" : orderAdvanceDualField(type, "Exchange Amount", "exchangeAmount", "exchangeWeight", draft.exchangeAmount, draft.exchangeWeight)}
-        ${isRefund ? "" : orderAdvanceReadonlyDual("Total Amount", moneyValue(summary.draftTotalAmount), numericValue(summary.draftTotalWeight), "draftTotal")}
+        ${isRefund ? orderAdvanceAmountField(type, "Refund Amount", "refundAmount", draft.refundAmount) : ""}
+        ${isRefund ? "" : orderAdvanceAmountField(type, "Additional Advance", "advanceAmount", draft.advanceAmount)}
+        ${isRefund ? "" : orderAdvanceReadonlyAmount("Entry Total", moneyValue(summary.draftTotalAmount), "draftTotal")}
         <label class="classic-field order-advance-remark"><span>Remark</span><textarea data-order-${type}-field="remark">${draft.remark || ""}</textarea></label>
       </div>
     </div>
@@ -3187,14 +3850,13 @@ function orderAdvanceDetailsPanel(order, summary, type) {
         ${orderAdvanceReadonlyDual("Order No, Ref No", order?.entryNo || "", order?.refNo || "")}
         ${orderAdvanceReadonlyDual("Ord Date, Delvry Date", order?.date || "", order?.dueDate || "")}
         <label class="classic-field order-advance-remark"><span>Party Details</span><textarea readonly>${orderPartyDetails(order)}</textarea></label>
-        ${orderAdvanceReadonlyDual("Prepared By", order?.staffName || order?.preparedBy || "", "")}
-        ${orderAdvanceReadonlyDual("Approximate Amt", moneyValue(summary.approximate), numericValue(summary.approximateWeight))}
-        ${orderAdvanceReadonlyDual("Advance Amount", moneyValue(summary.baseAdvance), numericValue(summary.baseAdvanceWeight))}
-        ${orderAdvanceReadonlyDual("Exchange Amount", moneyValue(summary.exchangeTotal), numericValue(summary.exchangeWeight))}
-        ${orderAdvanceReadonlyDual("Return Amount", moneyValue(summary.returnTotal), numericValue(summary.returnWeight))}
-        ${orderAdvanceReadonlyDual("Additional Advance", moneyValue(summary.additionalAdvance), numericValue(summary.additionalAdvanceWeight))}
-        ${orderAdvanceReadonlyDual("Advance Refund", moneyValue(summary.advanceRefund), numericValue(summary.advanceRefundWeight))}
-        ${isRefund ? orderAdvanceReadonlyDual("Total Advance", moneyValue(summary.netAdvance), numericValue(summary.netAdvanceWeight), "emphasis") : orderAdvanceReadonlyDual("Balance Amount", moneyValue(summary.balance), numericValue(summary.balanceWeight), "emphasis")}
+        ${orderAdvanceReadonlyStaff("Prepared By", order?.staffName || order?.preparedBy || "")}
+        ${orderAdvanceReadonlyAmount("Quotation Amount", moneyValue(summary.approximate))}
+        ${orderAdvanceReadonlyAmount("Original Advance", moneyValue(summary.baseAdvance))}
+        ${orderAdvanceReadonlyAmount("Additional Advance", moneyValue(summary.additionalAdvance))}
+        ${orderAdvanceReadonlyAmount("Advance Refund", moneyValue(summary.advanceRefund))}
+        ${orderAdvanceReadonlyAmount("Available Advance", moneyValue(summary.netAdvance), "emphasis")}
+        ${orderAdvanceReadonlyAmount("Quotation Less Advance", moneyValue(summary.quoteBalance))}
         <label class="classic-field order-advance-remark"><span>Remark</span><textarea readonly>${latestOrderRemark(order, type)}</textarea></label>
       </div>
     </div>
@@ -3207,6 +3869,14 @@ function orderAdvanceDualField(type, label, leftField, rightField, leftValue, ri
       <input data-order-${type}-field="${leftField}" inputmode="${inputMode}" value="${inputMode === "decimal" ? numericValue(leftValue, 3) : leftValue || ""}" />
       <input data-order-${type}-field="${rightField}" inputmode="${inputMode}" value="${inputMode === "decimal" ? numericValue(rightValue, 3) : rightValue || ""}" />
     </span></label>
+  `;
+}
+
+function orderAdvanceAmountField(type, label, field, value, inputMode = "decimal") {
+  return `
+    <label class="classic-field"><span>${label}</span>
+      <input data-order-${type}-field="${field}" inputmode="${inputMode}" value="${inputMode === "decimal" ? moneyValue(value) : value || ""}" />
+    </label>
   `;
 }
 
@@ -3234,9 +3904,28 @@ function orderAdvanceReadonlyDual(label, leftValue, rightValue, variant = "") {
   `;
 }
 
+function orderAdvanceReadonlyAmount(label, value, variant = "") {
+  const live = variant === "draftTotal" ? ` data-order-live="draftTotalAmount"` : "";
+  return `
+    <label class="classic-field readonly-dual ${variant}"><span>${label}</span>
+      <input${live} value="${value ?? ""}" readonly />
+    </label>
+  `;
+}
+
+function orderAdvanceReadonlyStaff(label, value) {
+  return `<label class="classic-field"><span>${label}</span>${readonlyEmployeeDropdown(value)}</label>`;
+}
+
 function staffNameOptions() {
   const names = (state.staffs || []).map((staff) => staff.name).filter(Boolean);
   return names.length ? names : ["Goldland Staff"];
+}
+
+function agentNameOptions(includeBlank = true) {
+  const agents = (state.miscellaneous?.agents || seed.miscellaneous?.agents || []).map((agent) => agent.name).filter(Boolean);
+  const staff = staffNameOptions();
+  return [...new Set([...(includeBlank ? [""] : []), ...agents, ...staff])];
 }
 
 function cashBankOptions() {
@@ -3256,54 +3945,43 @@ function orderAdvanceSummary(order, draft = {}, draftType = "advance") {
   if (!order) return emptyOrderAdvanceSummary(draft, draftType);
   const financials = billFinancials(order);
   const baseAdvance = Number(order.paymentBreakup?.cash || 0) + Number(order.adjustments?.card || 0);
-  const baseAdvanceWeight = 0;
   const advances = orderAdvanceRecords(order, "advance");
   const refunds = orderAdvanceRecords(order, "refund");
   const savedAdditional = advances.reduce((sum, item) => sum + Number(item.totalAmount || 0), 0);
-  const savedAdditionalWeight = advances.reduce((sum, item) => sum + Number(item.totalWeight || 0), 0);
   const savedRefund = refunds.reduce((sum, item) => sum + Number(item.refundAmount || 0), 0);
-  const savedRefundWeight = refunds.reduce((sum, item) => sum + Number(item.refundWeight || 0), 0);
-  const draftAdvance = draftType === "advance" ? Number(draft.advanceAmount || 0) + Number(draft.exchangeAmount || 0) : 0;
-  const draftAdvanceWeight = draftType === "advance" ? Number(draft.advanceWeight || 0) + Number(draft.exchangeWeight || 0) : 0;
+  const draftAdvance = draftType === "advance" ? Number(draft.advanceAmount || 0) : 0;
   const draftRefund = draftType === "refund" ? Number(draft.refundAmount || 0) : 0;
-  const draftRefundWeight = draftType === "refund" ? Number(draft.refundWeight || 0) : 0;
-  const exchangeWeight = sumField(order.sections?.exchange || [], "net");
-  const returnWeight = sumField(order.sections?.return || [], "net");
   const approximateWeight = sumField(order.sections?.sales || [], "net");
   const additionalAdvance = savedAdditional + draftAdvance;
-  const additionalAdvanceWeight = savedAdditionalWeight + draftAdvanceWeight;
   const advanceRefund = savedRefund + draftRefund;
-  const advanceRefundWeight = savedRefundWeight + draftRefundWeight;
   const netAdvance = baseAdvance + additionalAdvance - advanceRefund;
-  const netAdvanceWeight = baseAdvanceWeight + additionalAdvanceWeight - advanceRefundWeight;
-  const balance = financials.invoiceTotal - netAdvance;
-  const balanceWeight = approximateWeight - exchangeWeight - returnWeight - netAdvanceWeight;
+  const quoteBalance = financials.invoiceTotal - netAdvance;
   return {
     approximate: financials.invoiceTotal,
     approximateWeight,
     baseAdvance,
-    baseAdvanceWeight,
+    baseAdvanceWeight: 0,
     exchangeTotal: financials.exchangeTotal,
-    exchangeWeight,
+    exchangeWeight: 0,
     returnTotal: financials.returnTotal,
-    returnWeight,
+    returnWeight: 0,
     additionalAdvance,
-    additionalAdvanceWeight,
+    additionalAdvanceWeight: 0,
     advanceRefund,
-    advanceRefundWeight,
+    advanceRefundWeight: 0,
     netAdvance,
-    netAdvanceWeight,
-    balance,
-    balanceWeight,
+    netAdvanceWeight: 0,
+    balance: netAdvance,
+    quoteBalance,
+    balanceWeight: 0,
     draftTotalAmount: draftAdvance,
-    draftTotalWeight: draftAdvanceWeight
+    draftTotalWeight: 0
   };
 }
 
 function emptyOrderAdvanceSummary(draft = {}, draftType = "advance") {
-  const draftTotalAmount = draftType === "advance" ? Number(draft.advanceAmount || 0) + Number(draft.exchangeAmount || 0) : 0;
-  const draftTotalWeight = draftType === "advance" ? Number(draft.advanceWeight || 0) + Number(draft.exchangeWeight || 0) : 0;
-  return { approximate: 0, approximateWeight: 0, baseAdvance: 0, baseAdvanceWeight: 0, exchangeTotal: 0, exchangeWeight: 0, returnTotal: 0, returnWeight: 0, additionalAdvance: draftTotalAmount, additionalAdvanceWeight: draftTotalWeight, advanceRefund: Number(draft.refundAmount || 0), advanceRefundWeight: Number(draft.refundWeight || 0), netAdvance: 0, netAdvanceWeight: 0, balance: 0, balanceWeight: 0, draftTotalAmount, draftTotalWeight };
+  const draftTotalAmount = draftType === "advance" ? Number(draft.advanceAmount || 0) : 0;
+  return { approximate: 0, approximateWeight: 0, baseAdvance: 0, baseAdvanceWeight: 0, exchangeTotal: 0, exchangeWeight: 0, returnTotal: 0, returnWeight: 0, additionalAdvance: draftTotalAmount, additionalAdvanceWeight: 0, advanceRefund: Number(draft.refundAmount || 0), advanceRefundWeight: 0, netAdvance: 0, netAdvanceWeight: 0, balance: 0, quoteBalance: 0, balanceWeight: 0, draftTotalAmount, draftTotalWeight: 0 };
 }
 
 function orderAdvanceRecords(order, type) {
@@ -3488,7 +4166,7 @@ function salesReturn() {
         <strong class="classic-rate">Gold Rate ${money(latestRates().find((rateItem) => rateItem.type === "Gold" && rateItem.grade === "22K")?.price || 0)}</strong>
         <strong class="classic-rate small-rate">Silver Rate ${money(latestRates().find((rateItem) => rateItem.type === "Silver")?.price || 0)}</strong>
       </div>
-      ${transactionHeader("Return", bill, { partyLabel: "Customer", nameLabel: "Customer Name", preparedLabel: "Prepared By", staffSelect: true })}
+      ${transactionHeader("Return", bill, { headerClass: "sales-return-header", partyLabel: "Customer", nameLabel: "Customer Name", preparedLabel: "Prepared By", staffSelect: true })}
       ${classicTransactionTable("sales-return", returnEntryColumns(), returnEntryRow(defaultEntryLine("return")), returnColumns(), rows.map(returnRow))}
       ${returnTotals(totals)}
     </section>
@@ -4017,7 +4695,7 @@ function transactions() {
       actions: [
         ["Barcode Entry", "Ctrl+F4", "open-stock"],
         ["Stock Adjustments", "", "open-stock-adjustment"],
-        ["Opening Stock Account Entry", "", "open-stock"]
+        ["Opening Stock Account Entry", "", "open-opening-stock"]
       ]
     },
     {
@@ -4056,8 +4734,8 @@ function transactions() {
         ["Sample Issue", "", "open-work-sample"],
         ["Sample Return", "", "open-work-sample"],
         ["Polishing", "", "open-work-polishing"],
-        ["New Service / Job", "", "open-work-service"],
-        ["Close Service / Job", "", "open-work-service"]
+        ["New Service / Job", "", "open-service-new"],
+        ["Close Service / Job", "", "open-service-close"]
       ]
     },
     {
@@ -4132,15 +4810,32 @@ function transactionGroup(group) {
 }
 
 function stock() {
-  if (stockView === "Stock Adjustments") return stockAdjustmentScreen();
-  if (stockView === "Gold Deposit") return goldDepositScreen("Deposit");
-  if (stockView === "Gold Withdrawal") return goldDepositScreen("Withdrawal");
-  if (stockView !== "Stock Register") return stockActionPage(stockView);
+  const activeScreen = stockView === "Stock Adjustments"
+    ? stockAdjustmentScreen()
+    : stockView === OPENING_STOCK_VIEW
+      ? openingStockScreen()
+      : stockView === "Gold Deposit"
+        ? goldDepositScreen("Deposit")
+        : stockView === "Gold Withdrawal"
+          ? goldDepositScreen("Withdrawal")
+          : stockView !== "Stock Register"
+            ? stockActionPage(stockView)
+            : stockRegisterScreen();
+  return `
+    ${moduleSwitcher("Stock", STOCK_ITEMS, stockView, "data-stock-section")}
+    ${activeScreen}
+  `;
+}
+
+function stockRegisterScreen() {
   return `
     <section class="panel">
       <div class="panel-head">
         <h2>Manual Stock Register</h2>
-        <button class="secondary" data-action="open-stock">Add New Item</button>
+        <div class="panel-actions">
+          <button class="secondary" data-action="open-opening-stock">Opening Stock</button>
+          <button class="secondary" data-action="open-stock">Add New Item</button>
+        </div>
       </div>
       ${table(["Item Name", "Purity", "HUID/BIS", "Qty", "Opening", "Addition", "Deduction", "Closing", "Gross", "Status"], state.stock.map((s) => [s.item, s.purity, s.huid, s.qty, grams(s.opening), grams(s.addition), grams(s.deduction), grams(s.closing), grams(s.gross), s.status]))}
     </section>
@@ -4150,7 +4845,7 @@ function stock() {
       ${workflow("Refiner", "Melting issue, return and wastage tracking", "open-work-refiner")}
       ${workflow("Polishing", "Issue, receive and polishing balance", "open-work-polishing")}
       ${workflow("Sample", "Sample issue and sample return", "open-work-sample")}
-      ${workflow("Service / Job", "New service, close service and payment", "open-work-service")}
+      ${workflow("Service / Job", "New service, close service and payment", "open-service-new")}
       ${workflow("Transfers", "Smith, jeweller and item transfer", "open-work-transfer")}
       ${workflow("Stock Adjustment", "Addition, deduction and reconciliation", "open-stock-adjustment")}
     </section>
@@ -4189,10 +4884,20 @@ function management() {
   `;
 }
 
+function openOpeningStockEntry() {
+  active = "Stock";
+  expandedNavGroups.add("Stock");
+  stockView = OPENING_STOCK_VIEW;
+  openingStockDraft = normalizeOpeningStockEntry(
+    openingStockDraft || state.openingStockEntries?.[0] || defaultOpeningStockEntry()
+  );
+  render();
+}
+
 function stockActionPage(view) {
   const configs = {
     "Barcode Entry": ["Create or print barcode records for stock items.", "open-stock"],
-    "Opening Stock Entry": ["Enter opening stock balances for the financial year.", "open-stock"],
+    [OPENING_STOCK_VIEW]: ["Enter opening stock balances for the financial year.", "open-opening-stock"],
     "Stock Adjustments": ["Approve additions, deductions and reconciliation corrections.", "open-stock-adjustment"],
     "Item Transfer": ["Move stock between internal item groups.", "open-work-transfer"],
     "Gold Deposit": ["Record gold deposited into the shop account.", "open-transaction-gold-deposit"],
@@ -4200,6 +4905,50 @@ function stockActionPage(view) {
   };
   const [note, action] = configs[view] || ["Open stock transaction.", "open-stock"];
   return transactionLauncherPage(view, note, [["Open Window", action], ["Back To Stock Register", "Stock Register", "data-stock-section"]]);
+}
+
+function openingStockScreen() {
+  state.openingStockEntries ||= [];
+  openingStockDraft = normalizeOpeningStockEntry(openingStockDraft || state.openingStockEntries[0] || defaultOpeningStockEntry());
+  const totals = openingStockTotals(openingStockDraft);
+  return `
+    <section class="classic-billing-shell clean-entry-shell panel opening-stock-shell">
+      <div class="opening-stock-title">Opening Stock</div>
+      <div class="opening-stock-controls">
+        <label class="classic-field inline-date-field"><span>Opening Date</span><input class="classic-input" type="date" data-opening-stock-date value="${toDateInputValue(openingStockDraft.openingDate)}" /></label>
+        <button class="secondary compact-button" data-action="show-opening-stock">Show</button>
+      </div>
+      <div class="opening-stock-grid-wrap">
+        <table class="opening-stock-grid">
+          <thead>
+            <tr>${["Description", "Weight", "Stone", "Net Weight", "Rate", "Amount", "%", "Pure Wght"].map((head) => `<th>${head}</th>`).join("")}</tr>
+          </thead>
+          <tbody>${openingStockDraft.lines.map(openingStockRow).join("")}</tbody>
+        </table>
+      </div>
+      <div class="opening-stock-footer">
+        <input class="classic-input opening-stock-code" value="--- --- ---" readonly />
+        <input class="classic-input opening-stock-total" value="${numericValue(totals.pureWeight, 3)}" readonly />
+        <button class="classic-ok-button" data-action="save-opening-stock">OK</button>
+      </div>
+    </section>
+  `;
+}
+
+function openingStockRow(line, index) {
+  const selected = index === 0 ? "selected" : "";
+  return `
+    <tr class="${selected}">
+      <td class="description-cell">${line.description}</td>
+      <td><input data-opening-stock-row="${index}" data-opening-stock-field="weight" value="${numericValue(line.weight, 3)}" inputmode="decimal" /></td>
+      <td><input data-opening-stock-row="${index}" data-opening-stock-field="stone" value="${numericValue(line.stone, 3)}" inputmode="decimal" /></td>
+      <td><input class="readonly-cell" value="${numericValue(line.netWeight, 3)}" readonly /></td>
+      <td><input data-opening-stock-row="${index}" data-opening-stock-field="rate" value="${numericValue(line.rate, 2)}" inputmode="decimal" /></td>
+      <td><input class="readonly-cell" value="${moneyValue(line.amount)}" readonly /></td>
+      <td><input data-opening-stock-row="${index}" data-opening-stock-field="percent" value="${numericValue(line.percent, 2)}" inputmode="decimal" /></td>
+      <td><input class="readonly-cell" value="${numericValue(line.pureWeight, 3)}" readonly /></td>
+    </tr>
+  `;
 }
 
 function stockAdjustmentScreen() {
@@ -4404,6 +5153,8 @@ function workOrders() {
   if (workOrderView === "Complimentary Item") return complimentaryModule();
   if (workOrderView === "Refining") return refineryWorkOrders();
   if (workOrderView === "Sample") return sampleWorkOrders();
+  if (workOrderView === "Polishing") return polishingScreen();
+  if (workOrderView === "Service / Job") return serviceWorkOrders();
   if (workOrderView === "Smith" || workOrderView === "Jeweller") return smithWorkOrders();
   const keyMap = {
     Smith: "smith",
@@ -4442,6 +5193,131 @@ function workOrders() {
       <div class="panel-head"><h2>${config.workflow} Register</h2></div>
       ${table(["Ref No", "Date", "Workflow", "Action", "Party", "Item", "Qty", "Gross", "Issue", "Receive", "Balance", "Status"], state.workLogs.filter((w) => w.workflow === config.workflow || config.workflow === "Service / Job").map((w) => [w.refNo, w.date, w.workflow, w.action, w.party, w.item, w.qty, grams(w.gross), grams(w.issue), grams(w.receive), grams(w.balance), w.status]))}
     </section>
+  `;
+}
+
+function serviceWorkOrders() {
+  const tabs = ["New Service / Job", "Close Service / Job"];
+  if (!tabs.includes(serviceWorkView)) serviceWorkView = tabs[0];
+  const type = serviceWorkView === "Close Service / Job" ? "Close" : "New";
+  return `
+    ${moduleSwitcher("Work Orders", WORK_ORDER_ITEMS, workOrderView, "data-work-section")}
+    <section class="panel management-hero work-smith-hero service-hero">
+      <div>
+        <p class="eyebrow">Service / job work</p>
+        <h2>${serviceWorkView}</h2>
+        <p>Register service jobs with item complaints, due details, advance and final balance.</p>
+      </div>
+      <div class="module-tabs compact-tabs">
+        ${tabs.map((tab) => `<button class="module-tab ${serviceWorkView === tab ? "active" : ""}" data-service-view="${tab}">${tab}</button>`).join("")}
+      </div>
+    </section>
+    ${serviceJobScreen(type)}
+  `;
+}
+
+function serviceJobScreen(type = "New") {
+  const isClose = type === "Close";
+  state.serviceJobs ||= [];
+  state.serviceClosures ||= [];
+  if (isClose) {
+    serviceCloseDraft = normalizeServiceJob(serviceCloseDraft || state.serviceClosures[0] || defaultServiceJob("Close"), "Close");
+  } else {
+    serviceNewDraft = normalizeServiceJob(serviceNewDraft || state.serviceJobs[0] || defaultServiceJob("New"), "New");
+  }
+  const record = isClose ? serviceCloseDraft : serviceNewDraft;
+  const totals = serviceFinancials(record);
+  const prefix = isClose ? "service-close" : "service-new";
+  return `
+    <section class="classic-billing-shell clean-entry-shell panel service-job-shell">
+      <div class="entry-actions body-toolbar">
+        ${toolbarButton("New", `refresh-${prefix}`)}
+        ${toolbarButton("Save", `save-${prefix}`)}
+        ${toolbarButton("Refresh", `refresh-${prefix}`)}
+        ${toolbarButton("Search", "find-service-job")}
+        ${toolbarButton("Delete", `delete-${prefix}`)}
+        ${toolbarButton("Print", "print-service-job")}
+        ${toolbarButton("Previous", "previous-bill")}
+        ${toolbarButton("Next", "next-bill")}
+        ${toolbarButton("Close", "close-work-orders")}
+      </div>
+      ${serviceJobHeader(record)}
+      ${classicTransactionTable("service-job-entry", serviceEntryColumns(), serviceEntryRow(defaultServiceLine()), serviceColumns(), record.lines.map((line, index) => serviceRow(line, index)))}
+      ${serviceBottom(record, totals)}
+    </section>
+  `;
+}
+
+function serviceJobHeader(record) {
+  return `
+    <div class="transaction-entry-header sample-header service-header">
+      <div class="classic-fields left">
+        <label class="classic-field split-field"><span>Entry No, Ref No</span><span class="field-pair"><input data-service-field="entryNo" value="${record.entryNo}" /><input data-service-field="refNo" value="${record.refNo}" /></span></label>
+        <label class="classic-field split-field"><span>Date, Time</span><span class="field-pair"><input type="date" data-service-field="date" value="${toDateInputValue(record.date)}" /><input data-service-field="time" value="${record.time}" /></span></label>
+        <label class="classic-field split-field"><span>Due Days, Date</span><span class="field-pair"><input inputmode="numeric" data-service-field="dueDays" value="${record.dueDays}" /><input type="date" data-service-field="dueDate" value="${toDateInputValue(record.dueDate)}" /></span></label>
+        <label class="classic-field"><span>Sales Man</span>${employeeDropdown("salesMan", record.salesMan, "data-service-field")}</label>
+        <label class="classic-field"><span>Job Status</span><select class="classic-input" data-service-field="jobStatus">${["Pending", "In Progress", "Ready", "Closed", "Cancelled"].map((status) => `<option ${record.jobStatus === status ? "selected" : ""}>${status}</option>`).join("")}</select></label>
+      </div>
+      <div class="classic-fields right">
+        <label class="classic-field"><span>Party Account</span><input data-service-field="partyAccount" value="${record.partyAccount}" /></label>
+        <label class="classic-field"><span>Party Name</span><input data-service-field="partyName" value="${record.partyName}" list="customer-options" /></label>
+        <label class="classic-field"><span>Place</span><input data-service-field="place" value="${record.place}" /></label>
+        <label class="classic-field"><span>Contact No.</span><input data-service-field="contactNo" value="${record.contactNo}" /></label>
+      </div>
+    </div>
+  `;
+}
+
+function serviceEntryColumns() {
+  return ["#", "Item Name", "Description", "Nos", "Gross Wght", "Stone Wght", "Net Weight", "Complaint", "Add"];
+}
+
+function serviceEntryRow(line) {
+  return [
+    "",
+    editCell("itemName", line.itemName),
+    editCell("description", line.description),
+    editCell("nos", line.nos, "numeric"),
+    editCell("gross", numericValue(line.gross), "decimal"),
+    editCell("stone", numericValue(line.stone), "decimal"),
+    autoCell("net", numericValue(line.net), "decimal"),
+    editCell("complaint", line.complaint),
+    `<button class="grid-add-button" data-action="add-service-line">Add</button>`
+  ];
+}
+
+function serviceColumns() {
+  return ["Sl", "X", "Item Name", "Description", "Nos", "Gross Weight", "Stone Weight", "Net Weight", "Complaint"];
+}
+
+function serviceLineInput(index, field, value, mode = "text", extraClass = "") {
+  return `<input class="grid-input ${extraClass}" data-service-line-field="${field}" data-index="${index}" inputmode="${mode}" value="${value ?? ""}" />`;
+}
+
+function serviceRow(line, index) {
+  return [
+    index + 1,
+    `<button class="row-remove" data-action="delete-service-line" data-index="${index}">X</button>`,
+    serviceLineInput(index, "itemName", line.itemName),
+    serviceLineInput(index, "description", line.description),
+    serviceLineInput(index, "nos", line.nos, "numeric"),
+    serviceLineInput(index, "gross", numericValue(line.gross), "decimal"),
+    serviceLineInput(index, "stone", numericValue(line.stone), "decimal"),
+    serviceLineInput(index, "net", numericValue(line.net), "decimal", "auto-field"),
+    serviceLineInput(index, "complaint", line.complaint)
+  ];
+}
+
+function serviceBottom(record, totals) {
+  return `
+    <div class="service-bottom classic-bottom-grid">
+      <label class="classic-field remarks-wide"><span>Remarks</span><textarea data-service-field="remarks">${record.remarks}</textarea></label>
+      <div class="bill-totals return-bottom service-totals">
+        <label><span>Aprx Amount</span><input data-service-field="approxAmount" inputmode="decimal" value="${moneyValue(totals.approxAmount)}" /></label>
+        <label><span>Advance</span><input data-service-field="advance" inputmode="decimal" value="${moneyValue(totals.advance)}" /></label>
+        <label><span>Balance</span><input class="orange-readout" value="${moneyValue(totals.balance)}" readonly /></label>
+      </div>
+    </div>
   `;
 }
 
@@ -4569,6 +5445,143 @@ function sampleBottom(record, totals, type) {
       <label class="classic-check"><input type="checkbox" ${attr}="showRate" ${record.showRate ? "checked" : ""} /><span>Show Rate</span></label>
       <span></span>
       <label class="sample-total"><span>Total Amount</span><input value="${moneyValue(totals.totalAmount)}" readonly /></label>
+    </div>
+  `;
+}
+
+function polishingScreen() {
+  state.polishingEntries ||= [];
+  polishingDraft = normalizePolishingEntry(polishingDraft || state.polishingEntries[0] || defaultPolishingEntry());
+  const record = polishingDraft;
+  const totals = polishingFinancials(record);
+  return `
+    ${moduleSwitcher("Work Orders", WORK_ORDER_ITEMS, workOrderView, "data-work-section")}
+    <section class="classic-billing-shell clean-entry-shell panel sample-work-shell polishing-work-shell">
+      <div class="entry-actions body-toolbar">
+        ${toolbarButton("Refresh", "refresh-polishing")}
+        ${toolbarButton("Update", "save-polishing")}
+        ${toolbarButton("Edit", "edit-current-bill")}
+        ${toolbarButton("Delete", "delete-polishing")}
+        ${toolbarButton("Print", "print-polishing")}
+        ${toolbarButton("Close", "close-work-orders")}
+      </div>
+      ${polishingHeader(record)}
+      ${classicTransactionTable("polishing-item-entry", polishingEntryColumns(), polishingEntryRow(defaultPolishingLine()), polishingColumns(), record.lines.map(polishingRow))}
+      ${classicTransactionTable("polishing-stone-entry", polishingStoneEntryColumns(), polishingStoneEntryRow(defaultPolishingStoneLine()), polishingStoneColumns(), record.stones.map(polishingStoneRow))}
+      ${polishingBottom(record, totals)}
+    </section>
+  `;
+}
+
+function polishingHeader(record) {
+  const partyOptions = ["", ...(state.parties || []).map((party) => party.name)];
+  return `
+    <div class="transaction-entry-header polishing-header">
+      <div class="classic-fields left">
+        <label class="classic-field split-field"><span>Entry No, Date</span><span class="field-pair"><input data-polishing-field="entryNo" value="${record.entryNo}" /><input type="date" data-polishing-field="date" value="${toDateInputValue(record.date)}" /></span></label>
+        <label class="classic-field split-field"><span>Ref. No, Time</span><span class="field-pair"><input data-polishing-field="refNo" value="${record.refNo}" /><input data-polishing-field="time" value="${record.time}" /></span></label>
+      </div>
+      <div class="classic-fields right">
+        <label class="classic-check inline-check"><input type="checkbox" data-polishing-field="hasParty" ${record.hasParty ? "checked" : ""} /><span>Party Name</span><select data-polishing-field="partyName">${partyOptions.map((option) => `<option ${option === record.partyName ? "selected" : ""}>${option}</option>`).join("")}</select></label>
+        <label class="classic-field split-field"><span>Prepared By</span><span class="field-pair staff-pair"><input class="classic-code" value="${staffCodeForName(record.preparedBy)}" readonly />${employeeDropdown("preparedBy", record.preparedBy, "data-polishing-field")}</span></label>
+      </div>
+    </div>
+  `;
+}
+
+function polishingEntryColumns() {
+  return ["ID", "Barcode", "Item Name", "Qty", "Gross", "Stone", "Net Wght", "Add"];
+}
+
+function polishingEntryRow(line) {
+  return [
+    editCell("itemId", line.itemId),
+    editCell("barcode", line.barcode),
+    editCell("itemName", line.itemName),
+    editCell("qty", numericValue(line.qty, 0), "decimal"),
+    editCell("gross", numericValue(line.gross), "decimal"),
+    editCell("stone", numericValue(line.stone), "decimal"),
+    autoCell("net", numericValue(line.net), "decimal"),
+    `<button class="grid-add-button" data-action="add-polishing-line">+ Add</button>`
+  ];
+}
+
+function polishingColumns() {
+  return ["X", "Sl", "ID", "Barcode", "Item Name", "Qty", "Gross", "Stone", "Net Wght"];
+}
+
+function polishingRow(line, index) {
+  return [
+    `<button class="mini-danger" data-action="delete-polishing-line" data-index="${index}">X</button>`,
+    index + 1,
+    line.itemId || "",
+    line.barcode || "",
+    line.itemName || "",
+    numericValue(line.qty, 0),
+    grams(line.gross),
+    grams(line.stone),
+    grams(line.net)
+  ];
+}
+
+function polishingStoneEntryColumns() {
+  return ["ICo", "Barcode", "Color Type", "Color Scale", "Shape", "Cut", "Clarity", "Seive/Size", "Carat/Cent", "CT", "Pcs", "Purchase Rate", "Selling Rate", "Amount", "Add"];
+}
+
+function polishingStoneEntryRow(line) {
+  return [
+    editCell("code", line.code),
+    editCell("barcode", line.barcode),
+    selectCell("colorType", line.colorType, ["", "White", "Fancy", "Yellow", "Blue", "Pink"]),
+    selectCell("colorScale", line.colorScale, ["", "D", "E", "F", "G", "H", "I"]),
+    selectCell("shape", line.shape, ["", "Round", "Oval", "Pear", "Princess", "Emerald"]),
+    selectCell("cut", line.cut, ["", "Excellent", "Very Good", "Good", "Fair"]),
+    selectCell("clarity", line.clarity, ["", "VVS", "VS", "SI", "I"]),
+    editCell("sieveSize", line.sieveSize),
+    editCell("caratCent", numericValue(line.caratCent), "decimal"),
+    selectCell("ct", line.ct, ["Cnt", "Ct"]),
+    editCell("pcs", numericValue(line.pcs, 0), "decimal"),
+    editCell("purchaseRate", moneyValue(line.purchaseRate), "decimal"),
+    editCell("sellingRate", moneyValue(line.sellingRate), "decimal"),
+    autoCell("amount", moneyValue(line.amount), "decimal"),
+    `<button class="grid-add-button" data-action="add-polishing-stone">+ Add</button>`
+  ];
+}
+
+function polishingStoneColumns() {
+  return ["X", "Sl", "ICo", "Barcode", "Color Type", "Color Scale", "Shape", "Cut", "Clarity", "Seive / Size", "Carat / Cent", "CT", "Pcs", "Purchase Rate", "Selling Rate", "Amount"];
+}
+
+function polishingStoneRow(line, index) {
+  return [
+    `<button class="mini-danger" data-action="delete-polishing-stone" data-index="${index}">X</button>`,
+    index + 1,
+    line.code || "",
+    line.barcode || "",
+    line.colorType || "",
+    line.colorScale || "",
+    line.shape || "",
+    line.cut || "",
+    line.clarity || "",
+    line.sieveSize || "",
+    numericValue(line.caratCent),
+    line.ct || "",
+    numericValue(line.pcs, 0),
+    money(line.purchaseRate),
+    money(line.sellingRate),
+    money(line.amount)
+  ];
+}
+
+function polishingBottom(record, totals) {
+  return `
+    <div class="polishing-bottom">
+      <label class="sample-remarks"><span>Remarks</span><textarea data-polishing-field="remarks">${record.remarks}</textarea></label>
+      <div class="polishing-totals">
+        <span>Total Net Weight</span><input value="${grams(totals.net)}" readonly />
+        <span>Stone Amount</span><input value="${moneyValue(totals.stoneAmount)}" readonly />
+        <span>Total Amount</span><input value="${moneyValue(totals.totalAmount)}" readonly />
+      </div>
     </div>
   `;
 }
@@ -4707,6 +5720,7 @@ function meltingReturnScreen() {
   meltingReturnDraft = normalizeMeltingReturn(meltingReturnDraft || state.meltingReturns[0] || defaultMeltingReturn());
   const record = meltingReturnDraft;
   const totals = meltingReturnFinancials(record);
+  const issueActive = meltingReturnView === "Issue";
   return `
     <section class="classic-billing-shell clean-entry-shell panel smith-work-shell refinery-work-shell melting-work-shell">
       <div class="entry-actions body-toolbar">
@@ -4717,16 +5731,60 @@ function meltingReturnScreen() {
         ${toolbarButton("Close", "close-work-orders")}
       </div>
       <div class="classic-subtabs refinery-inner-tabs">
-        <button class="active" type="button">Final Return</button>
-        <button type="button">Issue</button>
+        <button class="${issueActive ? "" : "active"}" type="button" data-melting-return-view="Final Return">Final Return</button>
+        <button class="${issueActive ? "active" : ""}" type="button" data-melting-return-view="Issue">Issue</button>
       </div>
-      ${meltingReturnHeader(record)}
-      <section class="classic-entry-area billing-section refinery-final-table">
-        <div class="classic-detail-grid">${table(meltingReturnColumns(), record.lines.map(meltingReturnRow))}</div>
-      </section>
-      ${meltingReturnTotals(record, totals)}
+      ${issueActive ? meltingReturnIssueDetails(record) : `
+        ${meltingReturnHeader(record)}
+        <section class="classic-entry-area billing-section refinery-final-table">
+          <div class="classic-detail-grid">${table(meltingReturnColumns(), record.lines.map(meltingReturnRow))}</div>
+        </section>
+        ${meltingReturnTotals(record, totals)}
+      `}
     </section>
   `;
+}
+
+function meltingReturnIssueDetails(returnRecord) {
+  const issue = selectedMeltingIssue(returnRecord.pendingIssueId);
+  const lines = issue?.lines || [];
+  return `
+    <div class="transaction-entry-header refinery-header melting-return-issue-header">
+      <div class="classic-fields left">
+        ${refineryIssuedReadout("Entry No, Ref No", issue?.entryNo, issue?.refNo, "", true)}
+        ${refineryIssuedReadout("Date, Time", issue?.date, issue?.time, "", true)}
+      </div>
+      <div class="melting-issue-type-readout">
+        <input value="${issue?.issueType || ""}" readonly aria-label="Issue type" />
+      </div>
+      <div class="classic-fields right">
+        ${refineryIssuedReadout("Refiner Name", issue?.refinerName)}
+        ${refineryPreparedByReadout(issue?.preparedBy)}
+      </div>
+    </div>
+    <section class="classic-entry-area billing-section melting-return-issue-table">
+      <div class="classic-detail-grid">
+        ${table(meltingReturnIssueColumns(), lines.map(meltingReturnIssueRow))}
+        ${issue ? "" : `<div class="refinery-issued-empty">Select a pending Melting Issue in Final Return to view its details.</div>`}
+      </div>
+    </section>
+  `;
+}
+
+function meltingReturnIssueColumns() {
+  return ["Sl", "Item Name", "Qty", "Gross Weight", "Net Weight", "Rate", "Amount"];
+}
+
+function meltingReturnIssueRow(line, index) {
+  return [
+    index + 1,
+    line.itemName || "",
+    numericValue(line.qty, 0),
+    grams(line.gross),
+    grams(line.net),
+    money(line.rate),
+    money(line.amount)
+  ];
 }
 
 function meltingReturnHeader(record) {
@@ -4840,6 +5898,7 @@ function refineryReturnScreen() {
   refineryReturnDraft = normalizeRefineryReturn(refineryReturnDraft || state.refineryReturns[0] || defaultRefineryReturn());
   const record = refineryReturnDraft;
   const totals = refineryReturnFinancials(record);
+  const issuedDetailsActive = refineryReturnView === "Issued Details";
   return `
     <section class="classic-billing-shell clean-entry-shell panel smith-work-shell refinery-work-shell">
       <div class="entry-actions body-toolbar">
@@ -4850,23 +5909,76 @@ function refineryReturnScreen() {
         ${toolbarButton("Close", "close-work-orders")}
       </div>
       <div class="classic-subtabs refinery-inner-tabs">
-        <button class="active" type="button">Test Return</button>
-        <button type="button">Issued Details</button>
+        <button class="${issuedDetailsActive ? "" : "active"}" type="button" data-refinery-return-view="Test Return">Test Return</button>
+        <button class="${issuedDetailsActive ? "active" : ""}" type="button" data-refinery-return-view="Issued Details">Issued Details</button>
       </div>
-      ${refineryReturnHeader(record)}
-      <section class="classic-entry-area billing-section refinery-return-table">
-        <div class="classic-detail-grid">${table(refineryReturnColumns(), record.lines.map(refineryReturnRow))}</div>
-      </section>
-      <div class="refinery-work-bottom">
-        ${refineryTotalInput("Issued Weight", numericValue(totals.issuedWeight), true)}
-        ${refineryTotalInput("Melting Loss", numericValue(totals.meltingLoss), true)}
-        ${refineryTotalInput("Received Weight", numericValue(totals.receivedWeight), true)}
-        ${refineryTotalInput("Bottle Stock Weight", numericValue(totals.bottleStockWeight), true)}
-        ${refineryTotalInput("Test Weight", numericValue(totals.testWeight), true)}
-        ${refineryTotalInput("Reissue Weight", numericValue(totals.reissueWeight), true)}
+      ${issuedDetailsActive ? refineryIssuedDetails(record) : `
+        ${refineryReturnHeader(record)}
+        <section class="classic-entry-area billing-section refinery-return-table">
+          <div class="classic-detail-grid">${table(refineryReturnColumns(), record.lines.map(refineryReturnRow))}</div>
+        </section>
+        <div class="refinery-work-bottom">
+          ${refineryTotalInput("Issued Weight", numericValue(totals.issuedWeight), true)}
+          ${refineryTotalInput("Melting Loss", numericValue(totals.meltingLoss), true)}
+          ${refineryTotalInput("Received Weight", numericValue(totals.receivedWeight), true)}
+          ${refineryTotalInput("Bottle Stock Weight", numericValue(totals.bottleStockWeight), true)}
+          ${refineryTotalInput("Test Weight", numericValue(totals.testWeight), true)}
+          ${refineryTotalInput("Reissue Weight", numericValue(totals.reissueWeight), true)}
+        </div>
+      `}
+    </section>
+  `;
+}
+
+function refineryIssuedDetails(returnRecord, extraClass = "") {
+  const issue = selectedRefineryIssue(returnRecord.pendingIssueId);
+  const lines = issue?.lines || [];
+  return `
+    <div class="transaction-entry-header refinery-header refinery-issued-header ${extraClass}">
+      <div class="classic-fields left">
+        ${refineryIssuedReadout("Entry No, Ref No", issue?.entryNo, issue?.refNo, "", true)}
+        ${refineryIssuedReadout("Date, Time", issue?.date, issue?.time, "", true)}
+        ${refineryIssuedReadout("Expected Touch", issue ? moneyValue(issue.expectedTouch) : "", "", "important-input")}
+      </div>
+      <div class="classic-fields right">
+        ${refineryIssuedReadout("Refiner Name", issue?.refinerName)}
+        ${refineryPreparedByReadout(issue?.preparedBy)}
+        ${refineryIssuedReadout("Remark", issue?.remark)}
+      </div>
+    </div>
+    <section class="classic-entry-area billing-section refinery-issued-table ${extraClass}">
+      <div class="classic-detail-grid">
+        ${table(refineryIssuedColumns(), lines.map(refineryIssuedRow))}
+        ${issue ? "" : `<div class="refinery-issued-empty">Select a refinery pending issue in Test Return to view its issued details.</div>`}
       </div>
     </section>
   `;
+}
+
+function refineryIssuedReadout(label, first = "", second = "", inputClass = "", paired = false) {
+  const inputs = `<input class="${inputClass}" value="${first || ""}" readonly />${paired ? `<input value="${second || ""}" readonly />` : ""}`;
+  return `<label class="classic-field ${paired ? "split-field" : ""}"><span>${label}</span><span class="${paired ? "field-pair" : "issued-readout"}">${inputs}</span></label>`;
+}
+
+function refineryPreparedByReadout(value = "") {
+  return `<label class="classic-field"><span>Prepared By</span>${readonlyEmployeeDropdown(value)}</label>`;
+}
+
+function refineryIssuedColumns() {
+  return ["Sl", "Item Name", "Qty", "Gross Weight", "Stone Weight", "Net Weight", "Rate", "Amount"];
+}
+
+function refineryIssuedRow(line, index) {
+  return [
+    index + 1,
+    line.itemName || "",
+    numericValue(line.qty, 0),
+    grams(line.gross),
+    grams(line.stone),
+    grams(line.net),
+    money(line.rate),
+    money(line.amount)
+  ];
 }
 
 function refineryReturnHeader(record) {
@@ -4907,6 +6019,8 @@ function refineryFinalReturnScreen() {
   refineryFinalDraft = normalizeRefineryFinalReturn(refineryFinalDraft || state.refineryFinalReturns[0] || defaultRefineryFinalReturn());
   const record = refineryFinalDraft;
   const totals = refineryFinalFinancials(record);
+  const isFinalReturn = refineryFinalView === "Final Return";
+  const isTestReturn = refineryFinalView === "Test Return";
   return `
     <section class="classic-billing-shell clean-entry-shell panel smith-work-shell refinery-work-shell">
       <div class="entry-actions body-toolbar">
@@ -4919,17 +6033,64 @@ function refineryFinalReturnScreen() {
         <strong class="classic-rate">Gold Rate <input class="mini-rate" value="${moneyValue(activeGoldRate())}" readonly /></strong>
       </div>
       <div class="classic-subtabs refinery-inner-tabs">
-        <button class="active" type="button">Final Return</button>
-        <button type="button">Test Return</button>
-        <button type="button">Issue</button>
+        <button class="${isFinalReturn ? "active" : ""}" type="button" data-refinery-final-view="Final Return">Final Return</button>
+        <button class="${isTestReturn ? "active" : ""}" type="button" data-refinery-final-view="Test Return">Test Return</button>
+        <button class="${!isFinalReturn && !isTestReturn ? "active" : ""}" type="button" data-refinery-final-view="Issue">Issue</button>
       </div>
-      ${refineryFinalHeader(record, totals)}
-      <section class="classic-entry-area billing-section refinery-final-table">
-        <div class="classic-detail-grid">${table(refineryFinalColumns(), record.lines.map(refineryFinalRow))}</div>
-      </section>
-      ${refineryFinalTotals(record, totals)}
+      ${isFinalReturn ? `
+        ${refineryFinalHeader(record, totals)}
+        <section class="classic-entry-area billing-section refinery-final-table">
+          <div class="classic-detail-grid">${table(refineryFinalColumns(), record.lines.map(refineryFinalRow))}</div>
+        </section>
+        ${refineryFinalTotals(record, totals)}
+      ` : isTestReturn
+        ? refineryFinalTestReturnDetails(record)
+        : refineryIssuedDetails(record, "refinery-final-issue-view")}
     </section>
   `;
+}
+
+function refineryFinalTestReturnDetails(finalRecord) {
+  const returnRecord = selectedRefineryReturn(finalRecord.pendingIssueId);
+  const lines = returnRecord?.lines || [];
+  return `
+    <div class="transaction-entry-header refinery-header refinery-test-return-header">
+      <div class="classic-fields left">
+        ${refineryIssuedReadout("Entry No, Ref No", returnRecord?.entryNo, returnRecord?.refNo, "", true)}
+        ${refineryIssuedReadout("Date, Time", returnRecord?.date, returnRecord?.time, "", true)}
+      </div>
+      <div class="refinery-test-touch">
+        <input value="${moneyValue(finalRecord.expectedTouch)}" readonly aria-label="Expected touch" />
+      </div>
+      <div class="classic-fields right">
+        ${refineryPreparedByReadout(returnRecord?.preparedBy)}
+        ${refineryIssuedReadout("Remark", returnRecord?.remark)}
+      </div>
+    </div>
+    <section class="classic-entry-area billing-section refinery-final-test-table">
+      <div class="classic-detail-grid">
+        ${table(refineryFinalTestColumns(), lines.map(refineryFinalTestRow))}
+        ${returnRecord ? "" : `<div class="refinery-issued-empty">Save a Test Return for the selected pending issue to view its details here.</div>`}
+      </div>
+    </section>
+  `;
+}
+
+function refineryFinalTestColumns() {
+  return ["Sl", "Item Name", "Issued Weight", "Mud Less", "Received Weight", "Bottle Stock Weight", "Test Weight", "Reissue Weight"];
+}
+
+function refineryFinalTestRow(line, index) {
+  return [
+    index + 1,
+    line.itemName || "",
+    grams(line.issuedWeight),
+    grams(line.meltingLoss),
+    grams(line.receivedWeight),
+    grams(line.bottleStockWeight),
+    grams(line.testWeight),
+    grams(line.reissueWeight)
+  ];
 }
 
 function refineryFinalHeader(record, totals) {
@@ -5259,6 +6420,15 @@ function employeeDropdown(field, value, attr) {
   const options = (state.staffs || []).map((staff) => staff.name).filter(Boolean);
   const list = options.length ? ["", ...options] : ["", "BIJU GEORGE", "ABDUL SALAM AP"];
   return `<select class="classic-input" ${attr}="${field}">${list.map((option) => `<option ${option === value ? "selected" : ""}>${option}</option>`).join("")}</select>`;
+}
+
+function readonlyEmployeeDropdown(value = "") {
+  const options = staffNameOptions();
+  const hasSelectedStaff = options.includes(value);
+  return `<select class="classic-input prepared-by-readonly" disabled aria-label="Prepared By">
+    <option value="" ${hasSelectedStaff ? "" : "selected"}>Select staff</option>
+    ${options.map((option) => `<option ${option === value ? "selected" : ""}>${option}</option>`).join("")}
+  </select>`;
 }
 
 function cashBankDropdown(field, value, attr) {
@@ -5787,7 +6957,7 @@ function partyInlineForm(party, type) {
         ${input("email", "Email Address", party.email, "email")}
         ${isSupplier || isSmith || isRefiner ? input("website", "Website", party.website) : ""}
         ${isCustomer ? input("aadhaar", "Aadhar", party.aadhaar) : ""}
-        ${isCustomer ? select("agent", "Agent", miscOptions("agents", ["", ...state.staffs.map((staff) => staff.name)]), party.agent) : ""}
+        ${isCustomer ? select("agent", "Agent", agentNameOptions(), party.agent) : ""}
         ${isCustomer || isSupplier ? input("birthDate", "D-O-Birth", party.birthDate) : ""}
         ${isCustomer || isSupplier ? input("joinDate", "Join", party.joinDate) : ""}
       </div>
@@ -6753,6 +7923,14 @@ function accounts() {
 function accountActionPage(view) {
   const billwiseType = billwiseTypeFromView(view);
   if (billwiseType) return billwiseTransactionScreen(billwiseType);
+  if (view === "Cash Receipt") return cashVoucherScreen("receipt");
+  if (view === "Cash Payment") return cashVoucherScreen("payment");
+  if (view === "Bank Deposit") return bankTransactionScreen("deposit");
+  if (view === "Bank Withdrawal") return bankTransactionScreen("withdrawal");
+  if (view === "PDC Transactions") return pdcTransactionsScreen();
+  if (view === "Journal Voucher") return journalVoucherScreen();
+  if (view === "Direct Entry") return directEntryScreen();
+  if (view === "Expense Entry") return expenseEntryScreen();
   if (view === "Custom Voucher") return customVoucherScreen();
   const configs = {
     "Cash Receipt": "Receive cash from customers or other ledgers.",
@@ -6862,8 +8040,8 @@ function billwiseHeader(type, record, financials) {
         ${type === "collection" || type === "payment" ? billwiseSelect(type, "costCenter", "Cost Center", miscOptions("costCenters", ["cost1"]), record.costCenter) : billwiseLabeledField(type, "discountAccount", "Discount Account", record.discountAccount)}
         ${type === "collection" ? `<label class="classic-field split-field"><span>Cash</span><span class="field-pair">${billwiseField(type, "cashCode", record.cashCode)}${billwiseSelectOnly(type, "cashAccount", ["Cash in Hand", "Scheme Cash", "Canara Bank Edak", "Federal Bank Edak", "Bank"], record.cashAccount)}</span></label>` : ""}
         ${type === "payment" ? billwiseSelect(type, "cashAccount", "Cash Account", ["Cash in Hand", "Scheme Cash", "Canara Bank Edak", "Federal Bank Edak", "Bank"], record.cashAccount) : ""}
-        ${billwiseSelect(type, "preparedBy", "Prepared By", state.staffs.map((staff) => staff.name), record.preparedBy)}
-        ${type !== "collection" ? billwiseSelect(type, "receivedBy", "Received By", state.staffs.map((staff) => staff.name), record.receivedBy) : ""}
+        ${billwiseSelect(type, "preparedBy", "Prepared By", staffNameOptions(), record.preparedBy)}
+        ${type !== "collection" ? billwiseSelect(type, "receivedBy", "Received By", staffNameOptions(), record.receivedBy) : ""}
       </div>
     </div>
   `;
@@ -6944,12 +8122,1879 @@ function billwiseBottomStrip(type, financials) {
   return `<div class="billwise-total-strip"><strong>Total Amount</strong><span>Only</span><output>${moneyValue(financials.totalAmount)}</output></div>`;
 }
 
+function bankTransactionStorageKey(type) {
+  return type === "withdrawal" ? "bankWithdrawals" : "bankDeposits";
+}
+
+function bankTransactionTitle(type) {
+  return type === "withdrawal" ? "Bank Payment" : "Bank Deposit";
+}
+
+function bankTransactionView(type) {
+  return type === "withdrawal" ? "Bank Withdrawal" : "Bank Deposit";
+}
+
+function bankCostCenters() {
+  const centers = (state?.miscellaneous?.costCenters || seed.miscellaneous?.costCenters || []).map((item) => item.name).filter(Boolean);
+  return [...new Set(["cost1", ...centers])];
+}
+
+function bankStaffOptions() {
+  return [...new Set([...(state?.staffs || seed.staffs || []).map((staff) => staff.name).filter(Boolean), "ABDUL SALAM AP"])];
+}
+
+function bankAccountOptions() {
+  const masters = state?.accountMasters || seed.accountMasters || [];
+  const bankMasters = masters
+    .filter((account) => /bank/i.test(`${account.subSchedule || ""} ${account.accountName || ""}`))
+    .map((account) => account.accountName)
+    .filter(Boolean);
+  return [...new Set(["Canara Bank Edakkara", "Federal Bank Edakkara", "NILAMBUR CO-OPERATIVE URBAN BANK", ...bankMasters])];
+}
+
+function bankAccountHeadOptions() {
+  const masters = (state?.accountMasters || seed.accountMasters || []).map((account) => ({
+    id: account.accountId || "",
+    name: account.accountName || ""
+  }));
+  const ledgers = (state?.accounts || seed.accounts || []).map((account) => ({
+    id: account.accountId || "",
+    name: account.ledger || account.particular || ""
+  }));
+  return [...masters, ...ledgers]
+    .filter((account) => account.name)
+    .filter((account, index, list) => list.findIndex((item) => item.name === account.name) === index);
+}
+
+function defaultBankTransactionLine() {
+  return {
+    id: crypto.randomUUID(),
+    headId: "",
+    accountHead: "",
+    amount: 0,
+    remarks: "",
+    voucherNo: "",
+    voucherDate: toDateInputValue(new Date())
+  };
+}
+
+function normalizeBankTransactionLine(line = {}) {
+  return {
+    id: line.id || crypto.randomUUID(),
+    headId: line.headId || "",
+    accountHead: line.accountHead || "",
+    amount: Number(line.amount || 0),
+    remarks: line.remarks || "",
+    voucherNo: line.voucherNo || "",
+    voucherDate: toDateInputValue(line.voucherDate || new Date())
+  };
+}
+
+function defaultBankTransaction(type = "deposit") {
+  const today = toDateInputValue(new Date());
+  const staff = bankStaffOptions()[0] || "";
+  return normalizeBankTransaction({
+    id: crypto.randomUUID(),
+    type,
+    voucherNo: "",
+    refNo: "",
+    date: today,
+    time: nowTimeWithSeconds(),
+    preparedBy: staff,
+    costCenter: bankCostCenters()[0] || "cost1",
+    bankAccount: bankAccountOptions()[0] || "Canara Bank Edakkara",
+    handledBy: staff,
+    entry: defaultBankTransactionLine(),
+    lines: [],
+    showAllAccount: false,
+    noPrint: false,
+    rateFixed: false,
+    narration: ""
+  }, type);
+}
+
+function normalizeBankTransaction(record = {}, type = "deposit") {
+  const today = toDateInputValue(new Date());
+  const staff = bankStaffOptions()[0] || "";
+  const lines = (record.lines || []).map(normalizeBankTransactionLine);
+  const clean = {
+    id: record.id || crypto.randomUUID(),
+    type: record.type || type,
+    voucherNo: record.voucherNo || "",
+    refNo: record.refNo || "",
+    date: toDateInputValue(record.date || today),
+    time: record.time || nowTimeWithSeconds(),
+    preparedBy: record.preparedBy || staff,
+    costCenter: record.costCenter || bankCostCenters()[0] || "cost1",
+    bankAccount: record.bankAccount || bankAccountOptions()[0] || "Canara Bank Edakkara",
+    handledBy: record.handledBy || staff,
+    entry: normalizeBankTransactionLine(record.entry || defaultBankTransactionLine()),
+    lines,
+    showAllAccount: Boolean(record.showAllAccount),
+    noPrint: Boolean(record.noPrint),
+    rateFixed: Boolean(record.rateFixed),
+    narration: record.narration || ""
+  };
+  clean.totalAmount = bankTransactionFinancials(clean).totalAmount;
+  return clean;
+}
+
+function bankTransactionFinancials(record) {
+  return {
+    totalAmount: sumBy(record.lines || [], "amount")
+  };
+}
+
+function bankTransactionDraft(type) {
+  if (!bankTransactionDrafts[type]) {
+    bankTransactionDrafts[type] = normalizeBankTransaction(state[bankTransactionStorageKey(type)]?.[0] || defaultBankTransaction(type), type);
+  }
+  return bankTransactionDrafts[type];
+}
+
+function bankTransactionScreen(type) {
+  const record = bankTransactionDraft(type);
+  const financials = bankTransactionFinancials(record);
+  return `
+    <section class="clean-entry-shell bank-transaction-shell" data-bank-type="${type}">
+      ${bankTransactionToolbar(type)}
+      ${bankTransactionHeader(type, record)}
+      <div class="bank-transaction-table-panel">
+        ${bankTransactionEntryRow(type, record)}
+        ${bankTransactionTable(type, record)}
+      </div>
+      ${bankTransactionTotalStrip(financials)}
+      ${bankTransactionFooter(type, record)}
+    </section>
+  `;
+}
+
+function bankTransactionToolbar(type) {
+  return `
+    <div class="entry-actions body-toolbar bank-transaction-toolbar">
+      ${toolbarButton("Save", `save-bank-transaction-${type}`)}
+      ${toolbarButton("Refresh", `refresh-bank-transaction-${type}`)}
+      ${toolbarButton("Edit", `edit-bank-transaction-${type}`)}
+      ${toolbarButton("Delete", `delete-bank-transaction-${type}`)}
+      ${toolbarButton("Print", `print-bank-transaction-${type}`)}
+      ${toolbarButton("Close", "close-account-action")}
+      <span class="toolbar-spacer"></span>
+      <label class="rate-inline"><span>Gold Rate</span><input value="${activeGoldRate()}" readonly /></label>
+    </div>
+  `;
+}
+
+function bankTransactionHeader(type, record) {
+  const handledLabel = type === "withdrawal" ? "Paid By" : "Received By";
+  return `
+    <div class="transaction-entry-header bank-transaction-header">
+      <div class="classic-fields left">
+        <label class="classic-field split-field"><span>Voucher No, Ref No</span><span class="field-pair">${bankField(type, "voucherNo", record.voucherNo)}${bankField(type, "refNo", record.refNo)}</span></label>
+        <label class="classic-field split-field"><span>Date, Time</span><span class="field-pair">${bankField(type, "date", toDateInputValue(record.date), "date")}${bankField(type, "time", record.time)}</span></label>
+        ${bankSelect(type, "preparedBy", "Prepared By", bankStaffOptions(), record.preparedBy)}
+      </div>
+      <div class="classic-fields right">
+        ${bankSelect(type, "costCenter", "Cost Center", bankCostCenters(), record.costCenter)}
+        ${bankSelect(type, "bankAccount", "Bank Account", bankAccountOptions(), record.bankAccount)}
+        ${bankSelect(type, "handledBy", handledLabel, bankStaffOptions(), record.handledBy)}
+      </div>
+    </div>
+  `;
+}
+
+function bankField(type, field, value = "", inputType = "text") {
+  return `<input data-bank-type="${type}" data-bank-field="${field}" type="${inputType}" value="${value ?? ""}" />`;
+}
+
+function bankSelect(type, field, label, options, selected) {
+  return `<label class="classic-field"><span>${label}</span>${bankSelectOnly(type, field, options, selected)}</label>`;
+}
+
+function bankSelectOnly(type, field, options, selected) {
+  const unique = [...new Set((options || []).filter(Boolean))];
+  return `<select data-bank-type="${type}" data-bank-field="${field}">${unique.map((option) => `<option ${option === selected ? "selected" : ""}>${option}</option>`).join("")}</select>`;
+}
+
+function bankTransactionEntryRow(type, record) {
+  const entry = normalizeBankTransactionLine(record.entry || {});
+  const heads = bankAccountHeadOptions();
+  const listId = `bank-head-options-${type}`;
+  return `
+    <datalist id="${listId}">${heads.map((account) => `<option value="${account.name}" data-id="${account.id}"></option>`).join("")}</datalist>
+    <div class="bank-transaction-entry-wrap">
+      <table class="bank-transaction-entry-grid">
+        <colgroup>
+          <col style="width: 130px" /><col style="width: 320px" /><col style="width: 150px" /><col style="width: 220px" /><col style="width: 130px" /><col style="width: 140px" /><col style="width: 82px" />
+        </colgroup>
+        <thead><tr><th>Head ID</th><th>Account Head</th><th>Amount</th><th>Remarks</th><th>Voucher No</th><th>Voucher Date</th><th></th></tr></thead>
+        <tbody>
+          <tr>
+            <td><input data-bank-type="${type}" data-bank-entry-field="headId" value="${entry.headId}" /></td>
+            <td><input list="${listId}" data-bank-type="${type}" data-bank-entry-field="accountHead" value="${entry.accountHead}" /></td>
+            <td><input class="numeric" data-bank-type="${type}" data-bank-entry-field="amount" type="number" value="${moneyValue(entry.amount)}" /></td>
+            <td><input data-bank-type="${type}" data-bank-entry-field="remarks" value="${entry.remarks}" /></td>
+            <td><input data-bank-type="${type}" data-bank-entry-field="voucherNo" value="${entry.voucherNo}" /></td>
+            <td><input data-bank-type="${type}" data-bank-entry-field="voucherDate" type="date" value="${toDateInputValue(entry.voucherDate)}" /></td>
+            <td><button class="compact-action" data-action="add-bank-transaction-line-${type}">Add</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function bankTransactionTable(type, record) {
+  const rows = (record.lines || []).map((line, index) => normalizeBankTransactionLine(line));
+  return `
+    <div class="table-wrap bank-transaction-table-wrap">
+      <table class="bank-transaction-table">
+        <colgroup>
+          <col style="width: 52px" /><col style="width: 44px" /><col style="width: 130px" /><col style="width: 320px" /><col style="width: 150px" /><col style="width: 220px" /><col style="width: 130px" /><col style="width: 140px" />
+        </colgroup>
+        <thead><tr><th>Sl#</th><th></th><th>Head ID</th><th>Account Head</th><th>Amount</th><th>Remarks</th><th>Voucher No</th><th>Voucher Date</th></tr></thead>
+        <tbody>
+          ${rows.map((line, index) => `
+            <tr>
+              <td>${index + 1}</td>
+              <td><button class="line-delete" data-action="delete-bank-transaction-line-${type}" data-index="${index}" title="Remove row">x</button></td>
+              <td><input data-bank-type="${type}" data-bank-line="${index}" data-bank-line-field="headId" value="${line.headId}" /></td>
+              <td><input data-bank-type="${type}" data-bank-line="${index}" data-bank-line-field="accountHead" value="${line.accountHead}" /></td>
+              <td><input class="numeric" data-bank-type="${type}" data-bank-line="${index}" data-bank-line-field="amount" type="number" value="${moneyValue(line.amount)}" /></td>
+              <td><input data-bank-type="${type}" data-bank-line="${index}" data-bank-line-field="remarks" value="${line.remarks}" /></td>
+              <td><input data-bank-type="${type}" data-bank-line="${index}" data-bank-line-field="voucherNo" value="${line.voucherNo}" /></td>
+              <td><input data-bank-type="${type}" data-bank-line="${index}" data-bank-line-field="voucherDate" type="date" value="${toDateInputValue(line.voucherDate)}" /></td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function bankTransactionTotalStrip(financials) {
+  return `<div class="bank-transaction-total-strip"><strong>Total Amount</strong><output>${moneyValue(financials.totalAmount)}</output><span>-</span></div>`;
+}
+
+function bankTransactionFooter(type, record) {
+  return `
+    <div class="bank-transaction-footer">
+      <div class="bank-transaction-checks">
+        <label><input type="checkbox" data-bank-type="${type}" data-bank-field="showAllAccount" ${record.showAllAccount ? "checked" : ""} /> Show All Account</label>
+        <label><input type="checkbox" data-bank-type="${type}" data-bank-field="noPrint" ${record.noPrint ? "checked" : ""} /> <strong>No Print</strong></label>
+        <label><input type="checkbox" data-bank-type="${type}" data-bank-field="rateFixed" ${record.rateFixed ? "checked" : ""} /> Rate Fixed</label>
+      </div>
+      <label class="bank-transaction-narration"><span>Narration</span><textarea data-bank-type="${type}" data-bank-field="narration">${record.narration || ""}</textarea></label>
+    </div>
+  `;
+}
+
+function pdcTypeFromView(view) {
+  return {
+    "PDC Issue": "issue",
+    "PDC Request": "pdcRequest",
+    "Bank Submission": "submission",
+    "PDC Receipt": "receipt",
+    "Cheque Bounce": "bounce",
+    "Cheque Represent": "request",
+    "Cheque Request": "request"
+  }[view] || "submission";
+}
+
+function pdcViewFromType(type) {
+  return {
+    issue: "PDC Issue",
+    pdcRequest: "PDC Request",
+    submission: "Bank Submission",
+    receipt: "PDC Receipt",
+    bounce: "Cheque Bounce",
+    request: "Cheque Represent"
+  }[type] || "Bank Submission";
+}
+
+function pdcStorageKey(type) {
+  return {
+    issue: "pdcIssues",
+    pdcRequest: "pdcRequests",
+    submission: "pdcBankSubmissions",
+    receipt: "pdcReceipts",
+    bounce: "pdcChequeBounces",
+    request: "pdcChequeRequests"
+  }[type] || "pdcBankSubmissions";
+}
+
+function pdcTitle(type) {
+  return {
+    issue: "PDC Issue",
+    pdcRequest: "PDC Request",
+    submission: "PDC Bank Submission",
+    receipt: "PDC Receipt",
+    bounce: "Cheque Bounce",
+    request: "Represent Bounced Cheque"
+  }[type] || "PDC Bank Submission";
+}
+
+function pdcAttr(value) {
+  return String(value ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function defaultPdcSubmissionLine() {
+  return {
+    id: crypto.randomUUID(),
+    chequeNo: "",
+    chequeDate: toDateInputValue(new Date()),
+    amount: 0,
+    entryDate: toDateInputValue(new Date()),
+    partyName: ""
+  };
+}
+
+function normalizePdcSubmissionLine(line = {}) {
+  return {
+    id: line.id || crypto.randomUUID(),
+    chequeNo: line.chequeNo || "",
+    chequeDate: toDateInputValue(line.chequeDate || new Date()),
+    amount: Number(line.amount || 0),
+    entryDate: toDateInputValue(line.entryDate || new Date()),
+    partyName: line.partyName || ""
+  };
+}
+
+function defaultPdcBounceLine() {
+  return {
+    id: crypto.randomUUID(),
+    entryNo: "",
+    chequeNo: "",
+    type: "PDC",
+    amount: 0,
+    chequeDate: toDateInputValue(new Date()),
+    serviceChargeBank: 0,
+    serviceChargeParty: 0,
+    partyName: ""
+  };
+}
+
+function normalizePdcBounceLine(line = {}) {
+  return {
+    id: line.id || crypto.randomUUID(),
+    entryNo: line.entryNo || "",
+    chequeNo: line.chequeNo || "",
+    type: line.type || "PDC",
+    amount: Number(line.amount || 0),
+    chequeDate: toDateInputValue(line.chequeDate || new Date()),
+    serviceChargeBank: Number(line.serviceChargeBank || 0),
+    serviceChargeParty: Number(line.serviceChargeParty || 0),
+    partyName: line.partyName || ""
+  };
+}
+
+function defaultPdcReceiptLine() {
+  return {
+    id: crypto.randomUUID(),
+    invoiceNo: "",
+    invoiceType: "Sales",
+    invoiceDate: toDateInputValue(new Date()),
+    billAmount: 0,
+    paid: 0,
+    received: 0,
+    balance: 0,
+    remark: "",
+    cvRid: ""
+  };
+}
+
+function normalizePdcReceiptLine(line = {}) {
+  const billAmount = Number(line.billAmount || 0);
+  const paid = Number(line.paid || 0);
+  const received = Number(line.received || 0);
+  return {
+    id: line.id || crypto.randomUUID(),
+    invoiceNo: line.invoiceNo || "",
+    invoiceType: line.invoiceType || "Sales",
+    invoiceDate: toDateInputValue(line.invoiceDate || new Date()),
+    billAmount,
+    paid,
+    received,
+    balance: billAmount - paid - received,
+    remark: line.remark || "",
+    cvRid: line.cvRid || ""
+  };
+}
+
+function defaultPdcRecord(type = "submission") {
+  const today = toDateInputValue(new Date());
+  const staff = bankStaffOptions()[0] || "";
+  return normalizePdcRecord({
+    id: crypto.randomUUID(),
+    type,
+    entryNo: "",
+    refNo: "",
+    date: today,
+    time: nowTimeWithSeconds(),
+    preparedBy: staff,
+    preparedByCode: "",
+    receivedBy: staff,
+    receivedByCode: "",
+    partyCode: "",
+    partyName: "",
+    chequeNo: "",
+    chequeDate: today,
+    chequeAmount: 0,
+    bankAccount: bankAccountOptions()[0] || "Canara Bank Edakkara",
+    bankName: bankAccountOptions()[0] || "Canara Bank Edakkara",
+    entry: type === "bounce" ? defaultPdcBounceLine() : ["receipt", "issue", "pdcRequest"].includes(type) ? defaultPdcReceiptLine() : defaultPdcSubmissionLine(),
+    lines: [],
+    bouncedChequeId: "",
+    reasonForRepresent: "As Per Party Request",
+    remark: ""
+  }, type);
+}
+
+function normalizePdcRecord(record = {}, type = "submission") {
+  const today = toDateInputValue(new Date());
+  const staff = bankStaffOptions()[0] || "";
+  const cleanType = record.type || type;
+  const lines = cleanType === "bounce"
+    ? (record.lines || []).map(normalizePdcBounceLine)
+    : ["receipt", "issue", "pdcRequest"].includes(cleanType)
+      ? (record.lines || []).map(normalizePdcReceiptLine)
+      : cleanType === "submission"
+      ? (record.lines || []).map(normalizePdcSubmissionLine)
+      : [];
+  const clean = {
+    id: record.id || crypto.randomUUID(),
+    type: cleanType,
+    entryNo: record.entryNo || "",
+    refNo: record.refNo || "",
+    date: toDateInputValue(record.date || today),
+    time: record.time || nowTimeWithSeconds(),
+    preparedBy: record.preparedBy || staff,
+    preparedByCode: record.preparedByCode || "",
+    receivedBy: record.receivedBy || staff,
+    receivedByCode: record.receivedByCode || "",
+    partyCode: record.partyCode || "",
+    partyName: record.partyName || record.party || "",
+    chequeNo: record.chequeNo || "",
+    bankAccount: record.bankAccount || record.bankName || bankAccountOptions()[0] || "Canara Bank Edakkara",
+    bankName: record.bankName || record.bankAccount || bankAccountOptions()[0] || "Canara Bank Edakkara",
+    entry: cleanType === "bounce" ? normalizePdcBounceLine(record.entry || {}) : ["receipt", "issue", "pdcRequest"].includes(cleanType) ? normalizePdcReceiptLine(record.entry || {}) : normalizePdcSubmissionLine(record.entry || {}),
+    lines,
+    bouncedChequeId: record.bouncedChequeId || "",
+    requestEntryNo: record.requestEntryNo || record.entryNo || "",
+    requestEntryDate: toDateInputValue(record.requestEntryDate || record.date || today),
+    chequeDate: toDateInputValue(record.chequeDate || today),
+    chequeAmount: Number(record.chequeAmount || 0),
+    party: record.party || record.partyName || "",
+    reason: record.reason || "",
+    reasonForRepresent: record.reasonForRepresent || "As Per Party Request",
+    remark: record.remark || ""
+  };
+  if (cleanType === "request" && clean.bouncedChequeId) applyPdcBounceToRequest(clean);
+  clean.totalAmount = pdcFinancials(clean, cleanType).totalAmount;
+  return clean;
+}
+
+function pdcFinancials(record = {}, type = record.type || "submission") {
+  if (type === "submission") return { totalAmount: sumBy(record.lines || [], "amount") };
+  if (["issue", "pdcRequest"].includes(type)) {
+    return {
+      totalAmount: sumBy(record.lines || [], "received"),
+      chequeAmount: Number(record.chequeAmount || 0),
+      balanceAmount: Number(record.chequeAmount || 0) - sumBy(record.lines || [], "received")
+    };
+  }
+  if (type === "receipt") {
+    return {
+      totalAmount: sumBy(record.lines || [], "received"),
+      chequeAmount: Number(record.chequeAmount || 0),
+      balanceAmount: Number(record.chequeAmount || 0) - sumBy(record.lines || [], "received")
+    };
+  }
+  if (type === "bounce") {
+    return {
+      totalAmount: sumBy(record.lines || [], "amount"),
+      totalServiceChargeBank: sumBy(record.lines || [], "serviceChargeBank"),
+      totalServiceChargeParty: sumBy(record.lines || [], "serviceChargeParty")
+    };
+  }
+  return { totalAmount: Number(record.chequeAmount || 0) };
+}
+
+function pdcDraft(type) {
+  if (!pdcDrafts[type]) {
+    pdcDrafts[type] = normalizePdcRecord(state[pdcStorageKey(type)]?.[0] || defaultPdcRecord(type), type);
+  }
+  return pdcDrafts[type];
+}
+
+function pdcBounceOptions() {
+  const rows = (state.pdcChequeBounces || []).flatMap((record) => (record.lines || []).map((line) => ({
+    id: `${record.id}:${line.id}`,
+    record,
+    line: normalizePdcBounceLine(line)
+  })));
+  return rows;
+}
+
+function findPdcBounceOption(id) {
+  return pdcBounceOptions().find((option) => option.id === id);
+}
+
+function applyPdcBounceToRequest(record) {
+  const match = findPdcBounceOption(record.bouncedChequeId);
+  if (!match) return record;
+  record.requestEntryNo = match.line.entryNo || match.record.entryNo || "";
+  record.requestEntryDate = toDateInputValue(match.record.date || new Date());
+  record.chequeDate = toDateInputValue(match.line.chequeDate || new Date());
+  record.chequeAmount = Number(match.line.amount || 0);
+  record.party = match.line.partyName || "";
+  record.reason = `Bounced cheque ${match.line.chequeNo || ""}`.trim();
+  return record;
+}
+
+function pdcTransactionsScreen() {
+  const views = ["PDC Issue", "PDC Request", "PDC Receipt", "Bank Submission", "Cheque Bounce", "Cheque Represent"];
+  const type = pdcTypeFromView(pdcView);
+  return `
+    ${moduleSwitcher("PDC Transactions", views, pdcView, "data-pdc-section")}
+    <section class="clean-entry-shell bank-transaction-shell pdc-shell" data-pdc-type="${type}">
+      ${pdcToolbar(type)}
+      ${type === "request" ? pdcChequeRepresentScreen() : type === "bounce" ? pdcChequeBounceScreen() : type === "receipt" ? pdcReceiptScreen() : type === "issue" ? pdcIssueScreen() : type === "pdcRequest" ? pdcRequestScreen() : pdcBankSubmissionScreen()}
+    </section>
+  `;
+}
+
+function pdcToolbar(type) {
+  if (type === "request") {
+    return `
+      <div class="entry-actions body-toolbar bank-transaction-toolbar">
+        ${toolbarButton("New", `new-pdc-${type}`)}
+        ${toolbarButton("Save F9", `save-pdc-${type}`)}
+        ${toolbarButton("Refresh", `refresh-pdc-${type}`)}
+        <button class="toolbar-button muted" disabled>Search</button>
+        ${toolbarButton("Close", "close-account-action")}
+        <span class="toolbar-spacer"></span>
+        <label class="rate-inline"><span>Gold Rate</span><input value="${activeGoldRate()}" readonly /></label>
+      </div>
+    `;
+  }
+  return `
+    <div class="entry-actions body-toolbar bank-transaction-toolbar">
+      ${toolbarButton("New", `new-pdc-${type}`)}
+      ${toolbarButton(type === "submission" ? "Save" : "Save F9", `save-pdc-${type}`)}
+      ${toolbarButton("Refresh", `refresh-pdc-${type}`)}
+      ${type !== "submission" ? toolbarButton("Print", `print-pdc-${type}`) : ""}
+      ${type !== "submission" ? toolbarButton("Delete", `delete-pdc-${type}`) : ""}
+      ${toolbarButton("Close", "close-account-action")}
+      ${type === "receipt" ? toolbarButton("Search", "search-pdc-receipt") : `<button class="toolbar-button muted" disabled>Search</button>`}
+      <span class="toolbar-spacer"></span>
+      ${type === "submission" ? "" : `<label class="rate-inline"><span>Gold Rate</span><input value="${activeGoldRate()}" readonly /></label>`}
+    </div>
+  `;
+}
+
+function pdcField(type, field, value = "", inputType = "text", readonly = false) {
+  return `<input data-pdc-type="${type}" data-pdc-field="${field}" type="${inputType}" value="${pdcAttr(value)}" ${readonly ? "readonly" : ""} />`;
+}
+
+function pdcEntryField(type, field, value = "", inputType = "text") {
+  return `<input class="grid-input" data-pdc-type="${type}" data-pdc-entry-field="${field}" type="${inputType}" value="${pdcAttr(value)}" />`;
+}
+
+function pdcLineField(type, index, field, value = "", inputType = "text") {
+  return `<input class="grid-input" data-pdc-type="${type}" data-pdc-line="${index}" data-pdc-line-field="${field}" type="${inputType}" value="${pdcAttr(value)}" />`;
+}
+
+function pdcSelectOnly(type, field, options, selected, entry = false) {
+  const attr = entry ? "data-pdc-entry-field" : "data-pdc-field";
+  return `<select data-pdc-type="${type}" ${attr}="${field}">${[...new Set(options.filter(Boolean))].map((option) => `<option ${option === selected ? "selected" : ""}>${option}</option>`).join("")}</select>`;
+}
+
+function pdcSelect(type, field, label, options, selected) {
+  return `<label class="classic-field"><span>${label}</span>${pdcSelectOnly(type, field, options, selected)}</label>`;
+}
+
+function pdcPartyOptions() {
+  return [...new Set((state.parties || []).map((party) => party.name).filter(Boolean))];
+}
+
+function pdcStaffCode(name) {
+  const match = (state.staffs || []).find((staff) => staff.name === name || staff.staffId === name || staff.employeeId === name);
+  return match?.staffId || match?.employeeId || "";
+}
+
+function pdcReceiptScreen() {
+  const type = "receipt";
+  const record = pdcDraft(type);
+  const financials = pdcFinancials(record, type);
+  return `
+    <div class="transaction-entry-header pdc-receipt-header">
+      <div class="classic-fields left">
+        <label class="classic-field split-field"><span>Entry No, Ref No</span><span class="field-pair">${pdcField(type, "entryNo", record.entryNo)}${pdcField(type, "refNo", record.refNo)}</span></label>
+        <label class="classic-field split-field"><span>Date, Time</span><span class="field-pair">${pdcField(type, "date", toDateInputValue(record.date), "date")}${pdcField(type, "time", record.time)}</span></label>
+        <label class="classic-field split-field"><span>Cheque No, Date</span><span class="field-pair">${pdcField(type, "chequeNo", record.chequeNo)}${pdcField(type, "chequeDate", toDateInputValue(record.chequeDate), "date")}</span></label>
+        <label class="classic-field split-field amount-pair"><span>Cheque Amount</span><span class="field-pair">${pdcField(type, "receivedTotal", moneyValue(financials.totalAmount), "number", true)}${pdcField(type, "chequeAmount", moneyValue(record.chequeAmount), "number")}</span></label>
+      </div>
+      <div class="classic-fields right">
+        <label class="classic-field split-field"><span>Party Name</span><span class="field-pair">${pdcField(type, "partyCode", record.partyCode)}${pdcSelectOnly(type, "partyName", pdcPartyOptions(), record.partyName)}</span></label>
+        <label class="classic-field split-field"><span>Prepared By</span><span class="field-pair">${pdcField(type, "preparedByCode", record.preparedByCode || pdcStaffCode(record.preparedBy))}${pdcSelectOnly(type, "preparedBy", bankStaffOptions(), record.preparedBy)}</span></label>
+        <label class="classic-field split-field"><span>Received By</span><span class="field-pair">${pdcField(type, "receivedByCode", record.receivedByCode || pdcStaffCode(record.receivedBy))}${pdcSelectOnly(type, "receivedBy", bankStaffOptions(), record.receivedBy)}</span></label>
+      </div>
+    </div>
+    <div class="bank-transaction-table-panel pdc-receipt-table-panel">
+      <div class="table-wrap bank-transaction-table-wrap pdc-receipt-table-wrap">
+        <table class="bank-transaction-table pdc-receipt-table">
+          <colgroup><col style="width:52px" /><col style="width:150px" /><col style="width:130px" /><col style="width:145px" /><col style="width:140px" /><col style="width:120px" /><col style="width:120px" /><col style="width:120px" /><col style="width:220px" /><col style="width:100px" /><col style="width:64px" /></colgroup>
+          <thead><tr><th>Sl#</th><th>Invoice No</th><th>InvoiceType</th><th>Invoice Date</th><th>Bill Amount</th><th>Paid</th><th>Received</th><th>Balance</th><th>Remark</th><th>CVrid</th><th></th></tr></thead>
+          <tbody>
+            <tr>
+              <td></td>
+              <td>${pdcEntryField(type, "invoiceNo", record.entry.invoiceNo)}</td>
+              <td>${pdcEntryField(type, "invoiceType", record.entry.invoiceType)}</td>
+              <td>${pdcEntryField(type, "invoiceDate", toDateInputValue(record.entry.invoiceDate), "date")}</td>
+              <td>${pdcEntryField(type, "billAmount", moneyValue(record.entry.billAmount), "number")}</td>
+              <td>${pdcEntryField(type, "paid", moneyValue(record.entry.paid), "number")}</td>
+              <td>${pdcEntryField(type, "received", moneyValue(record.entry.received), "number")}</td>
+              <td><input class="grid-input auto-field numeric" value="${moneyValue(record.entry.balance)}" readonly /></td>
+              <td>${pdcEntryField(type, "remark", record.entry.remark)}</td>
+              <td>${pdcEntryField(type, "cvRid", record.entry.cvRid)}</td>
+              <td><button class="compact-action" data-action="add-pdc-line-${type}">Add</button></td>
+            </tr>
+            ${(record.lines || []).map((line, index) => {
+              const row = normalizePdcReceiptLine(line);
+              return `<tr>
+                <td>${index + 1}<button class="line-delete" data-action="delete-pdc-line-${type}" data-index="${index}" title="Remove row">x</button></td>
+                <td>${pdcLineField(type, index, "invoiceNo", row.invoiceNo)}</td>
+                <td>${pdcLineField(type, index, "invoiceType", row.invoiceType)}</td>
+                <td>${pdcLineField(type, index, "invoiceDate", toDateInputValue(row.invoiceDate), "date")}</td>
+                <td>${pdcLineField(type, index, "billAmount", moneyValue(row.billAmount), "number")}</td>
+                <td>${pdcLineField(type, index, "paid", moneyValue(row.paid), "number")}</td>
+                <td>${pdcLineField(type, index, "received", moneyValue(row.received), "number")}</td>
+                <td><input class="grid-input auto-field numeric" value="${moneyValue(row.balance)}" readonly /></td>
+                <td>${pdcLineField(type, index, "remark", row.remark)}</td>
+                <td>${pdcLineField(type, index, "cvRid", row.cvRid)}</td>
+                <td></td>
+              </tr>`;
+            }).join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    ${pdcReceiptTotalStrip(financials)}
+    ${pdcReceiptRegister()}
+  `;
+}
+
+function pdcReceiptTotalStrip(financials) {
+  return `<div class="bank-transaction-total-strip pdc-receipt-total-strip"><strong>Total Amount :</strong><span>-</span><output>${moneyValue(financials.totalAmount)}</output></div>`;
+}
+
+function pdcReceiptRegister() {
+  const rows = (state.pdcReceipts || []).slice(0, 8).map((record) => {
+    const clean = normalizePdcRecord(record, "receipt");
+    return `<tr>
+      <td>${clean.entryNo || "-"}</td>
+      <td>${formatDisplayDate(clean.date)}</td>
+      <td>${clean.partyName || "-"}</td>
+      <td>${clean.chequeNo || "-"}</td>
+      <td>${moneyValue(clean.totalAmount)}</td>
+      <td><button class="compact-action" data-action="load-pdc-receipt" data-record-id="${pdcAttr(clean.id)}">Load</button></td>
+    </tr>`;
+  }).join("");
+  return `
+    <div class="panel pdc-receipt-register">
+      <div class="panel-head"><h2>Saved PDC Receipts</h2><small>Use Search or Load to reopen a saved entry.</small></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Entry No</th><th>Date</th><th>Party</th><th>Cheque No</th><th>Total</th><th>Open</th></tr></thead>
+          <tbody>${rows || `<tr><td colspan="6">No PDC receipts saved yet.</td></tr>`}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function pdcIssueScreen() {
+  const type = "issue";
+  const record = pdcDraft(type);
+  const financials = pdcFinancials(record, type);
+  return `
+    <div class="transaction-entry-header pdc-receipt-header pdc-issue-header">
+      <div class="classic-fields left">
+        <label class="classic-field split-field"><span>Entry No, Ref No</span><span class="field-pair">${pdcField(type, "entryNo", record.entryNo)}${pdcField(type, "refNo", record.refNo)}</span></label>
+        <label class="classic-field split-field"><span>Date, Time</span><span class="field-pair">${pdcField(type, "date", toDateInputValue(record.date), "date")}${pdcField(type, "time", record.time)}</span></label>
+        <label class="classic-field split-field"><span>Cheque No, Date</span><span class="field-pair">${pdcField(type, "chequeNo", record.chequeNo)}${pdcField(type, "chequeDate", toDateInputValue(record.chequeDate), "date")}</span></label>
+        <label class="classic-field split-field amount-pair"><span>Cheque Amount</span><span class="field-pair">${pdcField(type, "receivedTotal", moneyValue(financials.totalAmount), "number", true)}${pdcField(type, "chequeAmount", moneyValue(record.chequeAmount), "number")}</span></label>
+      </div>
+      <div class="classic-fields right">
+        ${pdcSelect(type, "bankName", "Bank Name", bankAccountOptions(), record.bankName)}
+        <label class="classic-field split-field"><span>Party Name</span><span class="field-pair">${pdcField(type, "partyCode", record.partyCode)}${pdcSelectOnly(type, "partyName", pdcPartyOptions(), record.partyName)}</span></label>
+        <label class="classic-field split-field"><span>Prepared By</span><span class="field-pair">${pdcField(type, "preparedByCode", record.preparedByCode || pdcStaffCode(record.preparedBy))}${pdcSelectOnly(type, "preparedBy", bankStaffOptions(), record.preparedBy)}</span></label>
+        <label class="classic-field split-field"><span>Received By</span><span class="field-pair">${pdcField(type, "receivedByCode", record.receivedByCode || pdcStaffCode(record.receivedBy))}${pdcSelectOnly(type, "receivedBy", bankStaffOptions(), record.receivedBy)}</span></label>
+      </div>
+    </div>
+    <div class="bank-transaction-table-panel pdc-receipt-table-panel">
+      <div class="table-wrap bank-transaction-table-wrap pdc-receipt-table-wrap">
+        <table class="bank-transaction-table pdc-receipt-table pdc-issue-table">
+          <colgroup><col style="width:52px" /><col style="width:150px" /><col style="width:130px" /><col style="width:145px" /><col style="width:140px" /><col style="width:120px" /><col style="width:120px" /><col style="width:120px" /><col style="width:220px" /><col style="width:100px" /><col style="width:64px" /></colgroup>
+          <thead><tr><th>Sl#</th><th>Invoice No</th><th>InvoiceType</th><th>Invoice Date</th><th>Bill Amount</th><th>Paid</th><th>Received</th><th>Balance</th><th>Remark</th><th>CVrid</th><th></th></tr></thead>
+          <tbody>
+            <tr>
+              <td></td>
+              <td>${pdcEntryField(type, "invoiceNo", record.entry.invoiceNo)}</td>
+              <td>${pdcEntryField(type, "invoiceType", record.entry.invoiceType)}</td>
+              <td>${pdcEntryField(type, "invoiceDate", toDateInputValue(record.entry.invoiceDate), "date")}</td>
+              <td>${pdcEntryField(type, "billAmount", moneyValue(record.entry.billAmount), "number")}</td>
+              <td>${pdcEntryField(type, "paid", moneyValue(record.entry.paid), "number")}</td>
+              <td>${pdcEntryField(type, "received", moneyValue(record.entry.received), "number")}</td>
+              <td><input class="grid-input auto-field numeric" value="${moneyValue(record.entry.balance)}" readonly /></td>
+              <td>${pdcEntryField(type, "remark", record.entry.remark)}</td>
+              <td>${pdcEntryField(type, "cvRid", record.entry.cvRid)}</td>
+              <td><button class="compact-action" data-action="add-pdc-line-${type}">Add</button></td>
+            </tr>
+            ${(record.lines || []).map((line, index) => {
+              const row = normalizePdcReceiptLine(line);
+              return `<tr>
+                <td>${index + 1}<button class="line-delete" data-action="delete-pdc-line-${type}" data-index="${index}" title="Remove row">x</button></td>
+                <td>${pdcLineField(type, index, "invoiceNo", row.invoiceNo)}</td>
+                <td>${pdcLineField(type, index, "invoiceType", row.invoiceType)}</td>
+                <td>${pdcLineField(type, index, "invoiceDate", toDateInputValue(row.invoiceDate), "date")}</td>
+                <td>${pdcLineField(type, index, "billAmount", moneyValue(row.billAmount), "number")}</td>
+                <td>${pdcLineField(type, index, "paid", moneyValue(row.paid), "number")}</td>
+                <td>${pdcLineField(type, index, "received", moneyValue(row.received), "number")}</td>
+                <td><input class="grid-input auto-field numeric" value="${moneyValue(row.balance)}" readonly /></td>
+                <td>${pdcLineField(type, index, "remark", row.remark)}</td>
+                <td>${pdcLineField(type, index, "cvRid", row.cvRid)}</td>
+                <td></td>
+              </tr>`;
+            }).join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    ${pdcIssueTotalStrip(financials)}
+  `;
+}
+
+function pdcIssueTotalStrip(financials) {
+  return `<div class="bank-transaction-total-strip pdc-receipt-total-strip"><strong>Total Amount:</strong><span>-</span><output>${moneyValue(financials.totalAmount)}</output></div>`;
+}
+
+function pdcRequestScreen() {
+  const type = "pdcRequest";
+  const record = pdcDraft(type);
+  const financials = pdcFinancials(record, type);
+  return `
+    <div class="transaction-entry-header pdc-receipt-header pdc-request-allocation-header">
+      <div class="classic-fields left">
+        <label class="classic-field split-field"><span>Entry No, Ref No</span><span class="field-pair">${pdcField(type, "entryNo", record.entryNo)}${pdcField(type, "refNo", record.refNo)}</span></label>
+        <label class="classic-field split-field"><span>Date, Time</span><span class="field-pair">${pdcField(type, "date", toDateInputValue(record.date), "date")}${pdcField(type, "time", record.time)}</span></label>
+        <label class="classic-field split-field"><span>Cheque No, Date</span><span class="field-pair">${pdcField(type, "chequeNo", record.chequeNo)}${pdcField(type, "chequeDate", toDateInputValue(record.chequeDate), "date")}</span></label>
+        <label class="classic-field split-field amount-pair"><span>Cheque Amount</span><span class="field-pair">${pdcField(type, "receivedTotal", moneyValue(financials.totalAmount), "number", true)}${pdcField(type, "chequeAmount", moneyValue(record.chequeAmount), "number")}</span></label>
+      </div>
+      <div class="classic-fields right">
+        <label class="classic-field split-field"><span>Party Name</span><span class="field-pair">${pdcField(type, "partyCode", record.partyCode)}${pdcSelectOnly(type, "partyName", pdcPartyOptions(), record.partyName)}</span></label>
+        <label class="classic-field split-field"><span>Prepared By</span><span class="field-pair">${pdcField(type, "preparedByCode", record.preparedByCode || pdcStaffCode(record.preparedBy))}${pdcSelectOnly(type, "preparedBy", bankStaffOptions(), record.preparedBy)}</span></label>
+        <label class="classic-field split-field"><span>Received By</span><span class="field-pair">${pdcField(type, "receivedByCode", record.receivedByCode || pdcStaffCode(record.receivedBy))}${pdcSelectOnly(type, "receivedBy", bankStaffOptions(), record.receivedBy)}</span></label>
+      </div>
+    </div>
+    <div class="bank-transaction-table-panel pdc-receipt-table-panel">
+      <div class="table-wrap bank-transaction-table-wrap pdc-receipt-table-wrap">
+        <table class="bank-transaction-table pdc-receipt-table pdc-request-allocation-table">
+          <colgroup><col style="width:52px" /><col style="width:150px" /><col style="width:130px" /><col style="width:145px" /><col style="width:140px" /><col style="width:120px" /><col style="width:120px" /><col style="width:120px" /><col style="width:220px" /><col style="width:100px" /><col style="width:64px" /></colgroup>
+          <thead><tr><th>Sl#</th><th>Invoice No</th><th>InvoiceType</th><th>Invoice Date</th><th>Bill Amount</th><th>Paid</th><th>Received</th><th>Balance</th><th>Remark</th><th>CVrid</th><th></th></tr></thead>
+          <tbody>
+            <tr>
+              <td></td>
+              <td>${pdcEntryField(type, "invoiceNo", record.entry.invoiceNo)}</td>
+              <td>${pdcEntryField(type, "invoiceType", record.entry.invoiceType)}</td>
+              <td>${pdcEntryField(type, "invoiceDate", toDateInputValue(record.entry.invoiceDate), "date")}</td>
+              <td>${pdcEntryField(type, "billAmount", moneyValue(record.entry.billAmount), "number")}</td>
+              <td>${pdcEntryField(type, "paid", moneyValue(record.entry.paid), "number")}</td>
+              <td>${pdcEntryField(type, "received", moneyValue(record.entry.received), "number")}</td>
+              <td><input class="grid-input auto-field numeric" value="${moneyValue(record.entry.balance)}" readonly /></td>
+              <td>${pdcEntryField(type, "remark", record.entry.remark)}</td>
+              <td>${pdcEntryField(type, "cvRid", record.entry.cvRid)}</td>
+              <td><button class="compact-action" data-action="add-pdc-line-${type}">Add</button></td>
+            </tr>
+            ${(record.lines || []).map((line, index) => {
+              const row = normalizePdcReceiptLine(line);
+              return `<tr>
+                <td>${index + 1}<button class="line-delete" data-action="delete-pdc-line-${type}" data-index="${index}" title="Remove row">x</button></td>
+                <td>${pdcLineField(type, index, "invoiceNo", row.invoiceNo)}</td>
+                <td>${pdcLineField(type, index, "invoiceType", row.invoiceType)}</td>
+                <td>${pdcLineField(type, index, "invoiceDate", toDateInputValue(row.invoiceDate), "date")}</td>
+                <td>${pdcLineField(type, index, "billAmount", moneyValue(row.billAmount), "number")}</td>
+                <td>${pdcLineField(type, index, "paid", moneyValue(row.paid), "number")}</td>
+                <td>${pdcLineField(type, index, "received", moneyValue(row.received), "number")}</td>
+                <td><input class="grid-input auto-field numeric" value="${moneyValue(row.balance)}" readonly /></td>
+                <td>${pdcLineField(type, index, "remark", row.remark)}</td>
+                <td>${pdcLineField(type, index, "cvRid", row.cvRid)}</td>
+                <td></td>
+              </tr>`;
+            }).join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    ${pdcRequestTotalStrip(financials)}
+  `;
+}
+
+function pdcRequestTotalStrip(financials) {
+  return `<div class="bank-transaction-total-strip pdc-receipt-total-strip"><strong>Total Amount :</strong><span>-</span><output>${moneyValue(financials.totalAmount)}</output></div>`;
+}
+
+function pdcIssueRequestScreen(type) {
+  const record = pdcDraft(type);
+  const title = pdcTitle(type);
+  return `
+    <div class="transaction-entry-header bank-transaction-header pdc-issue-request-header">
+      <div class="classic-fields left">
+        <label class="classic-field split-field"><span>Entry No, Ref No</span><span class="field-pair">${pdcField(type, "entryNo", record.entryNo)}${pdcField(type, "refNo", record.refNo)}</span></label>
+        <label class="classic-field split-field"><span>Date, Time</span><span class="field-pair">${pdcField(type, "date", toDateInputValue(record.date), "date")}${pdcField(type, "time", record.time)}</span></label>
+        ${pdcSelect(type, "bankAccount", type === "issue" ? "Issue Bank" : "Request Bank", bankAccountOptions(), record.bankAccount)}
+      </div>
+      <div class="classic-fields right">
+        <label class="classic-field split-field"><span>Prepared By</span><span class="field-pair">${pdcField(type, "preparedByCode", record.preparedByCode || pdcStaffCode(record.preparedBy))}${pdcSelectOnly(type, "preparedBy", bankStaffOptions(), record.preparedBy)}</span></label>
+        <label class="classic-field textarea-field"><span>Remark</span><textarea data-pdc-type="${type}" data-pdc-field="remark">${pdcAttr(record.remark)}</textarea></label>
+      </div>
+    </div>
+    <div class="bank-transaction-table-panel">
+      <div class="panel-head pdc-inline-heading"><h2>${title}</h2><button class="secondary" data-action="add-pdc-line-${type}">Add Cheque Row</button></div>
+      <div class="table-wrap bank-transaction-table-wrap">
+        <table class="bank-transaction-table">
+          <colgroup><col style="width:52px" /><col style="width:170px" /><col style="width:150px" /><col style="width:150px" /><col style="width:150px" /><col style="width:320px" /><col style="width:72px" /></colgroup>
+          <thead><tr><th>Sl</th><th>Cheque No</th><th>Cheque Date</th><th>Amount</th><th>Entry Date</th><th>Party Name</th><th></th></tr></thead>
+          <tbody>
+            <tr>
+              <td></td>
+              <td>${pdcEntryField(type, "chequeNo", record.entry.chequeNo)}</td>
+              <td>${pdcEntryField(type, "chequeDate", toDateInputValue(record.entry.chequeDate), "date")}</td>
+              <td>${pdcEntryField(type, "amount", moneyValue(record.entry.amount), "number")}</td>
+              <td>${pdcEntryField(type, "entryDate", toDateInputValue(record.entry.entryDate), "date")}</td>
+              <td>${pdcEntryField(type, "partyName", record.entry.partyName)}</td>
+              <td><button class="compact-action" data-action="add-pdc-line-${type}">Add</button></td>
+            </tr>
+            ${(record.lines || []).map((line, index) => {
+              const row = normalizePdcSubmissionLine(line);
+              return `<tr>
+                <td>${index + 1}</td>
+                <td>${pdcLineField(type, index, "chequeNo", row.chequeNo)}</td>
+                <td>${pdcLineField(type, index, "chequeDate", toDateInputValue(row.chequeDate), "date")}</td>
+                <td>${pdcLineField(type, index, "amount", moneyValue(row.amount), "number")}</td>
+                <td>${pdcLineField(type, index, "entryDate", toDateInputValue(row.entryDate), "date")}</td>
+                <td>${pdcLineField(type, index, "partyName", row.partyName)}</td>
+                <td><button class="line-delete" data-action="delete-pdc-line-${type}" data-index="${index}" title="Remove row">x</button></td>
+              </tr>`;
+            }).join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    ${bankTransactionTotalStrip(pdcFinancials(record, type))}
+  `;
+}
+
+function pdcBankSubmissionScreen() {
+  const type = "submission";
+  const record = pdcDraft(type);
+  return `
+    ${pdcSplitHeader(type, record, "Entry Date, Time", "Bank Account")}
+    <div class="bank-transaction-table-panel">
+      <div class="table-wrap bank-transaction-table-wrap">
+        <table class="bank-transaction-table">
+          <colgroup><col style="width:52px" /><col style="width:170px" /><col style="width:150px" /><col style="width:150px" /><col style="width:150px" /><col style="width:320px" /><col style="width:72px" /></colgroup>
+          <thead><tr><th>Sl</th><th>Cheque No</th><th>Cheque Date</th><th>Amount</th><th>Entry Date</th><th>Party Name</th><th></th></tr></thead>
+          <tbody>
+            <tr>
+              <td></td>
+              <td>${pdcEntryField(type, "chequeNo", record.entry.chequeNo)}</td>
+              <td>${pdcEntryField(type, "chequeDate", toDateInputValue(record.entry.chequeDate), "date")}</td>
+              <td>${pdcEntryField(type, "amount", moneyValue(record.entry.amount), "number")}</td>
+              <td>${pdcEntryField(type, "entryDate", toDateInputValue(record.entry.entryDate), "date")}</td>
+              <td>${pdcEntryField(type, "partyName", record.entry.partyName)}</td>
+              <td><button class="compact-action" data-action="add-pdc-line-${type}">Add</button></td>
+            </tr>
+            ${(record.lines || []).map((line, index) => {
+              const row = normalizePdcSubmissionLine(line);
+              return `<tr>
+                <td>${index + 1}</td>
+                <td>${pdcLineField(type, index, "chequeNo", row.chequeNo)}</td>
+                <td>${pdcLineField(type, index, "chequeDate", toDateInputValue(row.chequeDate), "date")}</td>
+                <td>${pdcLineField(type, index, "amount", moneyValue(row.amount), "number")}</td>
+                <td>${pdcLineField(type, index, "entryDate", toDateInputValue(row.entryDate), "date")}</td>
+                <td>${pdcLineField(type, index, "partyName", row.partyName)}</td>
+                <td><button class="line-delete" data-action="delete-pdc-line-${type}" data-index="${index}" title="Remove row">x</button></td>
+              </tr>`;
+            }).join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    ${bankTransactionTotalStrip(pdcFinancials(record, type))}
+  `;
+}
+
+function pdcChequeBounceScreen() {
+  const type = "bounce";
+  const record = pdcDraft(type);
+  return `
+    ${pdcSplitHeader(type, record, "Date, Time", "Bank Name")}
+    <div class="bank-transaction-table-panel">
+      <div class="table-wrap bank-transaction-table-wrap">
+        <table class="bank-transaction-table">
+          <colgroup><col style="width:48px" /><col style="width:100px" /><col style="width:160px" /><col style="width:100px" /><col style="width:130px" /><col style="width:130px" /><col style="width:170px" /><col style="width:170px" /><col style="width:250px" /><col style="width:66px" /></colgroup>
+          <thead><tr><th>Sl</th><th>Entry No</th><th>Cheque No</th><th>Type</th><th>Amount</th><th>Cheque Date</th><th>Service Charge [Bank]</th><th>Service Charge [Party]</th><th>Party Name</th><th></th></tr></thead>
+          <tbody>
+            <tr>
+              <td></td>
+              <td>${pdcEntryField(type, "entryNo", record.entry.entryNo)}</td>
+              <td>${pdcEntryField(type, "chequeNo", record.entry.chequeNo)}</td>
+              <td>${pdcSelectOnly(type, "type", ["PDC", "Normal"], record.entry.type, true)}</td>
+              <td>${pdcEntryField(type, "amount", moneyValue(record.entry.amount), "number")}</td>
+              <td>${pdcEntryField(type, "chequeDate", toDateInputValue(record.entry.chequeDate), "date")}</td>
+              <td>${pdcEntryField(type, "serviceChargeBank", moneyValue(record.entry.serviceChargeBank), "number")}</td>
+              <td>${pdcEntryField(type, "serviceChargeParty", moneyValue(record.entry.serviceChargeParty), "number")}</td>
+              <td>${pdcEntryField(type, "partyName", record.entry.partyName)}</td>
+              <td><button class="compact-action" data-action="add-pdc-line-${type}">Add</button></td>
+            </tr>
+            ${(record.lines || []).map((line, index) => {
+              const row = normalizePdcBounceLine(line);
+              return `<tr>
+                <td>${index + 1}</td>
+                <td>${pdcLineField(type, index, "entryNo", row.entryNo)}</td>
+                <td>${pdcLineField(type, index, "chequeNo", row.chequeNo)}</td>
+                <td><select class="grid-input" data-pdc-type="${type}" data-pdc-line="${index}" data-pdc-line-field="type">${["PDC", "Normal"].map((option) => `<option ${option === row.type ? "selected" : ""}>${option}</option>`).join("")}</select></td>
+                <td>${pdcLineField(type, index, "amount", moneyValue(row.amount), "number")}</td>
+                <td>${pdcLineField(type, index, "chequeDate", toDateInputValue(row.chequeDate), "date")}</td>
+                <td>${pdcLineField(type, index, "serviceChargeBank", moneyValue(row.serviceChargeBank), "number")}</td>
+                <td>${pdcLineField(type, index, "serviceChargeParty", moneyValue(row.serviceChargeParty), "number")}</td>
+                <td>${pdcLineField(type, index, "partyName", row.partyName)}</td>
+                <td><button class="line-delete" data-action="delete-pdc-line-${type}" data-index="${index}" title="Remove row">x</button></td>
+              </tr>`;
+            }).join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    ${bankTransactionTotalStrip(pdcFinancials(record, type))}
+  `;
+}
+
+function pdcSplitHeader(type, record, dateLabel, bankLabel) {
+  return `
+    <div class="transaction-entry-header bank-transaction-header">
+      <div class="classic-fields left">
+        <label class="classic-field split-field"><span>Entry No, Ref No</span><span class="field-pair">${pdcField(type, "entryNo", record.entryNo)}${pdcField(type, "refNo", record.refNo)}</span></label>
+        <label class="classic-field split-field"><span>${dateLabel}</span><span class="field-pair">${pdcField(type, "date", toDateInputValue(record.date), "date")}${pdcField(type, "time", record.time)}</span></label>
+      </div>
+      <div class="classic-fields right">
+        ${pdcSelect(type, type === "bounce" ? "bankName" : "bankAccount", bankLabel, bankAccountOptions(), type === "bounce" ? record.bankName : record.bankAccount)}
+        ${pdcSelect(type, "preparedBy", "Prepared By", bankStaffOptions(), record.preparedBy)}
+      </div>
+    </div>
+  `;
+}
+
+function pdcChequeRepresentScreen() {
+  const type = "request";
+  const record = pdcDraft(type);
+  const bounced = pdcBounceOptions();
+  const options = [`<option value="">Select bounced cheque</option>`, ...bounced.map((option) => `<option value="${pdcAttr(option.id)}" ${option.id === record.bouncedChequeId ? "selected" : ""}>${pdcAttr(`${option.line.chequeNo || "Cheque"} - ${option.line.partyName || "Party"} - ${moneyValue(option.line.amount)}`)}</option>`)].join("");
+  return `
+    <div class="transaction-entry-header pdc-request-header pdc-represent-header">
+      <div class="classic-fields left pdc-represent-panel">
+        <label class="classic-field split-field"><span>Entry No, Ref No</span><span class="field-pair">${pdcField(type, "entryNo", record.entryNo)}${pdcField(type, "refNo", record.refNo)}</span></label>
+        <label class="classic-field split-field"><span>Date, Time</span><span class="field-pair">${pdcField(type, "date", toDateInputValue(record.date), "date")}${pdcField(type, "time", record.time)}</span></label>
+        <label class="classic-field split-field"><span>Prepared By</span><span class="field-pair">${pdcField(type, "preparedByCode", record.preparedByCode || pdcStaffCode(record.preparedBy))}${pdcSelectOnly(type, "preparedBy", bankStaffOptions(), record.preparedBy)}</span></label>
+        <label class="classic-field"><span>Bounced Cheques</span><select data-pdc-type="${type}" data-pdc-field="bouncedChequeId">${options}</select></label>
+        ${pdcSelect(type, "bankAccount", "Bank Account", bankAccountOptions(), record.bankAccount)}
+        ${pdcSelect(type, "reasonForRepresent", "Reason for Represent", ["As Per Party Request", "Bank Advice", "Wrong Date", "Insufficient Funds Cleared"], record.reasonForRepresent)}
+        <label class="classic-field textarea-field"><span>Remark</span><textarea data-pdc-type="${type}" data-pdc-field="remark">${pdcAttr(record.remark)}</textarea></label>
+      </div>
+      <div class="classic-fields right pdc-represent-panel">
+        <label class="classic-field"><span>Entry No</span>${pdcField(type, "requestEntryNo", record.requestEntryNo, "text", true)}</label>
+        <label class="classic-field"><span>Entry Date</span>${pdcField(type, "requestEntryDate", toDateInputValue(record.requestEntryDate), "date", true)}</label>
+        <label class="classic-field"><span>Cheque Date</span>${pdcField(type, "chequeDate", toDateInputValue(record.chequeDate), "date", true)}</label>
+        <label class="classic-field"><span>Cheque Amount</span>${pdcField(type, "chequeAmount", moneyValue(record.chequeAmount), "number", true)}</label>
+        <label class="classic-field"><span>Party</span>${pdcField(type, "party", record.party, "text", true)}</label>
+        <label class="classic-field"><span>Reason</span>${pdcField(type, "reason", record.reason, "text", true)}</label>
+      </div>
+    </div>
+  `;
+}
+
+function defaultJournalVoucherLine() {
+  return {
+    id: crypto.randomUUID(),
+    accountId: "",
+    accountHead: "",
+    debit: 0,
+    credit: 0,
+    remark: ""
+  };
+}
+
+function normalizeJournalVoucherLine(line = {}) {
+  return {
+    id: line.id || crypto.randomUUID(),
+    accountId: line.accountId || line.headId || "",
+    accountHead: line.accountHead || line.head || line.ledger || "",
+    debit: Number(line.debit || 0),
+    credit: Number(line.credit || 0),
+    remark: line.remark || line.remarks || ""
+  };
+}
+
+function journalVoucherFinancials(record = {}) {
+  const lines = (record.lines || []).map(normalizeJournalVoucherLine);
+  const totalDebit = sumBy(lines, "debit");
+  const totalCredit = sumBy(lines, "credit");
+  return {
+    totalDebit,
+    totalCredit,
+    difference: totalDebit - totalCredit
+  };
+}
+
+function defaultJournalVoucher() {
+  const today = toDateInputValue(new Date());
+  return normalizeJournalVoucher({
+    id: crypto.randomUUID(),
+    voucherNo: "",
+    refNo: "",
+    date: today,
+    time: nowTimeWithSeconds(),
+    costCenter: bankCostCenters()[0] || "cost1",
+    preparedBy: bankStaffOptions()[0] || "",
+    entry: defaultJournalVoucherLine(),
+    lines: [],
+    rateFixed: false,
+    ignoreReverseAccount: false,
+    narration: ""
+  });
+}
+
+function normalizeJournalVoucher(record = {}) {
+  const today = toDateInputValue(new Date());
+  const clean = {
+    id: record.id || crypto.randomUUID(),
+    voucherNo: record.voucherNo || record.voucher || "",
+    refNo: record.refNo || "",
+    date: toDateInputValue(record.date || today),
+    time: record.time || nowTimeWithSeconds(),
+    costCenter: record.costCenter || bankCostCenters()[0] || "cost1",
+    preparedBy: record.preparedBy || bankStaffOptions()[0] || "",
+    entry: normalizeJournalVoucherLine(record.entry || defaultJournalVoucherLine()),
+    lines: (record.lines || []).map(normalizeJournalVoucherLine),
+    rateFixed: Boolean(record.rateFixed),
+    ignoreReverseAccount: Boolean(record.ignoreReverseAccount),
+    narration: record.narration || ""
+  };
+  return {
+    ...clean,
+    ...journalVoucherFinancials(clean)
+  };
+}
+
+function journalVoucherDraftRecord() {
+  if (!journalVoucherDraft) journalVoucherDraft = normalizeJournalVoucher(state.journalVouchers?.[0] || defaultJournalVoucher());
+  return journalVoucherDraft;
+}
+
+function resolveJournalAccount(value) {
+  return bankAccountHeadOptions().find((account) => account.name === value || account.id === value);
+}
+
+function journalVoucherScreen() {
+  const record = journalVoucherDraftRecord();
+  const financials = journalVoucherFinancials(record);
+  return `
+    <section class="clean-entry-shell bank-transaction-shell journal-voucher-shell">
+      ${journalVoucherToolbar()}
+      ${journalVoucherHeader(record)}
+      <div class="bank-transaction-table-panel">
+        ${journalVoucherEntryRow(record)}
+        ${journalVoucherTable(record)}
+      </div>
+      ${journalVoucherTotalStrip(financials)}
+      ${journalVoucherFooter(record)}
+    </section>
+  `;
+}
+
+function journalVoucherToolbar() {
+  return `
+    <div class="entry-actions body-toolbar bank-transaction-toolbar">
+      ${toolbarButton("Save", "save-journal-voucher")}
+      ${toolbarButton("Refresh", "refresh-journal-voucher")}
+      ${toolbarButton("Edit", "edit-journal-voucher")}
+      ${toolbarButton("Delete", "delete-journal-voucher")}
+      ${toolbarButton("Print", "print-journal-voucher")}
+      ${toolbarButton("Close", "close-account-action")}
+      <span class="toolbar-spacer"></span>
+      <label class="rate-inline"><span>Gold Rate</span><input value="${activeGoldRate()}" readonly /></label>
+    </div>
+  `;
+}
+
+function journalVoucherHeader(record) {
+  return `
+    <div class="transaction-entry-header bank-transaction-header">
+      <div class="classic-fields left">
+        <label class="classic-field split-field"><span>Voucher No, Ref No</span><span class="field-pair">${journalField("voucherNo", record.voucherNo)}${journalField("refNo", record.refNo)}</span></label>
+        <label class="classic-field split-field"><span>Date, Time</span><span class="field-pair">${journalField("date", toDateInputValue(record.date), "date")}${journalField("time", record.time)}</span></label>
+      </div>
+      <div class="classic-fields right">
+        ${journalSelect("costCenter", "Cost Center", bankCostCenters(), record.costCenter)}
+        ${journalSelect("preparedBy", "Prepared By", bankStaffOptions(), record.preparedBy)}
+      </div>
+    </div>
+  `;
+}
+
+function journalField(field, value = "", inputType = "text") {
+  return `<input data-journal-field="${field}" type="${inputType}" value="${value ?? ""}" />`;
+}
+
+function journalSelect(field, label, options, selected) {
+  const unique = [...new Set((options || []).filter(Boolean))];
+  return `<label class="classic-field"><span>${label}</span><select data-journal-field="${field}">${unique.map((option) => `<option ${option === selected ? "selected" : ""}>${option}</option>`).join("")}</select></label>`;
+}
+
+function journalVoucherEntryRow(record) {
+  const entry = normalizeJournalVoucherLine(record.entry || {});
+  const heads = bankAccountHeadOptions();
+  return `
+    <datalist id="journal-account-options">${heads.map((account) => `<option value="${account.name}" data-id="${account.id}"></option>`).join("")}</datalist>
+    <div class="bank-transaction-entry-wrap">
+      <table class="bank-transaction-entry-grid">
+        <colgroup>
+          <col style="width: 140px" /><col style="width: 340px" /><col style="width: 150px" /><col style="width: 150px" /><col style="width: 260px" /><col style="width: 82px" />
+        </colgroup>
+        <thead><tr><th>ID</th><th>Account Head</th><th>Debit</th><th>Credit</th><th>Remark</th><th></th></tr></thead>
+        <tbody>
+          <tr>
+            <td><input data-journal-entry-field="accountId" value="${entry.accountId}" /></td>
+            <td><input list="journal-account-options" data-journal-entry-field="accountHead" value="${entry.accountHead}" /></td>
+            <td><input class="numeric" data-journal-entry-field="debit" type="number" value="${moneyValue(entry.debit)}" /></td>
+            <td><input class="numeric" data-journal-entry-field="credit" type="number" value="${moneyValue(entry.credit)}" /></td>
+            <td><input data-journal-entry-field="remark" value="${entry.remark}" /></td>
+            <td><button class="compact-action" data-action="add-journal-voucher-line">Add</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function journalVoucherTable(record) {
+  const rows = (record.lines || []).map((line) => normalizeJournalVoucherLine(line));
+  return `
+    <div class="table-wrap bank-transaction-table-wrap">
+      <table class="bank-transaction-table">
+        <colgroup>
+          <col style="width: 52px" /><col style="width: 44px" /><col style="width: 140px" /><col style="width: 340px" /><col style="width: 150px" /><col style="width: 150px" /><col style="width: 260px" />
+        </colgroup>
+        <thead><tr><th>Sl</th><th>X</th><th>ID</th><th>Account Head</th><th>Debit</th><th>Credit</th><th>Remark</th></tr></thead>
+        <tbody>
+          ${rows.map((line, index) => `
+            <tr>
+              <td>${index + 1}</td>
+              <td><button class="line-delete" data-action="delete-journal-voucher-line" data-index="${index}" title="Remove row">x</button></td>
+              <td><input data-journal-line="${index}" data-journal-line-field="accountId" value="${line.accountId}" /></td>
+              <td><input list="journal-account-options" data-journal-line="${index}" data-journal-line-field="accountHead" value="${line.accountHead}" /></td>
+              <td><input class="numeric" data-journal-line="${index}" data-journal-line-field="debit" type="number" value="${moneyValue(line.debit)}" /></td>
+              <td><input class="numeric" data-journal-line="${index}" data-journal-line-field="credit" type="number" value="${moneyValue(line.credit)}" /></td>
+              <td><input data-journal-line="${index}" data-journal-line-field="remark" value="${line.remark}" /></td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function journalVoucherTotalStrip(financials) {
+  return `<div class="bank-transaction-total-strip"><strong>Total Amount</strong><output>${moneyValue(financials.totalDebit)}</output><output>${moneyValue(financials.totalCredit)}</output></div>`;
+}
+
+function journalVoucherFooter(record) {
+  return `
+    <div class="bank-transaction-footer">
+      <div class="bank-transaction-checks">
+        <label><input type="checkbox" data-journal-field="rateFixed" ${record.rateFixed ? "checked" : ""} /> Rate Fixed</label>
+        <label><input type="checkbox" data-journal-field="ignoreReverseAccount" ${record.ignoreReverseAccount ? "checked" : ""} /> Ignore Rev.Acc</label>
+      </div>
+      <label class="bank-transaction-narration"><span>Narration</span><textarea data-journal-field="narration">${record.narration || ""}</textarea></label>
+    </div>
+  `;
+}
+
+function cashVoucherStorageKey(type) {
+  return type === "payment" ? "cashPayments" : "cashReceipts";
+}
+
+function cashVoucherTitle(type) {
+  return type === "payment" ? "Cash Payment (Normal)" : "Cash Receipt (Normal)";
+}
+
+function cashVoucherView(type) {
+  return type === "payment" ? "Cash Payment" : "Cash Receipt";
+}
+
+function defaultCashVoucherLine(type = "receipt") {
+  return {
+    id: crypto.randomUUID(),
+    headId: "",
+    accountHead: "",
+    amount: 0,
+    discount: type === "receipt" ? 0 : 0,
+    remarks: "",
+    voucherNo: "",
+    voucherDate: toDateInputValue(new Date())
+  };
+}
+
+function normalizeCashVoucherLine(line = {}, type = "receipt") {
+  return {
+    id: line.id || crypto.randomUUID(),
+    headId: line.headId || "",
+    accountHead: line.accountHead || "",
+    amount: Number(line.amount || 0),
+    discount: type === "receipt" ? Number(line.discount || 0) : 0,
+    remarks: line.remarks || "",
+    voucherNo: line.voucherNo || "",
+    voucherDate: toDateInputValue(line.voucherDate || new Date())
+  };
+}
+
+function defaultCashVoucher(type = "receipt") {
+  const today = toDateInputValue(new Date());
+  const staff = bankStaffOptions()[0] || "";
+  return normalizeCashVoucher({
+    id: crypto.randomUUID(),
+    type,
+    voucherNo: "",
+    refNo: "",
+    date: today,
+    time: nowTimeWithSeconds(),
+    preparedBy: staff,
+    costCenter: bankCostCenters()[0] || "cost1",
+    cashAccount: "Cash in Hand",
+    handledBy: staff,
+    openingBalance: 0,
+    entry: defaultCashVoucherLine(type),
+    lines: [],
+    showAllAccount: true,
+    enableCashAccount: false,
+    noPrint: false,
+    rateFixed: false,
+    narration: ""
+  }, type);
+}
+
+function normalizeCashVoucher(record = {}, type = "receipt") {
+  const today = toDateInputValue(new Date());
+  const staff = bankStaffOptions()[0] || "";
+  const lines = (record.lines || []).map((line) => normalizeCashVoucherLine(line, type));
+  const clean = {
+    id: record.id || crypto.randomUUID(),
+    type: record.type || type,
+    voucherNo: record.voucherNo || "",
+    refNo: record.refNo || "",
+    date: toDateInputValue(record.date || today),
+    time: record.time || nowTimeWithSeconds(),
+    preparedBy: record.preparedBy || staff,
+    costCenter: record.costCenter || bankCostCenters()[0] || "cost1",
+    cashAccount: record.cashAccount || "Cash in Hand",
+    handledBy: record.handledBy || staff,
+    openingBalance: Number(record.openingBalance || 0),
+    entry: normalizeCashVoucherLine(record.entry || defaultCashVoucherLine(type), type),
+    lines,
+    showAllAccount: record.showAllAccount !== undefined ? Boolean(record.showAllAccount) : true,
+    enableCashAccount: Boolean(record.enableCashAccount),
+    noPrint: Boolean(record.noPrint),
+    rateFixed: Boolean(record.rateFixed),
+    narration: record.narration || ""
+  };
+  return { ...clean, ...cashVoucherFinancials(clean, type) };
+}
+
+function cashVoucherFinancials(record = {}, type = "receipt") {
+  const lines = (record.lines || []).map((line) => normalizeCashVoucherLine(line, type));
+  const grossAmount = sumBy(lines, "amount");
+  const discountAmount = type === "receipt" ? sumBy(lines, "discount") : 0;
+  const totalAmount = Math.max(0, grossAmount - discountAmount);
+  const openingBalance = Number(record.openingBalance || 0);
+  const closingBalance = type === "payment" ? openingBalance - totalAmount : openingBalance + totalAmount;
+  return { grossAmount, discountAmount, totalAmount, openingBalance, closingBalance };
+}
+
+function cashVoucherDraft(type) {
+  if (!cashVoucherDrafts[type]) {
+    cashVoucherDrafts[type] = normalizeCashVoucher(state[cashVoucherStorageKey(type)]?.[0] || defaultCashVoucher(type), type);
+  }
+  return cashVoucherDrafts[type];
+}
+
+function cashVoucherScreen(type) {
+  const record = cashVoucherDraft(type);
+  const financials = cashVoucherFinancials(record, type);
+  return `
+    <section class="clean-entry-shell bank-transaction-shell cash-voucher-shell" data-cash-voucher-type="${type}">
+      ${cashVoucherToolbar(type)}
+      ${cashVoucherHeader(type, record)}
+      <div class="bank-transaction-table-panel">
+        ${cashVoucherEntryRow(type, record)}
+        ${cashVoucherTable(type, record)}
+      </div>
+      ${cashVoucherTotalStrip(type, financials)}
+      ${cashVoucherFooter(type, record)}
+    </section>
+  `;
+}
+
+function cashVoucherToolbar(type) {
+  return `
+    <div class="entry-actions body-toolbar bank-transaction-toolbar">
+      ${toolbarButton("Save", `save-cash-voucher-${type}`)}
+      ${toolbarButton("Refresh", `refresh-cash-voucher-${type}`)}
+      ${toolbarButton("Edit", `edit-cash-voucher-${type}`)}
+      ${toolbarButton("Delete", `delete-cash-voucher-${type}`)}
+      ${toolbarButton("Print", `print-cash-voucher-${type}`)}
+      ${toolbarButton("Close", "close-account-action")}
+      <span class="toolbar-spacer"></span>
+      <label class="rate-inline"><span>Gold Rate</span><input value="${activeGoldRate()}" readonly /></label>
+    </div>
+  `;
+}
+
+function cashVoucherHeader(type, record) {
+  const handledLabel = type === "payment" ? "Paid By" : "Received By";
+  return `
+    <div class="transaction-entry-header bank-transaction-header cash-voucher-header">
+      <div class="classic-fields left">
+        <label class="classic-field split-field"><span>Voucher No, Ref No</span><span class="field-pair">${cashVoucherField(type, "voucherNo", record.voucherNo)}${cashVoucherField(type, "refNo", record.refNo)}</span></label>
+        <label class="classic-field split-field"><span>Date, Time</span><span class="field-pair">${cashVoucherField(type, "date", toDateInputValue(record.date), "date")}${cashVoucherField(type, "time", record.time)}</span></label>
+        ${cashVoucherSelect(type, "preparedBy", "Prepared By", bankStaffOptions(), record.preparedBy)}
+      </div>
+      <div class="classic-fields right">
+        ${cashVoucherSelect(type, "costCenter", "Cost Center", bankCostCenters(), record.costCenter)}
+        ${cashVoucherSelect(type, "cashAccount", "Cash Account", ["Cash in Hand", "Scheme Cash"], record.cashAccount, !record.enableCashAccount)}
+        ${cashVoucherSelect(type, "handledBy", handledLabel, bankStaffOptions(), record.handledBy)}
+      </div>
+    </div>
+  `;
+}
+
+function cashVoucherField(type, field, value = "", inputType = "text") {
+  return `<input data-cash-voucher-type="${type}" data-cash-voucher-field="${field}" type="${inputType}" value="${value ?? ""}" />`;
+}
+
+function cashVoucherSelect(type, field, label, options, selected, disabled = false) {
+  return `<label class="classic-field"><span>${label}</span>${cashVoucherSelectOnly(type, field, options, selected, disabled)}</label>`;
+}
+
+function cashVoucherSelectOnly(type, field, options, selected, disabled = false) {
+  const unique = [...new Set((options || []).filter(Boolean))];
+  return `<select data-cash-voucher-type="${type}" data-cash-voucher-field="${field}" ${disabled ? "disabled" : ""}>${unique.map((option) => `<option ${option === selected ? "selected" : ""}>${option}</option>`).join("")}</select>`;
+}
+
+function cashVoucherEntryRow(type, record) {
+  const entry = normalizeCashVoucherLine(record.entry || {}, type);
+  const heads = bankAccountHeadOptions();
+  const listId = `cash-voucher-head-options-${type}`;
+  const discountHead = type === "receipt" ? `<th>Discount</th>` : "";
+  const discountCell = type === "receipt" ? `<td><input class="numeric" data-cash-voucher-type="${type}" data-cash-voucher-entry-field="discount" type="number" value="${moneyValue(entry.discount)}" /></td>` : "";
+  return `
+    <datalist id="${listId}">${heads.map((account) => `<option value="${account.name}" data-id="${account.id}"></option>`).join("")}</datalist>
+    <div class="bank-transaction-entry-wrap">
+      <table class="bank-transaction-entry-grid cash-voucher-entry-grid ${type}">
+        <colgroup>
+          <col style="width: 130px" /><col style="width: 330px" /><col style="width: 140px" />${type === "receipt" ? '<col style="width: 120px" />' : ""}<col style="width: 220px" /><col style="width: 130px" /><col style="width: 140px" /><col style="width: 82px" />
+        </colgroup>
+        <thead><tr><th>Head ID</th><th>Account Head</th><th>Amount</th>${discountHead}<th>Remarks</th><th>Voucher No</th><th>Voucher Date</th><th></th></tr></thead>
+        <tbody>
+          <tr>
+            <td><input data-cash-voucher-type="${type}" data-cash-voucher-entry-field="headId" value="${entry.headId}" /></td>
+            <td><input list="${listId}" data-cash-voucher-type="${type}" data-cash-voucher-entry-field="accountHead" value="${entry.accountHead}" /></td>
+            <td><input class="numeric" data-cash-voucher-type="${type}" data-cash-voucher-entry-field="amount" type="number" value="${moneyValue(entry.amount)}" /></td>
+            ${discountCell}
+            <td><input data-cash-voucher-type="${type}" data-cash-voucher-entry-field="remarks" value="${entry.remarks}" /></td>
+            <td><input data-cash-voucher-type="${type}" data-cash-voucher-entry-field="voucherNo" value="${entry.voucherNo}" /></td>
+            <td><input data-cash-voucher-type="${type}" data-cash-voucher-entry-field="voucherDate" type="date" value="${toDateInputValue(entry.voucherDate)}" /></td>
+            <td><button class="compact-action" data-action="add-cash-voucher-line-${type}">Add</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function cashVoucherTable(type, record) {
+  const rows = (record.lines || []).map((line) => normalizeCashVoucherLine(line, type));
+  const discountHead = type === "receipt" ? "<th>Discount</th>" : "";
+  return `
+    <div class="table-wrap bank-transaction-table-wrap">
+      <table class="bank-transaction-table cash-voucher-table ${type}">
+        <colgroup>
+          <col style="width: 52px" /><col style="width: 44px" /><col style="width: 130px" /><col style="width: 330px" /><col style="width: 140px" />${type === "receipt" ? '<col style="width: 120px" />' : ""}<col style="width: 220px" /><col style="width: 130px" /><col style="width: 140px" />
+        </colgroup>
+        <thead><tr><th>Sl#</th><th></th><th>Head ID</th><th>Account Head</th><th>Amount</th>${discountHead}<th>Remarks</th><th>Voucher No</th><th>Voucher Date</th></tr></thead>
+        <tbody>
+          ${rows.map((line, index) => `
+            <tr>
+              <td>${index + 1}</td>
+              <td><button class="line-delete" data-action="delete-cash-voucher-line-${type}" data-index="${index}" title="Remove row">x</button></td>
+              <td><input data-cash-voucher-type="${type}" data-cash-voucher-line="${index}" data-cash-voucher-line-field="headId" value="${line.headId}" /></td>
+              <td><input data-cash-voucher-type="${type}" data-cash-voucher-line="${index}" data-cash-voucher-line-field="accountHead" value="${line.accountHead}" /></td>
+              <td><input class="numeric" data-cash-voucher-type="${type}" data-cash-voucher-line="${index}" data-cash-voucher-line-field="amount" type="number" value="${moneyValue(line.amount)}" /></td>
+              ${type === "receipt" ? `<td><input class="numeric" data-cash-voucher-type="${type}" data-cash-voucher-line="${index}" data-cash-voucher-line-field="discount" type="number" value="${moneyValue(line.discount)}" /></td>` : ""}
+              <td><input data-cash-voucher-type="${type}" data-cash-voucher-line="${index}" data-cash-voucher-line-field="remarks" value="${line.remarks}" /></td>
+              <td><input data-cash-voucher-type="${type}" data-cash-voucher-line="${index}" data-cash-voucher-line-field="voucherNo" value="${line.voucherNo}" /></td>
+              <td><input data-cash-voucher-type="${type}" data-cash-voucher-line="${index}" data-cash-voucher-line-field="voucherDate" type="date" value="${toDateInputValue(line.voucherDate)}" /></td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function cashVoucherTotalStrip(type, financials) {
+  if (type === "payment") {
+    return `<div class="bank-transaction-total-strip cash-voucher-total-strip payment"><strong>Total Amount</strong><output>${moneyValue(financials.totalAmount)}</output><span>-</span></div>`;
+  }
+  return `
+    <div class="bank-transaction-total-strip cash-voucher-total-strip receipt">
+      <strong>Total Amount</strong><output>${moneyValue(financials.totalAmount)}</output>
+      <span>Opening</span><output class="cash-voucher-numeric-danger">${moneyValue(financials.openingBalance)}</output>
+      <span>Closing</span><output class="cash-voucher-numeric-danger">${moneyValue(financials.closingBalance)}</output>
+    </div>
+  `;
+}
+
+function cashVoucherFooter(type, record) {
+  return `
+    <div class="bank-transaction-footer cash-voucher-footer">
+      <div class="bank-transaction-checks">
+        <label><input type="checkbox" data-cash-voucher-type="${type}" data-cash-voucher-field="showAllAccount" ${record.showAllAccount ? "checked" : ""} /> Show All Account</label>
+        <label><input type="checkbox" data-cash-voucher-type="${type}" data-cash-voucher-field="noPrint" ${record.noPrint ? "checked" : ""} /> <strong>No Print</strong></label>
+        <label><input type="checkbox" data-cash-voucher-type="${type}" data-cash-voucher-field="enableCashAccount" ${record.enableCashAccount ? "checked" : ""} /> Enable Cash A/c</label>
+        <label><input type="checkbox" data-cash-voucher-type="${type}" data-cash-voucher-field="rateFixed" ${record.rateFixed ? "checked" : ""} /> Rate Fixed</label>
+      </div>
+      <label class="bank-transaction-narration"><span>Narration</span><textarea data-cash-voucher-type="${type}" data-cash-voucher-field="narration">${record.narration || ""}</textarea></label>
+    </div>
+  `;
+}
+
+function defaultDirectEntryLine() {
+  return {
+    id: crypto.randomUUID(),
+    date: toDateInputValue(new Date()),
+    accountHead: "",
+    receipt: 0,
+    payment: 0,
+    remark: ""
+  };
+}
+
+function normalizeDirectEntryLine(line = {}) {
+  return {
+    id: line.id || crypto.randomUUID(),
+    date: toDateInputValue(line.date || new Date()),
+    accountHead: line.accountHead || "",
+    receipt: Number(line.receipt || 0),
+    payment: Number(line.payment || 0),
+    remark: line.remark || ""
+  };
+}
+
+function defaultDirectEntry() {
+  const today = toDateInputValue(new Date());
+  return normalizeDirectEntry({
+    id: crypto.randomUUID(),
+    entryNo: `DE${String((state?.directEntries || []).length + 1).padStart(5, "0")}`,
+    mode: "Cash",
+    costCenter: bankCostCenters()[0] || "cost1",
+    cashBank: "Cash in Hand",
+    preparedBy: bankStaffOptions()[0] || "",
+    repeatLastHead: false,
+    repeatLastNarration: false,
+    entry: { ...defaultDirectEntryLine(), date: today },
+    lines: []
+  });
+}
+
+function normalizeDirectEntry(record = {}) {
+  const lines = (record.lines || []).map(normalizeDirectEntryLine);
+  const clean = {
+    id: record.id || crypto.randomUUID(),
+    entryNo: record.entryNo || "",
+    mode: record.mode || "Cash",
+    costCenter: record.costCenter || bankCostCenters()[0] || "cost1",
+    cashBank: record.cashBank || "Cash in Hand",
+    preparedBy: record.preparedBy || bankStaffOptions()[0] || "",
+    repeatLastHead: Boolean(record.repeatLastHead),
+    repeatLastNarration: Boolean(record.repeatLastNarration),
+    entry: normalizeDirectEntryLine(record.entry || defaultDirectEntryLine()),
+    lines
+  };
+  return { ...clean, ...directEntryFinancials(clean) };
+}
+
+function directEntryFinancials(record = {}) {
+  const lines = (record.lines || []).map(normalizeDirectEntryLine);
+  const totalReceipt = sumField(lines, "receipt");
+  const totalPayment = sumField(lines, "payment");
+  return {
+    totalReceipt,
+    totalPayment,
+    balance: totalReceipt - totalPayment
+  };
+}
+
+function directEntryRecord() {
+  directEntryDraft = normalizeDirectEntry(directEntryDraft || state.directEntries?.[0] || defaultDirectEntry());
+  return directEntryDraft;
+}
+
+function directEntryScreen() {
+  const record = directEntryRecord();
+  const financials = directEntryFinancials(record);
+  return `
+    <section class="clean-entry-shell account-entry-shell direct-entry-shell">
+      <div class="entry-actions body-toolbar account-entry-toolbar">
+        ${toolbarButton("Save F9", "save-direct-entry")}
+        ${toolbarButton("Refresh", "refresh-direct-entry")}
+        ${toolbarButton("Close", "close-account-action")}
+      </div>
+      ${directEntryHeader(record)}
+      <div class="account-entry-table-panel">
+        ${directEntryEntryRow(record)}
+        ${directEntryTable(record)}
+      </div>
+      <div class="account-entry-total-strip three">
+        <span>Receipt Total</span><output>${moneyValue(financials.totalReceipt)}</output>
+        <span>Payment Total</span><output>${moneyValue(financials.totalPayment)}</output>
+        <strong>Balance</strong><output>${moneyValue(financials.balance)}</output>
+      </div>
+    </section>
+  `;
+}
+
+function directEntryHeader(record) {
+  const bankAccounts = ["Cash in Hand", ...bankAccountOptions(), "Scheme Cash"];
+  return `
+    <div class="account-entry-header direct-entry-header">
+      <div class="direct-entry-mode">
+        ${["Cash", "Bank", "Cash & Bank"].map((mode) => `<label><input type="radio" name="direct-entry-mode" data-direct-entry-field="mode" value="${mode}" ${record.mode === mode ? "checked" : ""} /> ${mode}</label>`).join("")}
+      </div>
+      <div class="classic-fields">
+        ${directSelect("costCenter", "Cost Center", bankCostCenters(), record.costCenter)}
+        ${directSelect("cashBank", "Cash/Bank", bankAccounts, record.cashBank)}
+      </div>
+      <div class="classic-fields">
+        ${directSelect("preparedBy", "Prepared By", bankStaffOptions(), record.preparedBy)}
+        <label class="plain-check"><input type="checkbox" data-direct-entry-field="repeatLastHead" ${record.repeatLastHead ? "checked" : ""} /> Repeat Last Head</label>
+        <label class="plain-check"><input type="checkbox" data-direct-entry-field="repeatLastNarration" ${record.repeatLastNarration ? "checked" : ""} /> Repeat Last Narration</label>
+      </div>
+    </div>
+  `;
+}
+
+function directEntryEntryRow(record) {
+  const entry = normalizeDirectEntryLine(record.entry || {});
+  const listId = "direct-entry-account-heads";
+  const heads = bankAccountHeadOptions();
+  return `
+    <datalist id="${listId}">${heads.map((account) => `<option value="${account.name}"></option>`).join("")}</datalist>
+    <div class="account-entry-entry-wrap">
+      <table class="account-entry-grid direct-entry-grid">
+        <colgroup>
+          <col style="width: 150px" /><col style="width: 340px" /><col style="width: 120px" /><col style="width: 120px" /><col style="width: 360px" /><col style="width: 86px" />
+        </colgroup>
+        <thead><tr><th>Date</th><th>Account Head</th><th>Receipt</th><th>Payment</th><th>Remark</th><th></th></tr></thead>
+        <tbody><tr>
+          <td><input type="date" data-direct-entry-entry-field="date" value="${entry.date}" /></td>
+          <td><input list="${listId}" data-direct-entry-entry-field="accountHead" value="${entry.accountHead}" /></td>
+          <td><input class="numeric" type="number" data-direct-entry-entry-field="receipt" value="${moneyValue(entry.receipt)}" /></td>
+          <td><input class="numeric" type="number" data-direct-entry-entry-field="payment" value="${moneyValue(entry.payment)}" /></td>
+          <td><input data-direct-entry-entry-field="remark" value="${entry.remark}" /></td>
+          <td><button class="compact-action" data-action="add-direct-entry-line">Add</button></td>
+        </tr></tbody>
+      </table>
+    </div>
+  `;
+}
+
+function directEntryTable(record) {
+  const rows = (record.lines || []).map(normalizeDirectEntryLine);
+  return `
+    <div class="table-wrap account-entry-table-wrap">
+      <table class="account-entry-table direct-entry-table">
+        <colgroup>
+          <col style="width: 52px" /><col style="width: 44px" /><col style="width: 150px" /><col style="width: 340px" /><col style="width: 120px" /><col style="width: 120px" /><col style="width: 360px" />
+        </colgroup>
+        <thead><tr><th>SL</th><th>X</th><th>Date</th><th>Account Head</th><th>Receipt</th><th>Payment</th><th>Remark</th></tr></thead>
+        <tbody>
+          ${rows.map((line, index) => `
+            <tr>
+              <td>${index + 1}</td>
+              <td><button class="line-delete" data-action="delete-direct-entry-line" data-index="${index}" title="Remove row">x</button></td>
+              <td><input type="date" data-direct-entry-line="${index}" data-direct-entry-line-field="date" value="${line.date}" /></td>
+              <td><input data-direct-entry-line="${index}" data-direct-entry-line-field="accountHead" value="${line.accountHead}" /></td>
+              <td><input class="numeric" type="number" data-direct-entry-line="${index}" data-direct-entry-line-field="receipt" value="${moneyValue(line.receipt)}" /></td>
+              <td><input class="numeric" type="number" data-direct-entry-line="${index}" data-direct-entry-line-field="payment" value="${moneyValue(line.payment)}" /></td>
+              <td><input data-direct-entry-line="${index}" data-direct-entry-line-field="remark" value="${line.remark}" /></td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function directSelect(field, label, options, selected) {
+  const unique = [...new Set((options || []).filter(Boolean))];
+  return `<label class="classic-field"><span>${label}</span><select data-direct-entry-field="${field}">${unique.map((option) => `<option ${option === selected ? "selected" : ""}>${option}</option>`).join("")}</select></label>`;
+}
+
+function expenseSupplierOptions() {
+  return [...new Set([
+    ...(state?.parties || []).filter((party) => party.type === "Supplier").map((party) => party.name).filter(Boolean),
+    "AJAYA KUMAR",
+    "NALUKANDATHIL JEWELLERS"
+  ])];
+}
+
+function defaultExpenseEntryLine() {
+  return {
+    id: crypto.randomUUID(),
+    ledgerHead: "",
+    billNo: "",
+    billDate: toDateInputValue(new Date()),
+    hsnCode: "",
+    taxable: 0,
+    gst: 0,
+    tdsPercent: 0,
+    tds: 0,
+    total: 0,
+    remarks: ""
+  };
+}
+
+function normalizeExpenseEntryLine(line = {}) {
+  const taxable = Number(line.taxable || 0);
+  const gst = Number(line.gst || 0);
+  const tdsPercent = Number(line.tdsPercent || 0);
+  const tds = Number(line.tds || (taxable * tdsPercent / 100) || 0);
+  return {
+    id: line.id || crypto.randomUUID(),
+    ledgerHead: line.ledgerHead || "",
+    billNo: line.billNo || "",
+    billDate: toDateInputValue(line.billDate || new Date()),
+    hsnCode: line.hsnCode || "",
+    taxable,
+    gst,
+    tdsPercent,
+    tds,
+    total: Number(line.total || (taxable + gst - tds) || 0),
+    remarks: line.remarks || ""
+  };
+}
+
+function defaultExpenseEntry() {
+  const today = toDateInputValue(new Date());
+  return normalizeExpenseEntry({
+    id: crypto.randomUUID(),
+    entryNo: `EX${String((state?.expenseEntries || []).length + 1).padStart(5, "0")}`,
+    refNo: "",
+    date: today,
+    time: nowTimeWithSeconds(),
+    costCenter: bankCostCenters()[0] || "cost1",
+    cashAccount: "Cash in Hand",
+    remarks: "",
+    supplier: "",
+    gstin: "",
+    preparedBy: bankStaffOptions()[0] || "",
+    supplierType: "Local",
+    paymentMode: "Cash",
+    entry: defaultExpenseEntryLine(),
+    lines: []
+  });
+}
+
+function normalizeExpenseEntry(record = {}) {
+  const lines = (record.lines || []).map(normalizeExpenseEntryLine);
+  const clean = {
+    id: record.id || crypto.randomUUID(),
+    entryNo: record.entryNo || "",
+    refNo: record.refNo || "",
+    date: toDateInputValue(record.date || new Date()),
+    time: record.time || nowTimeWithSeconds(),
+    costCenter: record.costCenter || bankCostCenters()[0] || "cost1",
+    cashAccount: record.cashAccount || "Cash in Hand",
+    remarks: record.remarks || "",
+    supplier: record.supplier || "",
+    gstin: record.gstin || "",
+    preparedBy: record.preparedBy || bankStaffOptions()[0] || "",
+    supplierType: record.supplierType || "Local",
+    paymentMode: record.paymentMode || "Cash",
+    entry: normalizeExpenseEntryLine(record.entry || defaultExpenseEntryLine()),
+    lines
+  };
+  return { ...clean, ...expenseEntryFinancials(clean) };
+}
+
+function expenseEntryFinancials(record = {}) {
+  const lines = (record.lines || []).map(normalizeExpenseEntryLine);
+  const billAmount = sumField(lines, "taxable");
+  const gstAmount = sumField(lines, "gst");
+  const tdsAmount = sumField(lines, "tds");
+  const invoiceTotal = sumField(lines, "total");
+  return { billAmount, gstAmount, tdsAmount, invoiceTotal };
+}
+
+function expenseEntryRecord() {
+  expenseEntryDraft = normalizeExpenseEntry(expenseEntryDraft || state.expenseEntries?.[0] || defaultExpenseEntry());
+  return expenseEntryDraft;
+}
+
+function expenseEntryScreen() {
+  const record = expenseEntryRecord();
+  const financials = expenseEntryFinancials(record);
+  return `
+    <section class="clean-entry-shell account-entry-shell expense-entry-shell">
+      <div class="entry-actions body-toolbar account-entry-toolbar">
+        ${toolbarButton("Refresh", "refresh-expense-entry")}
+        ${toolbarButton("Save F9", "save-expense-entry")}
+        ${toolbarButton("Edit", "edit-expense-entry")}
+        ${toolbarButton("Delete", "delete-expense-entry")}
+        ${toolbarButton("Close", "close-account-action")}
+      </div>
+      ${expenseEntryHeader(record)}
+      <div class="account-entry-table-panel">
+        ${expenseEntryEntryRow(record)}
+        ${expenseEntryTable(record)}
+      </div>
+      <div class="expense-entry-summary">
+        <span>Bill Amount</span><output>${moneyValue(financials.billAmount)}</output>
+        <span>GST</span><output>${moneyValue(financials.gstAmount)}</output>
+        <span>TDS</span><output>${moneyValue(financials.tdsAmount)}</output>
+        <strong>Invoice Total</strong><output>${moneyValue(financials.invoiceTotal)}</output>
+      </div>
+    </section>
+  `;
+}
+
+function expenseEntryHeader(record) {
+  return `
+    <div class="account-entry-header expense-entry-header">
+      <fieldset>
+        <legend>Entry Details</legend>
+        <label class="classic-field split-field"><span>Entry No, Ref No</span><span class="field-pair"><input data-expense-entry-field="entryNo" value="${record.entryNo}" /><input data-expense-entry-field="refNo" value="${record.refNo}" /></span></label>
+        <label class="classic-field split-field"><span>Entry Date, Time</span><span class="field-pair"><input type="date" data-expense-entry-field="date" value="${record.date}" /><input data-expense-entry-field="time" value="${record.time}" /></span></label>
+        ${expenseSelect("costCenter", "Cost Center", bankCostCenters(), record.costCenter)}
+        ${expenseSelect("cashAccount", "Cash Account", ["Cash in Hand", ...bankAccountOptions()], record.cashAccount)}
+      </fieldset>
+      <fieldset>
+        <legend>Remarks</legend>
+        <textarea data-expense-entry-field="remarks">${record.remarks || ""}</textarea>
+      </fieldset>
+      <fieldset>
+        <legend>Supplier Details</legend>
+        ${expenseInputWithList("supplier", "Supplier", expenseSupplierOptions(), record.supplier)}
+        <label class="classic-field"><span>GSTIN</span><input data-expense-entry-field="gstin" value="${record.gstin}" /></label>
+        ${expenseSelect("preparedBy", "Prepared By", bankStaffOptions(), record.preparedBy)}
+        <div class="expense-type-row">
+          ${expenseSelect("supplierType", "Type", ["Local", "Interstate", "Unregistered"], record.supplierType)}
+          ${["Cash", "Credit"].map((mode) => `<label><input type="radio" name="expense-payment-mode" data-expense-entry-field="paymentMode" value="${mode}" ${record.paymentMode === mode ? "checked" : ""} /> ${mode}</label>`).join("")}
+        </div>
+      </fieldset>
+    </div>
+  `;
+}
+
+function expenseEntryEntryRow(record) {
+  const entry = normalizeExpenseEntryLine(record.entry || {});
+  const listId = "expense-ledger-heads";
+  const heads = bankAccountHeadOptions();
+  return `
+    <datalist id="${listId}">${heads.map((account) => `<option value="${account.name}"></option>`).join("")}</datalist>
+    <div class="account-entry-entry-wrap">
+      <table class="account-entry-grid expense-entry-grid">
+        <colgroup>
+          <col style="width: 300px" /><col style="width: 110px" /><col style="width: 120px" /><col style="width: 120px" /><col style="width: 100px" /><col style="width: 90px" /><col style="width: 90px" /><col style="width: 90px" /><col style="width: 110px" /><col style="width: 260px" /><col style="width: 86px" />
+        </colgroup>
+        <thead><tr><th>Ledger Head</th><th>Bill No</th><th>Bill Date</th><th>HSN Code</th><th>Taxable</th><th>GST</th><th>TDS%</th><th>TDS</th><th>Total</th><th>Remarks</th><th></th></tr></thead>
+        <tbody><tr>
+          <td><input list="${listId}" data-expense-entry-entry-field="ledgerHead" value="${entry.ledgerHead}" /></td>
+          <td><input data-expense-entry-entry-field="billNo" value="${entry.billNo}" /></td>
+          <td><input type="date" data-expense-entry-entry-field="billDate" value="${entry.billDate}" /></td>
+          <td><input data-expense-entry-entry-field="hsnCode" value="${entry.hsnCode}" /></td>
+          <td><input class="numeric" type="number" data-expense-entry-entry-field="taxable" value="${moneyValue(entry.taxable)}" /></td>
+          <td><input class="numeric" type="number" data-expense-entry-entry-field="gst" value="${moneyValue(entry.gst)}" /></td>
+          <td><input class="numeric" type="number" data-expense-entry-entry-field="tdsPercent" value="${moneyValue(entry.tdsPercent)}" /></td>
+          <td><input class="numeric" type="number" data-expense-entry-entry-field="tds" value="${moneyValue(entry.tds)}" /></td>
+          <td><input class="numeric auto-field" value="${moneyValue(entry.total)}" readonly /></td>
+          <td><input data-expense-entry-entry-field="remarks" value="${entry.remarks}" /></td>
+          <td><button class="compact-action" data-action="add-expense-entry-line">Add</button></td>
+        </tr></tbody>
+      </table>
+    </div>
+  `;
+}
+
+function expenseEntryTable(record) {
+  const rows = (record.lines || []).map(normalizeExpenseEntryLine);
+  return `
+    <div class="table-wrap account-entry-table-wrap">
+      <table class="account-entry-table expense-entry-table">
+        <colgroup>
+          <col style="width: 52px" /><col style="width: 44px" /><col style="width: 300px" /><col style="width: 110px" /><col style="width: 120px" /><col style="width: 120px" /><col style="width: 100px" /><col style="width: 90px" /><col style="width: 90px" /><col style="width: 90px" /><col style="width: 110px" /><col style="width: 260px" />
+        </colgroup>
+        <thead><tr><th>SL</th><th>X</th><th>Ledger Head</th><th>Bill No</th><th>Bill Date</th><th>HSN Code</th><th>Taxable</th><th>GST</th><th>TDS%</th><th>TDS</th><th>Total</th><th>Remarks</th></tr></thead>
+        <tbody>
+          ${rows.map((line, index) => `
+            <tr>
+              <td>${index + 1}</td>
+              <td><button class="line-delete" data-action="delete-expense-entry-line" data-index="${index}" title="Remove row">x</button></td>
+              <td><input data-expense-entry-line="${index}" data-expense-entry-line-field="ledgerHead" value="${line.ledgerHead}" /></td>
+              <td><input data-expense-entry-line="${index}" data-expense-entry-line-field="billNo" value="${line.billNo}" /></td>
+              <td><input type="date" data-expense-entry-line="${index}" data-expense-entry-line-field="billDate" value="${line.billDate}" /></td>
+              <td><input data-expense-entry-line="${index}" data-expense-entry-line-field="hsnCode" value="${line.hsnCode}" /></td>
+              <td><input class="numeric" type="number" data-expense-entry-line="${index}" data-expense-entry-line-field="taxable" value="${moneyValue(line.taxable)}" /></td>
+              <td><input class="numeric" type="number" data-expense-entry-line="${index}" data-expense-entry-line-field="gst" value="${moneyValue(line.gst)}" /></td>
+              <td><input class="numeric" type="number" data-expense-entry-line="${index}" data-expense-entry-line-field="tdsPercent" value="${moneyValue(line.tdsPercent)}" /></td>
+              <td><input class="numeric" type="number" data-expense-entry-line="${index}" data-expense-entry-line-field="tds" value="${moneyValue(line.tds)}" /></td>
+              <td><input class="numeric auto-field" value="${moneyValue(line.total)}" readonly /></td>
+              <td><input data-expense-entry-line="${index}" data-expense-entry-line-field="remarks" value="${line.remarks}" /></td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function expenseSelect(field, label, options, selected) {
+  const unique = [...new Set((options || []).filter(Boolean))];
+  return `<label class="classic-field"><span>${label}</span><select data-expense-entry-field="${field}">${unique.map((option) => `<option ${option === selected ? "selected" : ""}>${option}</option>`).join("")}</select></label>`;
+}
+
+function expenseInputWithList(field, label, options, value) {
+  const listId = `expense-${field}-options`;
+  return `<label class="classic-field"><span>${label}</span><input list="${listId}" data-expense-entry-field="${field}" value="${value || ""}" /><datalist id="${listId}">${options.map((option) => `<option value="${option}"></option>`).join("")}</datalist></label>`;
+}
+
 const CUSTOM_VOUCHER_ACCOUNT_TYPES = ["Receivable", "Payable"];
 const CUSTOM_VOUCHER_SETTLEMENT_TYPES = ["One Time", "Monthly", "Quarterly", "Yearly"];
 
 function customVoucherDescriptions() {
   const fromMasters = (state?.accountMasters || seed.accountMasters || []).map((item) => item.accountName).filter(Boolean);
-  return [...new Set(["Rent", "Salary", "Insurance", "Electricity", "Shop Expense", "Interest", "Commission", ...fromMasters])];
+  return [...new Set(["", "Rent", "Salary", "Insurance", "Electricity", "Shop Expense", "Interest", "Commission", ...fromMasters])];
 }
 
 function customVoucherParties(accountType = "Receivable") {
@@ -7088,7 +10133,7 @@ function customVoucherScreen() {
   customVoucherConfirmDelete = record.confirmBeforeDelete !== false;
   return `
     <section class="clean-entry-shell custom-voucher-shell">
-      <div class="custom-voucher-window-title">Custom Voucher</div>
+      <div class="custom-voucher-window-title">ScheduledVoucher</div>
       ${customVoucherToolbar()}
       ${customVoucherHeader(record)}
       ${customVoucherEntryRow(entry)}
@@ -7136,14 +10181,31 @@ function customVoucherPartySelect(accountType, selected) {
 
 function customVoucherEntryRow(entry) {
   return `
-    <div class="custom-voucher-entry-row">
-      <label><span>Description</span>${plainSelect("description", entry.description, customVoucherDescriptions(), "data-custom-voucher-entry-field")}</label>
-      <label><span>Settlement Type</span>${plainSelect("settlementType", entry.settlementType, CUSTOM_VOUCHER_SETTLEMENT_TYPES, "data-custom-voucher-entry-field")}</label>
-      <label><span>Amount</span><input class="numeric" inputmode="decimal" data-custom-voucher-entry-field="amount" value="${moneyValue(entry.amount)}" /></label>
-      <label><span>Nos</span><input class="numeric" inputmode="numeric" data-custom-voucher-entry-field="nos" value="${numericValue(entry.nos, 0)}" /></label>
-      <label><span>Payment Date</span><input type="date" data-custom-voucher-entry-field="paymentDate" value="${entry.paymentDate}" /></label>
-      <label class="wide"><span>Remarks</span><input data-custom-voucher-entry-field="remarks" value="${entry.remarks}" /></label>
-      <button class="primary compact-action" data-action="add-custom-voucher-line">Add</button>
+    <div class="custom-voucher-entry-wrap">
+      <table class="custom-voucher-entry-grid">
+        <thead>
+          <tr>
+            <th>Description</th>
+            <th>Settlement Type</th>
+            <th>Amount</th>
+            <th>Nos</th>
+            <th>Payment Date</th>
+            <th>Remarks</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>${plainSelect("description", entry.description, customVoucherDescriptions(), "data-custom-voucher-entry-field")}</td>
+            <td>${plainSelect("settlementType", entry.settlementType, CUSTOM_VOUCHER_SETTLEMENT_TYPES, "data-custom-voucher-entry-field")}</td>
+            <td><input class="numeric" inputmode="decimal" data-custom-voucher-entry-field="amount" value="${moneyValue(entry.amount)}" /></td>
+            <td><input class="numeric" inputmode="numeric" data-custom-voucher-entry-field="nos" value="${numericValue(entry.nos, 0)}" /></td>
+            <td><input type="date" data-custom-voucher-entry-field="paymentDate" value="${entry.paymentDate}" /></td>
+            <td><input data-custom-voucher-entry-field="remarks" value="${entry.remarks}" /></td>
+            <td><button class="classic-add-button" data-action="add-custom-voucher-line">Add</button></td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   `;
 }
@@ -7155,7 +10217,7 @@ function customVoucherTable(record) {
       <div class="table-wrap custom-voucher-table-wrap">
         <table class="custom-voucher-table">
           <thead><tr><th>Description</th><th>Mode</th><th>Amount</th><th>Payment Date</th><th>Remarks</th></tr></thead>
-          <tbody>${lines.length ? lines.map((line, index) => customVoucherGridRow(line, index)).join("") : `<tr><td colspan="5" class="soft-note">Add schedule rows using the entry row above.</td></tr>`}</tbody>
+          <tbody>${lines.length ? lines.map((line, index) => customVoucherGridRow(line, index)).join("") : `<tr><td colspan="5" class="soft-note">Add scheduled rows using the entry strip above.</td></tr>`}</tbody>
         </table>
       </div>
     </div>
@@ -7180,7 +10242,7 @@ function customVoucherFooter(record, financials) {
     <div class="custom-voucher-footer">
       <label class="confirm-delete"><input type="checkbox" data-custom-voucher-field="confirmBeforeDelete" ${record.confirmBeforeDelete !== false ? "checked" : ""} />Confirm Before delete a Row</label>
       <span class="footer-hint">Double_Click on Row to Delete</span>
-      <div class="custom-voucher-total"><span>Total Amount</span><output>${moneyValue(financials.totalAmount)}</output></div>
+      <div class="custom-voucher-total"><span>Total Amount</span><span>Only</span><output>${moneyValue(financials.totalAmount)}</output></div>
     </div>
   `;
 }
@@ -7245,7 +10307,7 @@ function billHeader(bill) {
             ${billField("Customer Name", bill.customer)}
             ${billField("Address", bill.address || "-")}
             ${billField("Phone", bill.phone || "-")}
-            ${billSelectField("Staff, Agent", bill.staffName || "-", state.staffs.map((staff) => staff.name))}
+            ${billSelectField("Staff, Agent", bill.staffName || "-", staffNameOptions())}
           </div>
         </section>
       </div>
@@ -7491,11 +10553,12 @@ function toolbarButton(label, action) {
 }
 
 function editCell(field, value = "", inputMode = "text") {
-  return `<input class="grid-input" data-line-field="${field}" inputmode="${inputMode}" value="${value ?? ""}" />`;
+  return `<input class="grid-input" data-line-field="${field}" inputmode="${inputMode}" value="${value ?? ""}"${itemFieldListAttribute(field)} />${itemFieldListAttribute(field) ? itemDatalist(field) : ""}`;
 }
 
 function autoCell(field, value = "", inputMode = "text") {
-  return `<input class="grid-input auto-field" data-line-field="${field}" inputmode="${inputMode}" value="${value ?? ""}" readonly title="Auto calculated" />`;
+  const editable = ["makingCharge", "totalMc"].includes(field);
+  return `<input class="grid-input auto-field" data-line-field="${field}" inputmode="${inputMode}" value="${value ?? ""}" ${editable ? `title="Editable: MC/gm and total MC recalculate each other"` : `readonly title="Auto calculated"`} />`;
 }
 
 function selectCell(field, value, options) {
@@ -7526,7 +10589,13 @@ function billingSection(title, rows, entryColumns, entryMapper, columns, mapper)
 function classicBillingSection(title, rows, entryColumns, entryMapper, columns, mapper) {
   const normalizedFirst = defaultEntryLine(title.toLowerCase());
   const isSalesSection = title === "Sales";
-  const detailRows = rows.length ? table(columns, rows.map(mapper)) : table(columns, []);
+  const sectionKey = title.toLowerCase();
+  const detailRows = rows.length
+    ? tableWithRowAttrs(columns, rows.map((row, index) => ({
+        attrs: `data-edit-line-scope="bill" data-edit-line-section="${sectionKey}" data-edit-line-index="${index}" title="Double-click to edit this row"`,
+        cells: mapper(row, index)
+      })))
+    : table(columns, []);
   return `
     <section class="classic-entry-area billing-section">
       <div class="classic-entry-grid">
@@ -7551,12 +10620,12 @@ function transactionHeader(kind, bill, options = {}) {
   const preparedLabel = options.preparedLabel || "Prepared By";
   const modeLabel = options.modeLabel || "Mode, Type";
   return `
-    <div class="transaction-entry-header">
+    <div class="transaction-entry-header ${options.headerClass || ""}">
       <div class="classic-fields left">
         ${classicField("Entry No, Ref No", entryNo)}
         ${classicField("Date, Time", new Date().toLocaleDateString("en-GB"))}
         ${kind === "Purchase" || kind === "Purchase Return" ? classicField(modeLabel, "Cash / B2C", "text") : ""}
-        ${options.staffSelect ? `<label class="classic-field"><span>${preparedLabel}</span>${staffDropdownCell("staffName", bill?.staffName || "")}</label>` : classicField(preparedLabel, bill?.staffName || "")}
+        <label class="classic-field"><span>${preparedLabel}</span>${staffDropdownCell("staffName", bill?.staffName || bill?.preparedBy || "")}</label>
       </div>
       <div class="classic-fields right">
         ${classicField(partyLabel, party)}
@@ -7572,19 +10641,79 @@ function classicTransactionTable(kind, entryColumns, entryRow, columns, rows) {
   return `
     <section class="classic-entry-area billing-section ${kind}" data-entry-kind="${kind}">
       <div class="classic-entry-grid">${table(entryColumns, [entryRow])}</div>
-      <div class="classic-detail-grid">${table(columns, rows)}</div>
+      <div class="classic-detail-grid">${tableWithRowAttrs(columns, rows.map((row, index) => ({
+        attrs: `data-edit-line-scope="transaction" data-edit-line-kind="${kind}" data-edit-line-index="${index}" title="Double-click to edit this row"`,
+        cells: row
+      })))}</div>
     </section>
   `;
 }
 
 function staffDropdownCell(field, selected = "") {
-  const options = state.staffs.map((staff) => staff.name);
+  const options = staffNameOptions();
   return `<select class="classic-input" data-header-field="${field}">${options.map((name) => `<option ${name === selected ? "selected" : ""}>${name}</option>`).join("")}</select>`;
+}
+
+function itemCatalogRows() {
+  const stockRows = (state?.stock || seed.stock || []).map((item, index) => ({
+    sl: index + 1,
+    itemId: item.itemId || item.huid || item.barcode || item.item || "",
+    itemName: item.item || item.itemName || "",
+    itemType: item.purity || item.typeWastage || "",
+    itemCategory: item.product || item.category || (String(item.item || "").toLowerCase().includes("diamond") ? "Diamond" : "Gold")
+  }));
+  const masterRows = (state?.itemMasters || seed.itemMasters || []).map((item, index) => ({
+    sl: stockRows.length + index + 1,
+    itemId: item.itemId || item.itemCode || "",
+    itemName: item.itemName || "",
+    itemType: item.typeWastage || item.subGroup || "",
+    itemCategory: item.product || ""
+  }));
+  const seen = new Set();
+  return [...stockRows, ...masterRows].filter((item) => {
+    const key = `${item.itemId}|${item.itemName}`.toLowerCase();
+    if (!item.itemName || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function itemDatalistId(field = "itemName") {
+  return `item-catalog-${field}`;
+}
+
+function itemDatalist(field = "itemName") {
+  const valueFor = (item) => ["itemId", "itemCode", "barcode"].includes(field) ? item.itemId : item.itemName;
+  return `<datalist id="${itemDatalistId(field)}">${itemCatalogRows().map((item) => `<option value="${pdcAttr(valueFor(item))}" label="${pdcAttr(`${item.itemId} | ${item.itemType} | ${item.itemCategory}`)}"></option>`).join("")}</datalist>`;
+}
+
+function itemFieldListAttribute(field) {
+  return ["itemName", "item", "itemId", "itemCode", "itemDescription", "description", "barcode"].includes(field) ? ` list="${itemDatalistId(field)}"` : "";
+}
+
+function findItemCatalogMatch(value = "") {
+  const key = String(value || "").trim().toLowerCase();
+  if (!key) return null;
+  return itemCatalogRows().find((item) => [item.itemId, item.itemName].some((candidate) => String(candidate || "").trim().toLowerCase() === key)) || null;
+}
+
+function enrichLineFromItemCatalog(line = {}) {
+  const match = findItemCatalogMatch(line.itemName) || findItemCatalogMatch(line.item) || findItemCatalogMatch(line.itemCode) || findItemCatalogMatch(line.barcode);
+  if (!match) return line;
+  const master = (state.itemMasters || []).find((item) => item.itemName === match.itemName || item.itemId === match.itemId);
+  return {
+    ...line,
+    item: line.item || match.itemId,
+    itemCode: line.itemCode || match.itemId,
+    itemName: match.itemName || line.itemName,
+    va: Number(line.va || master?.va || 0),
+    mcPerGm: Number(line.mcPerGm || master?.mcGram || 0)
+  };
 }
 
 function dmdReturnHeader(bill) {
   return `
-    <div class="transaction-entry-header dmd-header">
+    <div class="transaction-entry-header dmd-header dmd-return-header">
       <div class="classic-fields left">
         ${classicField("Entry No, Ref No", bill.entryNo)}
         ${classicField("Date, Time", bill.date)}
@@ -7605,7 +10734,7 @@ function dmdReturnHeader(bill) {
 
 function dmdWholesaleHeader(bill) {
   return `
-    <div class="transaction-entry-header dmd-header">
+    <div class="transaction-entry-header dmd-header dmd-wholesale-header">
       <div class="classic-fields left">
         ${classicField("Entry No, Ref No.", bill.entryNo)}
         ${classicField("Date, Time", bill.date)}
@@ -8065,7 +11194,7 @@ function directPurchaseEntryRow(line) {
     editCell("rate", moneyValue(line.rate), "decimal"),
     editCell("stoneCharge", moneyValue(line.stoneCharge), "decimal"),
     editCell("mcPerGm", moneyValue(line.mcPerGm), "decimal"),
-    calcCell("totalMc", money(line.totalMc)),
+    autoCell("totalMc", moneyValue(line.totalMc), "decimal"),
     editCell("taxPct", numericValue(line.taxPct, 2), "decimal"),
     calcCell("tax", money(line.tax)),
     calcCell("itemTotal", money(line.itemTotal)),
@@ -8174,7 +11303,7 @@ function dmdWholeSalesClassicRow(line, index) {
 }
 
 function defaultDmdWholesaleLine() {
-  return normalizeDmdWholesaleLine({ nos: 1, gross: 0, stone: 0, stonePrice: 0, va: 0, goldType: "22K", salesType: "Weight", goldRate: activeGoldRate(), dmdWgt: 0, stnSPrice: latestDiamondRate(), purMc: 0, salesMc: 0 });
+  return normalizeDmdWholesaleLine({ nos: 1, gross: 0, stone: 0, stonePrice: 0, va: 0, goldType: "22K", salesType: "Weight", goldRate: activeGoldRate(), dmdWgt: 0, stnSPrice: 0, purMc: 0, salesMc: 0 });
 }
 
 function defaultDiamondPurchaseReturnLine() {
@@ -8592,28 +11721,27 @@ function salesOrderTotals(order) {
   const financials = billFinancials(order);
   const advanceSummary = orderAdvanceSummary(order);
   const advance = advanceSummary.netAdvance;
-  const balance = Math.max(0, financials.invoiceTotal - advance);
   return `
     <div class="transaction-bottom-grid order-bottom">
       <div class="adjustments">
-        ${readout("Sales Return", money(financials.returnTotal))}
-        ${readout("Exchange", money(financials.exchangeTotal))}
+        ${readout("Quotation Return", money(financials.returnTotal))}
+        ${readout("Quotation Exchange", money(financials.exchangeTotal))}
         <label class="readout editable-readout"><span>Due Date</span><span class="field-pair"><input value="0" /><input type="date" value="${toDateInputValue(order.dueDate)}" /></span></label>
       </div>
       <div class="adjustments">
         ${cardReadout(money(order.adjustments?.card || 0), "order")}
-        ${readout("Cash Advance", money(order.paymentBreakup?.cash || 0))}
-        ${readout("Total Advance", money(advance))}
+        ${readout("Original Advance", money(order.paymentBreakup?.cash || 0))}
+        ${readout("Available Advance", money(advance))}
       </div>
       <div class="adjustments">
         <label class="readout editable-readout"><span>Tax%</span><span class="field-pair"><input value="${numericValue(order.line?.taxPct || 0, 2)}" /><input value="${moneyValue(financials.taxTotal)}" readonly /></span></label>
       </div>
       <div class="adjustments total-block">
-        ${readout("Order Total", money(financials.invoiceTotal))}
-        ${readout("Ledger Balance", money(order.totals?.ledgerBalance || 0))}
-        ${readout("", money(0))}
-        ${readout("Cash Refund", money(0))}
-        ${readout("Balance", money(balance))}
+        ${readout("Quotation Total", money(financials.invoiceTotal))}
+        ${readout("Customer Deposit", money(advance))}
+        ${readout("Stock Impact", "None")}
+        ${readout("Refunded", money(advanceSummary.advanceRefund))}
+        ${readout("Quote Less Advance", money(advanceSummary.quoteBalance))}
       </div>
     </div>
   `;
@@ -8836,6 +11964,17 @@ function table(headers, rows) {
   `;
 }
 
+function tableWithRowAttrs(headers, rowSpecs) {
+  return `
+    <div class="table-wrap">
+      <table>
+        <thead><tr>${headers.map((h) => `<th>${h}</th>`).join("")}</tr></thead>
+        <tbody>${rowSpecs.map((row) => `<tr ${row.attrs || ""}>${row.cells.map((cell) => `<td>${cell}</td>`).join("")}</tr>`).join("")}</tbody>
+      </table>
+    </div>
+  `;
+}
+
 function rateTimeline() {
   return `<div class="timeline">${state.rates.slice().reverse().map((r) => `<article><time>${r.time}</time><div><strong>${r.type} ${r.grade} ${money(r.price)}</strong><span>${r.reason} by ${r.user}</span></div></article>`).join("")}</div>`;
 }
@@ -8890,7 +12029,15 @@ function bindEvents() {
 
   document.querySelectorAll("[data-nav]").forEach((button) => {
     button.addEventListener("click", () => {
-      active = button.dataset.nav;
+      const clicked = button.dataset.nav;
+      if (EXPANDABLE_NAVS.has(clicked)) {
+        if (expandedNavGroups.has(clicked)) {
+          expandedNavGroups.delete(clicked);
+        } else {
+          expandedNavGroups.add(clicked);
+        }
+      }
+      active = clicked;
       render();
     });
   });
@@ -8898,6 +12045,7 @@ function bindEvents() {
   document.querySelectorAll("[data-management]").forEach((button) => {
     button.addEventListener("click", () => {
       active = "Management";
+      expandedNavGroups.add("Management");
       managementView = button.dataset.management;
       render();
     });
@@ -8906,6 +12054,7 @@ function bindEvents() {
   document.querySelectorAll("[data-item-category]").forEach((button) => {
     button.addEventListener("click", () => {
       active = "Management";
+      expandedNavGroups.add("Management");
       managementView = "Item Category";
       itemCategoryView = button.dataset.itemCategory;
       render();
@@ -8915,6 +12064,7 @@ function bindEvents() {
   document.querySelectorAll("[data-miscellaneous]").forEach((button) => {
     button.addEventListener("click", () => {
       active = "Management";
+      expandedNavGroups.add("Management");
       managementView = "Miscellaneous";
       miscellaneousView = button.dataset.miscellaneous;
       render();
@@ -8924,6 +12074,7 @@ function bindEvents() {
   document.querySelectorAll("[data-sales-section]").forEach((button) => {
     button.addEventListener("click", () => {
       active = "Sales";
+      expandedNavGroups.add("Sales");
       salesView = button.dataset.salesSection;
       render();
     });
@@ -8932,6 +12083,7 @@ function bindEvents() {
   document.querySelectorAll("[data-purchase-section]").forEach((button) => {
     button.addEventListener("click", () => {
       active = "Purchase";
+      expandedNavGroups.add("Purchase");
       purchaseView = button.dataset.purchaseSection;
       render();
     });
@@ -8939,7 +12091,12 @@ function bindEvents() {
 
   document.querySelectorAll("[data-stock-section]").forEach((button) => {
     button.addEventListener("click", () => {
+      if (button.dataset.stockSection === OPENING_STOCK_VIEW) {
+        openOpeningStockEntry();
+        return;
+      }
       active = "Stock";
+      expandedNavGroups.add("Stock");
       stockView = button.dataset.stockSection;
       render();
     });
@@ -8948,6 +12105,7 @@ function bindEvents() {
   document.querySelectorAll("[data-work-section]").forEach((button) => {
     button.addEventListener("click", () => {
       active = "Work Orders";
+      expandedNavGroups.add("Work Orders");
       workOrderView = button.dataset.workSection;
       if (workOrderView === "Smith") smithWorkView = "Smith";
       if (workOrderView === "Jeweller") smithWorkView = "Jeweller";
@@ -8962,6 +12120,7 @@ function bindEvents() {
   document.querySelectorAll("[data-account-section]").forEach((button) => {
     button.addEventListener("click", () => {
       active = "Accounts";
+      expandedNavGroups.add("Accounts");
       accountView = button.dataset.accountSection;
       render();
     });
@@ -8970,6 +12129,7 @@ function bindEvents() {
   document.querySelectorAll("[data-complimentary-section]").forEach((button) => {
     button.addEventListener("click", () => {
       active = "Work Orders";
+      expandedNavGroups.add("Work Orders");
       workOrderView = "Complimentary Item";
       complimentaryView = button.dataset.complimentarySection;
       render();
@@ -9021,15 +12181,26 @@ function bindEvents() {
 
   setupItemMasterModal();
   setupEntryGridCalculations();
+  setupSavedLineEditing();
+  setupBillEnterNavigation();
   setupOrderAdvanceScreens();
   setupSmithWorkScreens();
+  setupOpeningStockScreen();
   setupStockAdjustmentScreen();
   setupGoldDepositScreens();
   setupSampleScreens();
+  setupServiceScreens();
+  setupPolishingScreen();
   setupRefineryScreens();
   setupComplimentaryScreens();
   setupCustomVoucherScreen();
   setupBillwiseScreens();
+  setupBankTransactionScreens();
+  setupPdcScreens();
+  setupCashVoucherScreens();
+  setupJournalVoucherScreen();
+  setupDirectEntryScreen();
+  setupExpenseEntryScreen();
 
   document.addEventListener("keydown", (event) => {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
@@ -9064,6 +12235,873 @@ function setupBillwiseScreens() {
       }
     });
   });
+}
+
+function setupBankTransactionScreens() {
+  document.querySelectorAll("[data-bank-field]").forEach((field) => {
+    const update = () => updateBankTransactionField(field.dataset.bankType, field.dataset.bankField, field.type === "checkbox" ? field.checked : field.value);
+    field.addEventListener("input", update);
+    field.addEventListener("change", () => {
+      update();
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-bank-entry-field]").forEach((field) => {
+    const update = () => updateBankTransactionEntry(field.dataset.bankType, field.dataset.bankEntryField, field.value);
+    field.addEventListener("input", update);
+    field.addEventListener("change", () => {
+      update();
+      render();
+    });
+    field.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        addBankTransactionLine(field.dataset.bankType);
+      }
+    });
+  });
+
+  document.querySelectorAll("[data-bank-line-field]").forEach((field) => {
+    const update = () => updateBankTransactionLine(field.dataset.bankType, Number(field.dataset.bankLine), field.dataset.bankLineField, field.value);
+    field.addEventListener("input", update);
+    field.addEventListener("change", () => {
+      update();
+      render();
+    });
+  });
+}
+
+function updateBankTransactionField(type, field, value) {
+  const draft = bankTransactionDraft(type);
+  if (["showAllAccount", "noPrint", "rateFixed"].includes(field)) draft[field] = Boolean(value);
+  else draft[field] = value;
+}
+
+function updateBankTransactionEntry(type, field, value) {
+  const draft = bankTransactionDraft(type);
+  const entry = normalizeBankTransactionLine(draft.entry || defaultBankTransactionLine());
+  entry[field] = field === "amount" ? Number(value || 0) : value;
+  if (field === "accountHead") {
+    const match = bankAccountHeadOptions().find((account) => account.name === value);
+    if (match && !entry.headId) entry.headId = match.id;
+  }
+  draft.entry = entry;
+}
+
+function updateBankTransactionLine(type, index, field, value) {
+  const draft = bankTransactionDraft(type);
+  const line = normalizeBankTransactionLine(draft.lines[index] || defaultBankTransactionLine());
+  line[field] = field === "amount" ? Number(value || 0) : value;
+  if (field === "accountHead") {
+    const match = bankAccountHeadOptions().find((account) => account.name === value);
+    if (match && !line.headId) line.headId = match.id;
+  }
+  draft.lines[index] = normalizeBankTransactionLine(line);
+  draft.totalAmount = bankTransactionFinancials(draft).totalAmount;
+}
+
+function addBankTransactionLine(type) {
+  const draft = bankTransactionDraft(type);
+  const line = normalizeBankTransactionLine(draft.entry || defaultBankTransactionLine());
+  if (!line.headId && !line.accountHead && !line.amount) {
+    toast("Enter an account head or amount before adding.");
+    return;
+  }
+  draft.lines.push(line);
+  draft.entry = defaultBankTransactionLine();
+  draft.totalAmount = bankTransactionFinancials(draft).totalAmount;
+  render();
+}
+
+function deleteBankTransactionLine(type, index) {
+  const draft = bankTransactionDraft(type);
+  draft.lines = (draft.lines || []).filter((_, rowIndex) => rowIndex !== Number(index));
+  draft.totalAmount = bankTransactionFinancials(draft).totalAmount;
+  render();
+}
+
+function resetBankTransactionAction(type) {
+  bankTransactionDrafts[type] = defaultBankTransaction(type);
+  accountView = bankTransactionView(type);
+  active = "Accounts";
+  render();
+}
+
+function refreshBankTransactionAction(type) {
+  bankTransactionDrafts[type] = normalizeBankTransaction(state[bankTransactionStorageKey(type)]?.[0] || defaultBankTransaction(type), type);
+  accountView = bankTransactionView(type);
+  active = "Accounts";
+  render();
+}
+
+function saveBankTransactionAction(type) {
+  const key = bankTransactionStorageKey(type);
+  const draft = normalizeBankTransaction(bankTransactionDraft(type), type);
+  state[key] = [draft, ...(state[key] || []).filter((record) => record.id !== draft.id)];
+  bankTransactionDrafts[type] = draft;
+  state.audit.unshift(audit(`Saved ${bankTransactionTitle(type)} ${draft.voucherNo || draft.refNo || ""}`.trim()));
+  saveState();
+  render();
+  toast(`${bankTransactionTitle(type)} saved.`);
+}
+
+function deleteBankTransactionAction(type) {
+  const key = bankTransactionStorageKey(type);
+  const draft = bankTransactionDraft(type);
+  state[key] = (state[key] || []).filter((record) => record.id !== draft.id);
+  bankTransactionDrafts[type] = defaultBankTransaction(type);
+  state.audit.unshift(audit(`Deleted ${bankTransactionTitle(type)} entry`));
+  saveState();
+  render();
+  toast(`${bankTransactionTitle(type)} deleted.`);
+}
+
+function printBankTransactionAction(type) {
+  state.audit.unshift(audit(`Printed ${bankTransactionTitle(type)}`));
+  saveState();
+  window.print();
+}
+
+function setupPdcScreens() {
+  document.querySelectorAll("[data-pdc-section]").forEach((button) => {
+    button.addEventListener("click", () => {
+      pdcView = button.dataset.pdcSection;
+      accountView = "PDC Transactions";
+      active = "Accounts";
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-pdc-field]").forEach((field) => {
+    const update = () => updatePdcField(field.dataset.pdcType, field.dataset.pdcField, field.type === "checkbox" ? field.checked : field.value);
+    field.addEventListener("input", update);
+    field.addEventListener("change", () => {
+      update();
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-pdc-entry-field]").forEach((field) => {
+    const update = () => updatePdcEntry(field.dataset.pdcType, field.dataset.pdcEntryField, field.value);
+    field.addEventListener("input", update);
+    field.addEventListener("change", () => {
+      update();
+      render();
+    });
+    field.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        addPdcLine(field.dataset.pdcType);
+      }
+    });
+  });
+
+  document.querySelectorAll("[data-pdc-line-field]").forEach((field) => {
+    const update = () => updatePdcLine(field.dataset.pdcType, Number(field.dataset.pdcLine), field.dataset.pdcLineField, field.value);
+    field.addEventListener("input", update);
+    field.addEventListener("change", () => {
+      update();
+      render();
+    });
+  });
+}
+
+function updatePdcField(type, field, value) {
+  const draft = pdcDraft(type);
+  if (["chequeAmount", "receivedTotal"].includes(field)) draft[field] = Number(value || 0);
+  else draft[field] = value;
+  if (field === "bankName") draft.bankAccount = value;
+  if (field === "bankAccount") draft.bankName = value;
+  if (field === "preparedBy") draft.preparedByCode = pdcStaffCode(value);
+  if (field === "receivedBy" && ["receipt", "issue", "pdcRequest"].includes(type)) draft.receivedByCode = pdcStaffCode(value);
+  if (field === "partyName" && ["receipt", "issue", "pdcRequest"].includes(type)) {
+    const party = (state.parties || []).find((item) => item.name === value);
+    draft.partyCode = party?.customerCode || party?.customerId || draft.partyCode || "";
+  }
+  if (type === "request" && field === "bouncedChequeId") applyPdcBounceToRequest(draft);
+  draft.totalAmount = pdcFinancials(draft, type).totalAmount;
+}
+
+function updatePdcEntry(type, field, value) {
+  const draft = pdcDraft(type);
+  const entry = type === "bounce"
+    ? normalizePdcBounceLine(draft.entry || defaultPdcBounceLine())
+    : ["receipt", "issue", "pdcRequest"].includes(type)
+      ? normalizePdcReceiptLine(draft.entry || defaultPdcReceiptLine())
+      : normalizePdcSubmissionLine(draft.entry || defaultPdcSubmissionLine());
+  if (["amount", "serviceChargeBank", "serviceChargeParty", "billAmount", "paid", "received"].includes(field)) entry[field] = Number(value || 0);
+  else entry[field] = value;
+  draft.entry = ["receipt", "issue", "pdcRequest"].includes(type) ? normalizePdcReceiptLine(entry) : entry;
+}
+
+function updatePdcLine(type, index, field, value) {
+  const draft = pdcDraft(type);
+  const normalizer = type === "bounce" ? normalizePdcBounceLine : ["receipt", "issue", "pdcRequest"].includes(type) ? normalizePdcReceiptLine : normalizePdcSubmissionLine;
+  const fallback = type === "bounce" ? defaultPdcBounceLine : ["receipt", "issue", "pdcRequest"].includes(type) ? defaultPdcReceiptLine : defaultPdcSubmissionLine;
+  const line = normalizer(draft.lines[index] || fallback());
+  if (["amount", "serviceChargeBank", "serviceChargeParty", "billAmount", "paid", "received"].includes(field)) line[field] = Number(value || 0);
+  else line[field] = value;
+  draft.lines[index] = normalizer(line);
+  draft.totalAmount = pdcFinancials(draft, type).totalAmount;
+}
+
+function addPdcLine(type) {
+  const draft = pdcDraft(type);
+  const line = type === "bounce"
+    ? normalizePdcBounceLine(draft.entry || defaultPdcBounceLine())
+    : ["receipt", "issue", "pdcRequest"].includes(type)
+      ? normalizePdcReceiptLine(draft.entry || defaultPdcReceiptLine())
+      : normalizePdcSubmissionLine(draft.entry || defaultPdcSubmissionLine());
+  if (["receipt", "issue", "pdcRequest"].includes(type) ? (!line.invoiceNo && !line.received && !line.billAmount) : (!line.chequeNo && !line.partyName && !line.amount)) {
+    toast(["receipt", "issue", "pdcRequest"].includes(type) ? "Enter invoice allocation details before adding." : "Enter cheque details before adding.");
+    return;
+  }
+  draft.lines.push(line);
+  draft.entry = type === "bounce" ? defaultPdcBounceLine() : ["receipt", "issue", "pdcRequest"].includes(type) ? defaultPdcReceiptLine() : defaultPdcSubmissionLine();
+  draft.totalAmount = pdcFinancials(draft, type).totalAmount;
+  render();
+}
+
+function deletePdcLine(type, index) {
+  const draft = pdcDraft(type);
+  draft.lines = (draft.lines || []).filter((_, rowIndex) => rowIndex !== Number(index));
+  draft.totalAmount = pdcFinancials(draft, type).totalAmount;
+  render();
+}
+
+function resetPdcAction(type) {
+  pdcDrafts[type] = defaultPdcRecord(type);
+  pdcView = pdcViewFromType(type);
+  accountView = "PDC Transactions";
+  active = "Accounts";
+  render();
+}
+
+function refreshPdcAction(type) {
+  pdcDrafts[type] = normalizePdcRecord(state[pdcStorageKey(type)]?.[0] || defaultPdcRecord(type), type);
+  pdcView = pdcViewFromType(type);
+  accountView = "PDC Transactions";
+  active = "Accounts";
+  render();
+}
+
+function savePdcAction(type) {
+  const key = pdcStorageKey(type);
+  const draft = normalizePdcRecord(pdcDraft(type), type);
+  state[key] = [draft, ...(state[key] || []).filter((record) => record.id !== draft.id)];
+  pdcDrafts[type] = draft;
+  state.audit.unshift(audit(`Saved ${pdcTitle(type)} ${draft.entryNo || draft.refNo || ""}`.trim()));
+  saveState();
+  render();
+  toast(`${pdcTitle(type)} saved.`);
+}
+
+function deletePdcAction(type) {
+  const key = pdcStorageKey(type);
+  const draft = pdcDraft(type);
+  state[key] = (state[key] || []).filter((record) => record.id !== draft.id);
+  pdcDrafts[type] = defaultPdcRecord(type);
+  state.audit.unshift(audit(`Deleted ${pdcTitle(type)} entry`));
+  saveState();
+  render();
+  toast(`${pdcTitle(type)} deleted.`);
+}
+
+function printPdcAction(type) {
+  state.audit.unshift(audit(`Printed ${pdcTitle(type)}`));
+  saveState();
+  window.print();
+}
+
+function loadPdcReceipt(recordId) {
+  const record = (state.pdcReceipts || []).find((item) => item.id === recordId);
+  if (!record) {
+    toast("PDC receipt not found.");
+    return;
+  }
+  pdcDrafts.receipt = normalizePdcRecord(record, "receipt");
+  pdcView = "PDC Receipt";
+  accountView = "PDC Transactions";
+  active = "Accounts";
+  render();
+}
+
+function searchPdcReceiptAction() {
+  const latest = state.pdcReceipts?.[0];
+  if (!latest) {
+    toast("No saved PDC receipts to search.");
+    return;
+  }
+  loadPdcReceipt(latest.id);
+  toast("Loaded latest PDC receipt.");
+}
+
+function setupJournalVoucherScreen() {
+  document.querySelectorAll("[data-journal-field]").forEach((field) => {
+    const update = () => updateJournalVoucherField(field.dataset.journalField, field.type === "checkbox" ? field.checked : field.value);
+    field.addEventListener("input", update);
+    field.addEventListener("change", () => {
+      update();
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-journal-entry-field]").forEach((field) => {
+    const update = () => updateJournalVoucherEntry(field.dataset.journalEntryField, field.value);
+    field.addEventListener("input", update);
+    field.addEventListener("change", () => {
+      update();
+      render();
+    });
+    field.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        addJournalVoucherLine();
+      }
+    });
+  });
+
+  document.querySelectorAll("[data-journal-line-field]").forEach((field) => {
+    const update = () => updateJournalVoucherLine(Number(field.dataset.journalLine), field.dataset.journalLineField, field.value);
+    field.addEventListener("input", update);
+    field.addEventListener("change", () => {
+      update();
+      render();
+    });
+  });
+}
+
+function updateJournalVoucherField(field, value) {
+  const draft = journalVoucherDraftRecord();
+  if (["rateFixed", "ignoreReverseAccount"].includes(field)) draft[field] = Boolean(value);
+  else draft[field] = value;
+  Object.assign(draft, journalVoucherFinancials(draft));
+}
+
+function updateJournalVoucherEntry(field, value) {
+  const draft = journalVoucherDraftRecord();
+  const entry = normalizeJournalVoucherLine(draft.entry || defaultJournalVoucherLine());
+  if (["debit", "credit"].includes(field)) {
+    entry[field] = Number(value || 0);
+    if (field === "debit" && entry.debit > 0) entry.credit = 0;
+    if (field === "credit" && entry.credit > 0) entry.debit = 0;
+  } else {
+    entry[field] = value;
+  }
+  if (field === "accountHead") {
+    const match = resolveJournalAccount(value);
+    if (match && !entry.accountId) entry.accountId = match.id;
+  }
+  if (field === "accountId") {
+    const match = resolveJournalAccount(value);
+    if (match && !entry.accountHead) entry.accountHead = match.name;
+  }
+  draft.entry = entry;
+}
+
+function updateJournalVoucherLine(index, field, value) {
+  const draft = journalVoucherDraftRecord();
+  const line = normalizeJournalVoucherLine(draft.lines[index] || defaultJournalVoucherLine());
+  if (["debit", "credit"].includes(field)) {
+    line[field] = Number(value || 0);
+    if (field === "debit" && line.debit > 0) line.credit = 0;
+    if (field === "credit" && line.credit > 0) line.debit = 0;
+  } else {
+    line[field] = value;
+  }
+  if (field === "accountHead") {
+    const match = resolveJournalAccount(value);
+    if (match && !line.accountId) line.accountId = match.id;
+  }
+  if (field === "accountId") {
+    const match = resolveJournalAccount(value);
+    if (match && !line.accountHead) line.accountHead = match.name;
+  }
+  draft.lines[index] = normalizeJournalVoucherLine(line);
+  Object.assign(draft, journalVoucherFinancials(draft));
+}
+
+function addJournalVoucherLine() {
+  const draft = journalVoucherDraftRecord();
+  const line = normalizeJournalVoucherLine(draft.entry || defaultJournalVoucherLine());
+  if (!line.accountId && !line.accountHead) {
+    toast("Choose an account head before adding.");
+    return;
+  }
+  if (!line.debit && !line.credit) {
+    toast("Enter debit or credit amount before adding.");
+    return;
+  }
+  draft.lines.push({ ...line, id: crypto.randomUUID() });
+  draft.entry = defaultJournalVoucherLine();
+  Object.assign(draft, journalVoucherFinancials(draft));
+  render();
+}
+
+function deleteJournalVoucherLine(index) {
+  const draft = journalVoucherDraftRecord();
+  draft.lines = (draft.lines || []).filter((_, rowIndex) => rowIndex !== Number(index));
+  Object.assign(draft, journalVoucherFinancials(draft));
+  render();
+}
+
+function refreshJournalVoucherAction() {
+  journalVoucherDraft = normalizeJournalVoucher(state.journalVouchers?.[0] || defaultJournalVoucher());
+  accountView = "Journal Voucher";
+  active = "Accounts";
+  render();
+}
+
+function saveJournalVoucherAction() {
+  const draft = normalizeJournalVoucher(journalVoucherDraftRecord());
+  if (!draft.lines.length) {
+    toast("Add at least one journal row.");
+    return;
+  }
+  if (Math.abs(draft.totalDebit - draft.totalCredit) > 0.005) {
+    toast("Debit and credit totals must match before saving.");
+    return;
+  }
+  const voucherNo = draft.voucherNo || draft.refNo || `JV-${draft.date}`;
+  state.journalVouchers = [draft, ...(state.journalVouchers || []).filter((record) => record.id !== draft.id)];
+  state.accounts = [
+    ...draft.lines.map((line) => normalizeAccount({
+      date: draft.date,
+      vouNo: voucherNo,
+      ledger: line.accountHead || line.accountId,
+      particular: draft.narration || line.remark || "Journal Voucher",
+      debit: line.debit,
+      credit: line.credit,
+      balance: Number(line.debit || 0) - Number(line.credit || 0),
+      crdr: Number(line.debit || 0) >= Number(line.credit || 0) ? "Dr" : "Cr"
+    })),
+    ...(state.accounts || []).filter((account) => account.vouNo !== voucherNo)
+  ];
+  journalVoucherDraft = draft;
+  state.audit.unshift(audit(`Saved Journal Voucher ${voucherNo}`));
+  saveState();
+  render();
+  toast("Journal voucher saved.");
+}
+
+function deleteJournalVoucherAction() {
+  const draft = journalVoucherDraftRecord();
+  const voucherNo = draft.voucherNo || draft.refNo || `JV-${draft.date}`;
+  state.journalVouchers = (state.journalVouchers || []).filter((record) => record.id !== draft.id);
+  state.accounts = (state.accounts || []).filter((account) => account.vouNo !== voucherNo);
+  journalVoucherDraft = defaultJournalVoucher();
+  state.audit.unshift(audit("Deleted Journal Voucher"));
+  saveState();
+  render();
+  toast("Journal voucher deleted.");
+}
+
+function printJournalVoucherAction() {
+  state.audit.unshift(audit("Printed Journal Voucher"));
+  saveState();
+  window.print();
+}
+
+function setupCashVoucherScreens() {
+  document.querySelectorAll("[data-cash-voucher-field]").forEach((field) => {
+    const update = () => updateCashVoucherField(field.dataset.cashVoucherType, field.dataset.cashVoucherField, field.type === "checkbox" ? field.checked : field.value);
+    field.addEventListener("input", update);
+    field.addEventListener("change", () => {
+      update();
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-cash-voucher-entry-field]").forEach((field) => {
+    const update = () => updateCashVoucherEntry(field.dataset.cashVoucherType, field.dataset.cashVoucherEntryField, field.value);
+    field.addEventListener("input", update);
+    field.addEventListener("change", () => {
+      update();
+      render();
+    });
+    field.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        addCashVoucherLine(field.dataset.cashVoucherType);
+      }
+    });
+  });
+
+  document.querySelectorAll("[data-cash-voucher-line-field]").forEach((field) => {
+    const update = () => updateCashVoucherLine(field.dataset.cashVoucherType, Number(field.dataset.cashVoucherLine), field.dataset.cashVoucherLineField, field.value);
+    field.addEventListener("input", update);
+    field.addEventListener("change", () => {
+      update();
+      render();
+    });
+  });
+}
+
+function updateCashVoucherField(type, field, value) {
+  const draft = cashVoucherDraft(type);
+  if (["showAllAccount", "enableCashAccount", "noPrint", "rateFixed"].includes(field)) {
+    draft[field] = Boolean(value);
+    if (field === "enableCashAccount" && !draft.enableCashAccount) draft.cashAccount = "Cash in Hand";
+  } else if (field === "openingBalance") {
+    draft[field] = Number(value || 0);
+  } else {
+    draft[field] = value;
+  }
+  Object.assign(draft, cashVoucherFinancials(draft, type));
+}
+
+function updateCashVoucherEntry(type, field, value) {
+  const draft = cashVoucherDraft(type);
+  const entry = normalizeCashVoucherLine(draft.entry || defaultCashVoucherLine(type), type);
+  entry[field] = ["amount", "discount"].includes(field) ? Number(value || 0) : value;
+  if (field === "accountHead") {
+    const match = bankAccountHeadOptions().find((account) => account.name === value);
+    if (match && !entry.headId) entry.headId = match.id;
+  }
+  draft.entry = entry;
+}
+
+function updateCashVoucherLine(type, index, field, value) {
+  const draft = cashVoucherDraft(type);
+  const line = normalizeCashVoucherLine(draft.lines[index] || defaultCashVoucherLine(type), type);
+  line[field] = ["amount", "discount"].includes(field) ? Number(value || 0) : value;
+  if (field === "accountHead") {
+    const match = bankAccountHeadOptions().find((account) => account.name === value);
+    if (match && !line.headId) line.headId = match.id;
+  }
+  draft.lines[index] = normalizeCashVoucherLine(line, type);
+  Object.assign(draft, cashVoucherFinancials(draft, type));
+}
+
+function addCashVoucherLine(type) {
+  const draft = cashVoucherDraft(type);
+  const line = normalizeCashVoucherLine(draft.entry || defaultCashVoucherLine(type), type);
+  if (!line.headId && !line.accountHead && !line.amount) {
+    toast("Enter an account head or amount before adding.");
+    return;
+  }
+  draft.lines.push(line);
+  draft.entry = defaultCashVoucherLine(type);
+  Object.assign(draft, cashVoucherFinancials(draft, type));
+  render();
+}
+
+function deleteCashVoucherLine(type, index) {
+  const draft = cashVoucherDraft(type);
+  draft.lines = (draft.lines || []).filter((_, rowIndex) => rowIndex !== Number(index));
+  Object.assign(draft, cashVoucherFinancials(draft, type));
+  render();
+}
+
+function resetCashVoucherAction(type) {
+  cashVoucherDrafts[type] = defaultCashVoucher(type);
+  accountView = cashVoucherView(type);
+  active = "Accounts";
+  render();
+}
+
+function refreshCashVoucherAction(type) {
+  cashVoucherDrafts[type] = normalizeCashVoucher(state[cashVoucherStorageKey(type)]?.[0] || defaultCashVoucher(type), type);
+  accountView = cashVoucherView(type);
+  active = "Accounts";
+  render();
+}
+
+function saveCashVoucherAction(type) {
+  const key = cashVoucherStorageKey(type);
+  const draft = normalizeCashVoucher(cashVoucherDraft(type), type);
+  state[key] = [draft, ...(state[key] || []).filter((record) => record.id !== draft.id)];
+  cashVoucherDrafts[type] = draft;
+  (draft.lines || []).forEach((line) => {
+    const amount = type === "receipt" ? Math.max(0, Number(line.amount || 0) - Number(line.discount || 0)) : Number(line.amount || 0);
+    state.accounts.unshift(normalizeAccount({
+      date: formatDisplayDate(draft.date),
+      vouNo: line.voucherNo || draft.voucherNo || draft.refNo || (type === "payment" ? "CP" : "CR"),
+      ledger: draft.cashAccount || "Cash in Hand",
+      particular: `${cashVoucherTitle(type)} - ${line.accountHead || "Account"}`,
+      debit: type === "payment" ? amount : 0,
+      credit: type === "receipt" ? amount : 0,
+      balance: type === "payment" ? amount : -amount,
+      crdr: type === "payment" ? "Dr" : "Cr"
+    }));
+  });
+  state.audit.unshift(audit(`Saved ${cashVoucherTitle(type)} ${draft.voucherNo || draft.refNo || ""}`.trim()));
+  saveState();
+  render();
+  toast(`${cashVoucherTitle(type)} saved.`);
+}
+
+function deleteCashVoucherAction(type) {
+  const key = cashVoucherStorageKey(type);
+  const draft = cashVoucherDraft(type);
+  state[key] = (state[key] || []).filter((record) => record.id !== draft.id);
+  cashVoucherDrafts[type] = defaultCashVoucher(type);
+  state.audit.unshift(audit(`Deleted ${cashVoucherTitle(type)} entry`));
+  saveState();
+  render();
+  toast(`${cashVoucherTitle(type)} deleted.`);
+}
+
+function printCashVoucherAction(type) {
+  state.audit.unshift(audit(`Printed ${cashVoucherTitle(type)}`));
+  saveState();
+  window.print();
+}
+
+function setupDirectEntryScreen() {
+  document.querySelectorAll("[data-direct-entry-field]").forEach((field) => {
+    const update = () => updateDirectEntryField(field.dataset.directEntryField, field.type === "checkbox" ? field.checked : field.value);
+    field.addEventListener("input", update);
+    field.addEventListener("change", () => {
+      update();
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-direct-entry-entry-field]").forEach((field) => {
+    const update = () => updateDirectEntryEntry(field.dataset.directEntryEntryField, field.value);
+    field.addEventListener("input", update);
+    field.addEventListener("change", () => {
+      update();
+      render();
+    });
+    field.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        addDirectEntryLine();
+      }
+    });
+  });
+
+  document.querySelectorAll("[data-direct-entry-line-field]").forEach((field) => {
+    const update = () => updateDirectEntryLine(Number(field.dataset.directEntryLine), field.dataset.directEntryLineField, field.value);
+    field.addEventListener("input", update);
+    field.addEventListener("change", () => {
+      update();
+      render();
+    });
+  });
+}
+
+function updateDirectEntryField(field, value) {
+  const draft = directEntryRecord();
+  if (["repeatLastHead", "repeatLastNarration"].includes(field)) draft[field] = Boolean(value);
+  else draft[field] = value;
+}
+
+function updateDirectEntryEntry(field, value) {
+  const draft = directEntryRecord();
+  const entry = normalizeDirectEntryLine(draft.entry || defaultDirectEntryLine());
+  entry[field] = ["receipt", "payment"].includes(field) ? Number(value || 0) : value;
+  draft.entry = entry;
+}
+
+function updateDirectEntryLine(index, field, value) {
+  const draft = directEntryRecord();
+  const line = normalizeDirectEntryLine(draft.lines[index] || defaultDirectEntryLine());
+  line[field] = ["receipt", "payment"].includes(field) ? Number(value || 0) : value;
+  draft.lines[index] = normalizeDirectEntryLine(line);
+  Object.assign(draft, directEntryFinancials(draft));
+}
+
+function addDirectEntryLine() {
+  const draft = directEntryRecord();
+  const line = normalizeDirectEntryLine(draft.entry || defaultDirectEntryLine());
+  if (!line.accountHead && !line.receipt && !line.payment && !line.remark) {
+    toast("Enter an account head or amount before adding.");
+    return;
+  }
+  draft.lines.push(line);
+  draft.entry = {
+    ...defaultDirectEntryLine(),
+    accountHead: draft.repeatLastHead ? line.accountHead : "",
+    remark: draft.repeatLastNarration ? line.remark : ""
+  };
+  Object.assign(draft, directEntryFinancials(draft));
+  render();
+}
+
+function deleteDirectEntryLine(index) {
+  const draft = directEntryRecord();
+  draft.lines = (draft.lines || []).filter((_, rowIndex) => rowIndex !== Number(index));
+  Object.assign(draft, directEntryFinancials(draft));
+  render();
+}
+
+function resetDirectEntryAction() {
+  directEntryDraft = defaultDirectEntry();
+  active = "Accounts";
+  accountView = "Direct Entry";
+  render();
+}
+
+function refreshDirectEntryAction() {
+  directEntryDraft = normalizeDirectEntry(state.directEntries?.[0] || defaultDirectEntry());
+  active = "Accounts";
+  accountView = "Direct Entry";
+  render();
+}
+
+function saveDirectEntryAction() {
+  const draft = normalizeDirectEntry(directEntryRecord());
+  if (!draft.lines.length) {
+    toast("Add at least one direct entry line before saving.");
+    return;
+  }
+  state.directEntries = [draft, ...(state.directEntries || []).filter((record) => record.id !== draft.id)];
+  draft.lines.forEach((line) => {
+    state.accounts.unshift({
+      date: formatDisplayDate(line.date),
+      vouNo: draft.entryNo,
+      ledger: draft.cashBank,
+      particular: `${line.accountHead || "Direct Entry"}${line.remark ? ` - ${line.remark}` : ""}`,
+      debit: Number(line.receipt || 0),
+      credit: Number(line.payment || 0),
+      balance: Number(line.receipt || 0) - Number(line.payment || 0),
+      crdr: Number(line.receipt || 0) >= Number(line.payment || 0) ? "Dr" : "Cr"
+    });
+  });
+  directEntryDraft = draft;
+  state.audit.unshift(audit(`Saved Direct Entry ${draft.entryNo}`));
+  saveState();
+  render();
+  toast("Direct Entry saved.");
+}
+
+function setupExpenseEntryScreen() {
+  document.querySelectorAll("[data-expense-entry-field]").forEach((field) => {
+    const update = () => updateExpenseEntryField(field.dataset.expenseEntryField, field.type === "radio" ? field.value : field.value);
+    field.addEventListener("input", update);
+    field.addEventListener("change", () => {
+      if (field.type === "radio" && !field.checked) return;
+      update();
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-expense-entry-entry-field]").forEach((field) => {
+    const update = () => updateExpenseEntryEntry(field.dataset.expenseEntryEntryField, field.value);
+    field.addEventListener("input", update);
+    field.addEventListener("change", () => {
+      update();
+      render();
+    });
+    field.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        addExpenseEntryLine();
+      }
+    });
+  });
+
+  document.querySelectorAll("[data-expense-entry-line-field]").forEach((field) => {
+    const update = () => updateExpenseEntryLine(Number(field.dataset.expenseEntryLine), field.dataset.expenseEntryLineField, field.value);
+    field.addEventListener("input", update);
+    field.addEventListener("change", () => {
+      update();
+      render();
+    });
+  });
+}
+
+function recalculateExpenseLine(line) {
+  const clean = normalizeExpenseEntryLine(line);
+  clean.tds = Number(clean.tds || (clean.taxable * clean.tdsPercent / 100) || 0);
+  clean.total = Number(clean.taxable || 0) + Number(clean.gst || 0) - Number(clean.tds || 0);
+  return clean;
+}
+
+function updateExpenseEntryField(field, value) {
+  const draft = expenseEntryRecord();
+  draft[field] = value;
+}
+
+function updateExpenseEntryEntry(field, value) {
+  const draft = expenseEntryRecord();
+  const entry = normalizeExpenseEntryLine(draft.entry || defaultExpenseEntryLine());
+  entry[field] = ["taxable", "gst", "tdsPercent", "tds"].includes(field) ? Number(value || 0) : value;
+  if (field === "tdsPercent") entry.tds = Number(entry.taxable || 0) * Number(entry.tdsPercent || 0) / 100;
+  draft.entry = recalculateExpenseLine(entry);
+}
+
+function updateExpenseEntryLine(index, field, value) {
+  const draft = expenseEntryRecord();
+  const line = normalizeExpenseEntryLine(draft.lines[index] || defaultExpenseEntryLine());
+  line[field] = ["taxable", "gst", "tdsPercent", "tds"].includes(field) ? Number(value || 0) : value;
+  if (field === "tdsPercent") line.tds = Number(line.taxable || 0) * Number(line.tdsPercent || 0) / 100;
+  draft.lines[index] = recalculateExpenseLine(line);
+  Object.assign(draft, expenseEntryFinancials(draft));
+}
+
+function addExpenseEntryLine() {
+  const draft = expenseEntryRecord();
+  const line = recalculateExpenseLine(draft.entry || defaultExpenseEntryLine());
+  if (!line.ledgerHead && !line.billNo && !line.taxable && !line.gst && !line.total) {
+    toast("Enter expense details before adding.");
+    return;
+  }
+  draft.lines.push(line);
+  draft.entry = defaultExpenseEntryLine();
+  Object.assign(draft, expenseEntryFinancials(draft));
+  render();
+}
+
+function deleteExpenseEntryLine(index) {
+  const draft = expenseEntryRecord();
+  draft.lines = (draft.lines || []).filter((_, rowIndex) => rowIndex !== Number(index));
+  Object.assign(draft, expenseEntryFinancials(draft));
+  render();
+}
+
+function resetExpenseEntryAction() {
+  expenseEntryDraft = defaultExpenseEntry();
+  active = "Accounts";
+  accountView = "Expense Entry";
+  render();
+}
+
+function refreshExpenseEntryAction() {
+  expenseEntryDraft = normalizeExpenseEntry(state.expenseEntries?.[0] || defaultExpenseEntry());
+  active = "Accounts";
+  accountView = "Expense Entry";
+  render();
+}
+
+function saveExpenseEntryAction() {
+  const draft = normalizeExpenseEntry(expenseEntryRecord());
+  if (!draft.lines.length) {
+    toast("Add at least one expense row before saving.");
+    return;
+  }
+  state.expenseEntries = [draft, ...(state.expenseEntries || []).filter((record) => record.id !== draft.id)];
+  draft.lines.forEach((line) => {
+    state.accounts.unshift({
+      date: formatDisplayDate(draft.date),
+      vouNo: draft.entryNo,
+      ledger: draft.cashAccount,
+      particular: `Expense: ${line.ledgerHead || "Ledger"}${line.billNo ? ` / Bill ${line.billNo}` : ""}`,
+      debit: 0,
+      credit: Number(line.total || 0),
+      balance: -Number(line.total || 0),
+      crdr: "Cr"
+    });
+  });
+  expenseEntryDraft = draft;
+  state.audit.unshift(audit(`Saved Expense Entry ${draft.entryNo}`));
+  saveState();
+  render();
+  toast("Expense Entry saved.");
+}
+
+function deleteExpenseEntryAction() {
+  const draft = expenseEntryRecord();
+  state.expenseEntries = (state.expenseEntries || []).filter((record) => record.id !== draft.id);
+  expenseEntryDraft = defaultExpenseEntry();
+  state.audit.unshift(audit("Deleted Expense Entry"));
+  saveState();
+  render();
+  toast("Expense Entry deleted.");
 }
 
 function updateBillwiseField(type, field, value) {
@@ -9659,6 +13697,25 @@ function setupStockAdjustmentScreen() {
   });
 }
 
+function setupOpeningStockScreen() {
+  document.querySelectorAll("[data-opening-stock-date]").forEach((field) => {
+    const update = () => updateOpeningStockDate(field.value);
+    field.addEventListener("input", update);
+    field.addEventListener("change", () => {
+      update();
+      render();
+    });
+  });
+  document.querySelectorAll("[data-opening-stock-row]").forEach((field) => {
+    const update = () => updateOpeningStockLine(Number(field.dataset.openingStockRow), field.dataset.openingStockField, field.value);
+    field.addEventListener("input", update);
+    field.addEventListener("change", () => {
+      update();
+      render();
+    });
+  });
+}
+
 function setupGoldDepositScreens() {
   document.querySelectorAll("[data-gold-deposit-field], [data-gold-withdrawal-field]").forEach((field) => {
     const type = field.dataset.goldWithdrawalField ? "Withdrawal" : "Deposit";
@@ -9683,6 +13740,55 @@ function setupSampleScreens() {
     const type = field.dataset.sampleReturnField ? "Return" : "Issue";
     const key = field.dataset.sampleReturnField || field.dataset.sampleIssueField;
     const update = () => updateSampleDraftField(type, key, field.type === "checkbox" ? field.checked : field.value);
+    field.addEventListener("input", update);
+    field.addEventListener("change", () => {
+      update();
+      render();
+    });
+  });
+}
+
+function setupServiceScreens() {
+  document.querySelectorAll("[data-service-view]").forEach((button) => {
+    button.addEventListener("click", () => {
+      serviceWorkView = button.dataset.serviceView;
+      render();
+    });
+  });
+  document.querySelectorAll("[data-service-field]").forEach((field) => {
+    const update = () => updateServiceDraftField(currentServiceType(), field.dataset.serviceField, field.value);
+    field.addEventListener("input", update);
+    field.addEventListener("change", () => {
+      update();
+      render();
+    });
+  });
+  document.querySelectorAll(".service-job-entry tr").forEach((row) => {
+    const recalc = () => updateServicePreview(row, readServiceEntryLine(row));
+    row.querySelectorAll("[data-line-field]").forEach((field) => {
+      field.addEventListener("input", recalc);
+      field.addEventListener("change", recalc);
+      field.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter") return;
+        event.preventDefault();
+        appendEntryLine(row);
+      });
+    });
+    recalc();
+  });
+  document.querySelectorAll("[data-service-line-field]").forEach((field) => {
+    const update = () => updateServiceLineField(currentServiceType(), Number(field.dataset.index), field.dataset.serviceLineField, field.value);
+    field.addEventListener("input", update);
+    field.addEventListener("change", () => {
+      update();
+      render();
+    });
+  });
+}
+
+function setupPolishingScreen() {
+  document.querySelectorAll("[data-polishing-field]").forEach((field) => {
+    const update = () => updatePolishingDraftField(field.dataset.polishingField, field.type === "checkbox" ? field.checked : field.value);
     field.addEventListener("input", update);
     field.addEventListener("change", () => {
       update();
@@ -9760,6 +13866,24 @@ function setupRefineryScreens() {
   document.querySelectorAll("[data-refinery-view]").forEach((button) => {
     button.addEventListener("click", () => {
       refineryView = button.dataset.refineryView;
+      render();
+    });
+  });
+  document.querySelectorAll("[data-refinery-return-view]").forEach((button) => {
+    button.addEventListener("click", () => {
+      refineryReturnView = button.dataset.refineryReturnView;
+      render();
+    });
+  });
+  document.querySelectorAll("[data-refinery-final-view]").forEach((button) => {
+    button.addEventListener("click", () => {
+      refineryFinalView = button.dataset.refineryFinalView;
+      render();
+    });
+  });
+  document.querySelectorAll("[data-melting-return-view]").forEach((button) => {
+    button.addEventListener("click", () => {
+      meltingReturnView = button.dataset.meltingReturnView;
       render();
     });
   });
@@ -9864,6 +13988,18 @@ function updateStockAdjustmentDraftField(field, value) {
   stockAdjustmentDraft[field] = value;
 }
 
+function updateOpeningStockDate(value) {
+  openingStockDraft = normalizeOpeningStockEntry(openingStockDraft || defaultOpeningStockEntry(value));
+  openingStockDraft.openingDate = value || financialYearOpeningDate();
+  openingStockDraft.financialYear = financialYear(openingStockDraft.openingDate);
+}
+
+function updateOpeningStockLine(index, field, value) {
+  openingStockDraft = normalizeOpeningStockEntry(openingStockDraft || defaultOpeningStockEntry());
+  const line = { ...(openingStockDraft.lines[index] || {}), [field]: parseEntryNumber(value) };
+  openingStockDraft.lines[index] = recalculateOpeningStockLine(line);
+}
+
 function updateGoldDepositDraftField(type, field, value) {
   const isWithdrawal = type === "Withdrawal";
   const draft = normalizeGoldDeposit((isWithdrawal ? goldWithdrawalDraft : goldDepositDraft) || defaultGoldDeposit(type), type);
@@ -9890,6 +14026,12 @@ function updateSampleDraftField(type, field, value) {
   }
   if (isReturn) sampleReturnDraft = draft;
   else sampleIssueDraft = draft;
+}
+
+function updatePolishingDraftField(field, value) {
+  polishingDraft = normalizePolishingEntry(polishingDraft || defaultPolishingEntry());
+  if (field === "hasParty") polishingDraft[field] = Boolean(value);
+  else polishingDraft[field] = value;
 }
 
 function updateRefineryIssueDraftField(field, value) {
@@ -9982,7 +14124,7 @@ function setupOrderAdvanceScreens() {
 }
 
 function updateOrderAdvanceDraft(draft, field, value) {
-  const numericFields = ["goldRateGram", "goldRateEightGram", "advanceAmount", "advanceWeight", "exchangeAmount", "exchangeWeight", "refundAmount", "refundWeight"];
+  const numericFields = ["goldRateGram", "goldRateEightGram", "advanceAmount", "refundAmount"];
   draft[field] = numericFields.includes(field) ? parseEntryNumber(value) : value;
 }
 
@@ -9993,16 +14135,14 @@ function updateOrderAdvanceLive(type) {
   document.querySelectorAll("[data-order-live]").forEach((target) => {
     const key = target.dataset.orderLive;
     if (key === "draftTotalAmount") target.value = moneyValue(summary.draftTotalAmount);
-    if (key === "draftTotalWeight") target.value = numericValue(summary.draftTotalWeight);
     if (key === "balance") target.value = moneyValue(summary.balance);
-    if (key === "balanceWeight") target.value = numericValue(summary.balanceWeight);
     if (key === "netAdvance") target.value = moneyValue(summary.netAdvance);
-    if (key === "netAdvanceWeight") target.value = numericValue(summary.netAdvanceWeight);
   });
 }
 
 function setupEntryGridCalculations() {
   document.querySelectorAll(".classic-entry-grid table tbody tr").forEach((row) => {
+    if (row.closest(".service-job-entry")) return;
     const section = entrySectionForRow(row);
     const recalc = () => {
       if (row.closest(".smith-work-entry")) {
@@ -10027,6 +14167,14 @@ function setupEntryGridCalculations() {
       }
       if (row.closest(".gold-deposit-entry")) {
         updateGoldDepositPreview(row, readGoldDepositEntryLine(row));
+        return;
+      }
+      if (row.closest(".polishing-item-entry")) {
+        updatePolishingPreview(row, readPolishingEntryLine(row));
+        return;
+      }
+      if (row.closest(".polishing-stone-entry")) {
+        updatePolishingStonePreview(row, readPolishingStoneEntryLine(row));
         return;
       }
       if (row.closest(".sample-entry")) {
@@ -10108,8 +14256,14 @@ function setupEntryGridCalculations() {
       });
       
       const inputsToUpdate = {
+        item: line.item || "",
+        itemCode: line.itemCode || line.item || "",
+        itemName: line.itemName || "",
+        va: numericValue(line.va, 2),
         lessWeight: numericValue(line.lessWeight),
         touchLess: numericValue(line.touchLess),
+        mcPerGm: numericValue(line.mcPerGm, 2),
+        totalMc: moneyValue(line.totalMc),
         makingCharge: moneyValue(line.makingCharge)
       };
       Object.entries(inputsToUpdate).forEach(([field, value]) => {
@@ -10129,27 +14283,61 @@ function setupEntryGridCalculations() {
       input.addEventListener("keydown", (event) => {
         if (event.key !== "Enter") return;
         event.preventDefault();
-        appendEntryLine(row);
+        moveToNextBillField(input, () => appendEntryLine(row));
       });
     });
     recalc();
   });
 }
 
+function setupBillEnterNavigation() {
+  document.querySelectorAll(".classic-billing-shell, .transaction-entry-header").forEach((scope) => {
+    scope.querySelectorAll("input, select, textarea").forEach((field) => {
+      if (field.dataset.lineField || field.readOnly || field.disabled) return;
+      field.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" || event.shiftKey) return;
+        event.preventDefault();
+        moveToNextBillField(field);
+      });
+    });
+  });
+}
+
+function billEntryFields(scope) {
+  return [...scope.querySelectorAll("input, select, textarea")]
+    .filter((field) => !field.disabled && !field.readOnly && field.type !== "hidden" && field.offsetParent !== null);
+}
+
+function moveToNextBillField(currentField, onLastField) {
+  const scope = currentField.closest(".classic-billing-shell") || currentField.closest(".modal") || document;
+  const fields = billEntryFields(scope);
+  const index = fields.indexOf(currentField);
+  const next = fields[index + 1];
+  if (next) {
+    next.focus();
+    next.select?.();
+    return true;
+  }
+  onLastField?.();
+  return false;
+}
+
 function updateEntryPreviewTotals(row, line, section) {
   const area = row.closest(".classic-entry-area");
   const shell = row.closest(".classic-billing-shell");
   const strip = area?.nextElementSibling?.classList?.contains("classic-total-strip") ? area.nextElementSibling : null;
+  const baseRows = entryRowsForTotals(row, section);
+  const previewRows = [...baseRows, line].filter(Boolean);
   if (strip) {
     const setTotal = (label, value) => {
       const input = strip.querySelector(`[data-total-value="${label}"]`);
       if (input) input.value = value;
     };
-    setTotal("Total", numericValue(line.qty, 0));
-    setTotal("Gross", grams(line.gross));
-    setTotal("Stone", grams(line.stone));
-    setTotal("Wastage", grams(line.wastage));
-    setTotal("Net", grams(line.net));
+    setTotal("Total", numericValue(sumField(previewRows, "qty"), 0));
+    setTotal("Gross", grams(sumField(previewRows, "gross")));
+    setTotal("Stone", grams(sumField(previewRows, "stone")));
+    setTotal("Wastage", grams(sumField(previewRows, "wastage")));
+    setTotal("Net", grams(sumField(previewRows, "net")));
     
     const labelKey = row.closest(".purchase-return") 
       ? "Purchase Return Total" 
@@ -10159,10 +14347,19 @@ function updateEntryPreviewTotals(row, line, section) {
           ? "Sales Order Total"
           : `${capitalize(section)} Total`;
         
-    setTotal(labelKey, money(line.amount || line.itemTotal));
+    setTotal(labelKey, money(sumLines(previewRows)));
   }
   const returnTotal = shell?.querySelector(".return-bottom .total-block .readout strong");
-  if (returnTotal && section === "return") returnTotal.textContent = money(line.amount || line.itemTotal);
+  if (returnTotal && section === "return") returnTotal.textContent = money(sumLines(previewRows));
+}
+
+function entryRowsForTotals(row, section) {
+  const bill = row.closest(".sales-order-shell") ? salesOrderBill() : row.closest(".purchase-entry, .purchase-return") ? purchaseBill() : state.bills[0] || {};
+  let sectionKey = section;
+  if (row.closest(".purchase-entry, .purchase-return")) sectionKey = "exchange";
+  if (row.closest(".sales-order-shell") && section === "order") sectionKey = "sales";
+  const rows = bill.sections?.[sectionKey] || [];
+  return rows.map((item) => normalizeBillLine(item, 0, bill, section === "purchase" ? "purchase" : sectionKey));
 }
 
 function capitalize(value) {
@@ -10193,6 +14390,123 @@ function entrySectionForRow(row) {
   return billingView.toLowerCase();
 }
 
+function setupSavedLineEditing() {
+  document.querySelectorAll("[data-edit-line-scope]").forEach((row) => {
+    row.addEventListener("dblclick", () => loadSavedLineIntoEntry(row));
+  });
+}
+
+function loadSavedLineIntoEntry(row) {
+  const line = editableLineForRow(row);
+  if (!line) {
+    toast("Saved row not found.");
+    return;
+  }
+  const entryRow = row.closest(".classic-entry-area")?.querySelector(".classic-entry-grid tbody tr");
+  if (!entryRow) return;
+  fillEntryRow(entryRow, line);
+  entryRow.querySelector("[data-line-field]")?.focus();
+  toast("Row loaded into the entry line. Make changes and press Enter to add corrected row.");
+}
+
+function editableLineForRow(row) {
+  const index = Number(row.dataset.editLineIndex || 0);
+  if (row.dataset.editLineScope === "bill") {
+    const section = row.dataset.editLineSection || "sales";
+    const bill = state.bills[0];
+    return bill?.sections?.[section]?.[index] || null;
+  }
+  const kind = row.dataset.editLineKind || "";
+  if (kind.startsWith("sales-order")) {
+    const section = salesOrderView === "Exchange" ? "exchange" : salesOrderView === "Return" ? "return" : "sales";
+    return salesOrderBill()?.sections?.[section]?.[index] || null;
+  }
+  if (kind === "purchase-entry" || kind === "purchase-return") return purchaseRows()[index] || null;
+  if (kind === "direct-purchase") return state.directPurchases?.[0]?.lines?.[index] || null;
+  if (kind === "direct-purchase-return") return state.directPurchaseReturns?.[0]?.lines?.[index] || null;
+  if (kind === "dmd-return-ornament") return state.dmdReturns?.[0]?.ornamentLines?.[index] || null;
+  if (kind === "dmd-return-stone") return state.dmdReturns?.[0]?.diamondLines?.[index] || null;
+  if (kind === "dmd-wholesale-entry") return state.dmdWholesales?.[0]?.lines?.[index] || null;
+  if (kind === "diamond-purchase-ornament") return state.diamondPurchases?.[0]?.ornamentLines?.[index] || null;
+  if (kind === "diamond-purchase-stone") return state.diamondPurchases?.[0]?.diamondLines?.[index] || null;
+  if (kind === "diamond-purchase-return-ornament") return state.diamondPurchaseReturns?.[0]?.ornamentLines?.[index] || null;
+  if (kind === "diamond-purchase-return-stone") return state.diamondPurchaseReturns?.[0]?.diamondLines?.[index] || null;
+  if (kind === "dmd-stone-purchase") return state.dmdStonePurchases?.[0]?.lines?.[index] || null;
+  return null;
+}
+
+function fillEntryRow(entryRow, sourceLine) {
+  const line = { ...sourceLine };
+  const aliases = {
+    barcode: ["barcode", "itemCode", "itemId"],
+    itemCode: ["itemCode", "barcode", "itemId"],
+    itemId: ["itemId", "itemCode", "barcode"],
+    item: ["item"],
+    itemName: ["itemName", "itemDescription", "colorType", "item"],
+    itemDescription: ["itemDescription", "description", "itemName"],
+    description: ["description", "itemDescription"],
+    qty: ["qty", "nos"],
+    nos: ["nos", "qty"],
+    gross: ["gross"],
+    stone: ["stone"],
+    wastage: ["wastage"],
+    mudLess: ["mudLess"],
+    lessPct: ["lessPct"],
+    lessWeight: ["lessWeight"],
+    touchPct: ["touchPct", "touch"],
+    touch: ["touch", "touchPct"],
+    touchLess: ["touchLess"],
+    stoneCharge: ["stoneCharge"],
+    rateLessPct: ["rateLessPct", "ratePct"],
+    rate: ["rate", "goldRate", "rateRtgs"],
+    goldRate: ["goldRate", "rate"],
+    va: ["va"],
+    mcPerGm: ["mcPerGm", "mcGrm"],
+    mcGrm: ["mcGrm", "mcPerGm"],
+    makingCharge: ["makingCharge", "totalMc"],
+    totalMc: ["totalMc", "makingCharge"],
+    taxPct: ["taxPct"],
+    cessPct: ["cessPct"],
+    huid: ["huid"],
+    length: ["length"],
+    breadth: ["breadth"],
+    model: ["model"],
+    previousWeight: ["previousWeight"],
+    diamondWtCent: ["diamondWtCent", "dmdWgt", "caratCent"],
+    colourStoneWt: ["colourStoneWt"],
+    crtCentRate: ["crtCentRate", "stnSPrice", "sellingRate"],
+    diamondAmount: ["diamondAmount"],
+    nos: ["nos", "qty"],
+    stonePrice: ["stonePrice"],
+    goldType: ["goldType"],
+    salesType: ["salesType"],
+    dmdWgt: ["dmdWgt", "diamondWtCent"],
+    stnSPrice: ["stnSPrice", "crtCentRate", "sellingRate"],
+    purMc: ["purMc", "purchaseMaking"],
+    salesMc: ["salesMc"],
+    type: ["type"],
+    colorType: ["colorType", "itemName"],
+    colorScale: ["colorScale"],
+    shape: ["shape"],
+    cut: ["cut"],
+    clarity: ["clarity"],
+    sieveSize: ["sieveSize"],
+    caratCent: ["caratCent", "diamondWtCent"],
+    ct: ["ct"],
+    pcs: ["pcs"],
+    purchaseRate: ["purchaseRate"],
+    sellingRate: ["sellingRate"]
+  };
+  entryRow.querySelectorAll("[data-line-field]").forEach((field) => {
+    const key = field.dataset.lineField;
+    const candidates = aliases[key] || [key];
+    const value = candidates.map((name) => line[name]).find((item) => item !== undefined && item !== null && item !== "");
+    if (value === undefined || value === null) return;
+    field.value = typeof value === "number" ? numericValue(value, String(key).toLowerCase().includes("qty") || key === "nos" || key === "pcs" ? 0 : 3) : value;
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+
 function selectManagementRecord(kind, id, group = "") {
   if (!id) return;
   if (kind === "party") managementSelection.parties[group] = id;
@@ -10211,7 +14525,8 @@ function readEntryLine(row, section) {
   };
   const readText = (field) => row.querySelector(`[data-line-field="${field}"]`)?.value || "";
   const contextBill = row.closest(".sales-order-shell") ? salesOrderBill() : row.closest(".purchase-entry, .purchase-return") ? purchaseBill() : state.bills[0] || {};
-  return normalizeBillLine({
+  const editedField = document.activeElement?.closest?.("[data-line-field]")?.dataset?.lineField || "";
+  return normalizeBillLine(enrichLineFromItemCatalog({
     id: crypto.randomUUID(),
     barcode: readText("barcode"),
     itemCode: readText("itemCode"),
@@ -10242,14 +14557,17 @@ function readEntryLine(row, section) {
     itemDescription: readText("itemDescription"),
     length: readText("length"),
     breadth: readText("breadth"),
-    model: readText("model")
-  }, 0, contextBill, section);
+    model: readText("model"),
+    _editedField: editedField
+  }), 0, contextBill, section === "return" ? "return" : section);
 }
 
 function updateLineOutputs(row, outputs) {
   Object.entries(outputs).forEach(([field, value]) => {
     const output = row.querySelector(`[data-line-output="${field}"]`);
     if (output) output.textContent = value;
+    const input = row.querySelector(`[data-line-field="${field}"]`);
+    if (input && document.activeElement !== input) input.value = value;
   });
 }
 
@@ -10287,6 +14605,7 @@ function updateDmdReturnPreview(row, line) {
 function readDmdWholesaleEntryLine(row) {
   const readNumber = (field) => parseEntryNumber(row.querySelector(`[data-line-field="${field}"]`)?.value);
   const readText = (field) => row.querySelector(`[data-line-field="${field}"]`)?.value || "";
+  const returnMode = Boolean(row.closest(".dmd-return-ornament"));
   return normalizeDmdWholesaleLine({
     itemId: readText("itemId"),
     itemDescription: readText("itemDescription"),
@@ -10303,7 +14622,7 @@ function readDmdWholesaleEntryLine(row) {
     stnSPrice: readNumber("stnSPrice"),
     purMc: readNumber("purMc"),
     salesMc: readNumber("salesMc")
-  });
+  }, { returnMode });
 }
 
 function updateDmdWholesalePreview(row, line) {
@@ -10343,7 +14662,8 @@ function updateDiamondPurchaseReturnPreview(row, line) {
 function readDirectPurchaseEntryLine(row) {
   const readNumber = (field) => parseEntryNumber(row.querySelector(`[data-line-field="${field}"]`)?.value);
   const readText = (field) => row.querySelector(`[data-line-field="${field}"]`)?.value || "";
-  return normalizeDirectPurchaseLine({
+  const editedField = document.activeElement?.closest?.("[data-line-field]")?.dataset?.lineField || "";
+  return normalizeDirectPurchaseLine(enrichLineFromItemCatalog({
     itemId: readText("itemId"),
     itemName: readText("itemName") || readText("itemId") || "Direct Purchase",
     qty: readNumber("qty") || 1,
@@ -10352,17 +14672,49 @@ function readDirectPurchaseEntryLine(row) {
     rate: readNumber("rate"),
     stoneCharge: readNumber("stoneCharge"),
     mcPerGm: readNumber("mcPerGm"),
+    totalMc: readNumber("totalMc"),
+    _editedField: editedField,
     taxPct: readNumber("taxPct")
-  });
+  }));
 }
 
 function updateDirectPurchasePreview(row, line) {
   updateLineOutputs(row, {
     net: grams(line.net),
-    totalMc: money(line.totalMc),
+    mcPerGm: numericValue(line.mcPerGm, 2),
+    totalMc: moneyValue(line.totalMc),
     tax: money(line.tax),
     itemTotal: money(line.itemTotal)
   });
+  updateDirectPurchasePreviewTotals(row, line);
+}
+
+function updateDirectPurchasePreviewTotals(row, line) {
+  const shell = row.closest(".direct-purchase-shell");
+  const strip = shell?.querySelector(".direct-purchase-bottom");
+  if (!strip) return;
+  const savedBill = row.closest(".direct-purchase-return")
+    ? normalizeDirectPurchaseReturnBill(state.directPurchaseReturns?.[0])
+    : normalizeDirectPurchaseBill(state.directPurchases?.[0]);
+  const totals = directPurchaseFinancials({
+    ...savedBill,
+    lines: [...(savedBill.lines || []), line].filter(Boolean)
+  });
+  const setReadout = (label, value, occurrence = 0) => {
+    const readouts = [...strip.querySelectorAll(".readout")].filter((item) => item.querySelector("span")?.textContent === label);
+    const target = readouts[occurrence]?.querySelector("strong");
+    if (target) target.textContent = value;
+  };
+  setReadout("Bill Amount", money(totals.billAmount));
+  setReadout("Addition", money(totals.addition));
+  setReadout("Discount", money(totals.discount));
+  setReadout("GST / VAT", money(totals.gstVat));
+  setReadout("Cess Amt", money(totals.cess));
+  setReadout("Invoice Total", money(totals.invoiceTotal));
+  setReadout("Round off", money(totals.roundOff));
+  setReadout("Account Balance", money(totals.accountBalance), 0);
+  setReadout("Cash Payment", money(totals.payment));
+  setReadout("Account Balance", money(totals.accountBalance), 1);
 }
 
 function readSmithWorkEntryLine(row) {
@@ -10675,6 +15027,51 @@ function updateSamplePreview(row, line) {
   });
 }
 
+function readPolishingEntryLine(row) {
+  const readNumber = (field) => parseEntryNumber(row.querySelector(`[data-line-field="${field}"]`)?.value);
+  const readText = (field) => row.querySelector(`[data-line-field="${field}"]`)?.value || "";
+  return normalizePolishingLine({
+    itemId: readText("itemId"),
+    barcode: readText("barcode"),
+    itemName: readText("itemName"),
+    qty: readNumber("qty") || 1,
+    gross: readNumber("gross"),
+    stone: readNumber("stone")
+  });
+}
+
+function updatePolishingPreview(row, line) {
+  updateLineOutputs(row, { net: grams(line.net) });
+  const input = row.querySelector(`[data-line-field="net"]`);
+  if (input && document.activeElement !== input) input.value = numericValue(line.net);
+}
+
+function readPolishingStoneEntryLine(row) {
+  const readNumber = (field) => parseEntryNumber(row.querySelector(`[data-line-field="${field}"]`)?.value);
+  const readText = (field) => row.querySelector(`[data-line-field="${field}"]`)?.value || "";
+  return normalizePolishingStoneLine({
+    code: readText("code"),
+    barcode: readText("barcode"),
+    colorType: readText("colorType"),
+    colorScale: readText("colorScale"),
+    shape: readText("shape"),
+    cut: readText("cut"),
+    clarity: readText("clarity"),
+    sieveSize: readText("sieveSize"),
+    caratCent: readNumber("caratCent"),
+    ct: readText("ct") || "Cnt",
+    pcs: readNumber("pcs"),
+    purchaseRate: readNumber("purchaseRate"),
+    sellingRate: readNumber("sellingRate")
+  });
+}
+
+function updatePolishingStonePreview(row, line) {
+  updateLineOutputs(row, { amount: money(line.amount) });
+  const input = row.querySelector(`[data-line-field="amount"]`);
+  if (input && document.activeElement !== input) input.value = moneyValue(line.amount);
+}
+
 function appendEntryLine(row) {
   if (row.closest(".smith-work-entry")) {
     appendSmithWorkLine(row);
@@ -10700,8 +15097,20 @@ function appendEntryLine(row) {
     appendGoldDepositLine(row);
     return;
   }
+  if (row.closest(".polishing-item-entry")) {
+    appendPolishingLine(row);
+    return;
+  }
+  if (row.closest(".polishing-stone-entry")) {
+    appendPolishingStone(row);
+    return;
+  }
   if (row.closest(".sample-entry")) {
     appendSampleLine(row);
+    return;
+  }
+  if (row.closest(".service-job-entry")) {
+    appendServiceLine(row);
     return;
   }
   if (row.closest(".refinery-issue-entry")) {
@@ -10857,6 +15266,32 @@ function appendSampleLine(row) {
   toast(`Sample ${type.toLowerCase()} item added.`);
 }
 
+function appendPolishingLine(row) {
+  const line = readPolishingEntryLine(row);
+  if (!line.itemName && !line.barcode && !line.itemId && line.gross <= 0) {
+    toast("Enter polishing item details before adding.");
+    return;
+  }
+  polishingDraft = normalizePolishingEntry(polishingDraft || defaultPolishingEntry());
+  polishingDraft.lines.push(line);
+  state.audit.unshift(audit(`Added ${line.itemName || line.barcode || "polishing item"} to Polishing`));
+  render();
+  toast("Polishing item added.");
+}
+
+function appendPolishingStone(row) {
+  const line = readPolishingStoneEntryLine(row);
+  if (!line.barcode && !line.colorType && !line.shape && line.amount <= 0 && line.pcs <= 0 && line.caratCent <= 0) {
+    toast("Enter polishing stone details before adding.");
+    return;
+  }
+  polishingDraft = normalizePolishingEntry(polishingDraft || defaultPolishingEntry());
+  polishingDraft.stones.push(line);
+  state.audit.unshift(audit("Added polishing stone detail"));
+  render();
+  toast("Polishing stone detail added.");
+}
+
 function appendStockAdjustmentLine(row) {
   const line = readStockAdjustmentEntryLine(row);
   const hasText = Boolean(line.barcode || line.itemName);
@@ -10982,6 +15417,20 @@ function deleteSampleLine(type, index) {
   }
   render();
   toast(`Sample ${type.toLowerCase()} item removed.`);
+}
+
+function deletePolishingLine(index) {
+  polishingDraft = normalizePolishingEntry(polishingDraft || defaultPolishingEntry());
+  polishingDraft.lines.splice(Number(index), 1);
+  render();
+  toast("Polishing item removed.");
+}
+
+function deletePolishingStone(index) {
+  polishingDraft = normalizePolishingEntry(polishingDraft || defaultPolishingEntry());
+  polishingDraft.stones.splice(Number(index), 1);
+  render();
+  toast("Polishing stone detail removed.");
 }
 
 function deleteRefineryIssueLine(index) {
@@ -11119,6 +15568,53 @@ function saveStockAdjustment() {
   toast("Stock adjustment saved.");
 }
 
+function saveOpeningStock() {
+  openingStockDraft = normalizeOpeningStockEntry(openingStockDraft || defaultOpeningStockEntry());
+  state.openingStockEntries ||= [];
+  const index = state.openingStockEntries.findIndex((item) => item.openingDate === openingStockDraft.openingDate);
+  if (index >= 0) state.openingStockEntries[index] = openingStockDraft;
+  else state.openingStockEntries.unshift(openingStockDraft);
+  applyOpeningStockToStock(openingStockDraft);
+  state.audit.unshift(audit(`Saved opening stock for ${openingStockDraft.openingDate}`));
+  saveState();
+  render();
+  toast("Opening stock saved.");
+}
+
+function showOpeningStock() {
+  const selectedDate = openingStockDraft?.openingDate || financialYearOpeningDate();
+  const found = (state.openingStockEntries || []).find((item) => item.openingDate === selectedDate);
+  openingStockDraft = normalizeOpeningStockEntry(found || { openingDate: selectedDate });
+  render();
+}
+
+function applyOpeningStockToStock(record) {
+  state.stock ||= [];
+  (record.lines || []).forEach((line) => {
+    const clean = normalizeOpeningStockLine(line);
+    if (!clean.weight && !clean.stone && !clean.netWeight && !clean.amount) return;
+    let item = state.stock.find((stockItem) => stockItem.item === clean.description);
+    if (!item) {
+      item = normalizeStock({
+        id: crypto.randomUUID(),
+        item: clean.description,
+        purity: clean.percent ? `${numericValue(clean.percent, 2)}%` : "-",
+        huid: "",
+        qty: clean.description.toLowerCase().includes("nos") ? clean.weight : 0,
+        status: "Ready"
+      });
+      state.stock.push(item);
+    }
+    item.opening = clean.netWeight;
+    item.gross = clean.weight;
+    item.stone = clean.stone;
+    item.rate = clean.rate;
+    item.openingAmount = clean.amount;
+    item.pureWeight = clean.pureWeight;
+    item.closing = Number(item.opening || 0) + Number(item.addition || 0) - Number(item.deduction || 0);
+  });
+}
+
 function saveGoldDeposit(type = "Deposit") {
   const isWithdrawal = type === "Withdrawal";
   const collection = isWithdrawal ? "goldWithdrawals" : "goldDeposits";
@@ -11191,6 +15687,173 @@ function saveSample(type = "Issue") {
   saveState();
   render();
   toast(`Sample ${type.toLowerCase()} saved.`);
+}
+
+function savePolishing() {
+  polishingDraft = normalizePolishingEntry(polishingDraft || defaultPolishingEntry());
+  if (!polishingDraft.lines.length && !polishingDraft.stones.length) {
+    toast("Add at least one item before updating polishing.");
+    return;
+  }
+  state.polishingEntries ||= [];
+  const index = state.polishingEntries.findIndex((item) => item.id === polishingDraft.id || item.entryNo === polishingDraft.entryNo);
+  if (index >= 0) state.polishingEntries[index] = polishingDraft;
+  else state.polishingEntries.unshift(polishingDraft);
+  const totals = polishingFinancials(polishingDraft);
+  state.workLogs ||= [];
+  state.workLogs.unshift(normalizeWorkLog({
+    refNo: polishingDraft.entryNo,
+    date: polishingDraft.date,
+    workflow: "Polishing",
+    action: "Polishing",
+    party: polishingDraft.partyName,
+    item: `${polishingDraft.lines.length} item(s)`,
+    qty: totals.qty,
+    gross: totals.gross,
+    issue: totals.net,
+    receive: 0,
+    balance: totals.net,
+    status: "Posted"
+  }));
+  state.audit.unshift(audit(`Saved polishing ${polishingDraft.entryNo}`));
+  saveState();
+  render();
+  toast("Polishing entry updated.");
+}
+
+function currentServiceType() {
+  return serviceWorkView === "Close Service / Job" ? "Close" : "New";
+}
+
+function activeServiceDraft(type = currentServiceType()) {
+  const draft = type === "Close" ? serviceCloseDraft : serviceNewDraft;
+  return normalizeServiceJob(draft || defaultServiceJob(type), type);
+}
+
+function setServiceDraft(type, draft) {
+  if (type === "Close") serviceCloseDraft = normalizeServiceJob(draft, "Close");
+  else serviceNewDraft = normalizeServiceJob(draft, "New");
+}
+
+function updateServiceDraftField(type, field, value) {
+  const draft = activeServiceDraft(type);
+  const numericFields = ["dueDays", "approxAmount", "advance"];
+  draft[field] = numericFields.includes(field) ? parseEntryNumber(value) : value;
+  if (field === "partyName") {
+    const party = [...(state.parties || []), ...(state.customers || [])].find((item) => item.name === value || item.customerName === value);
+    if (party) {
+      draft.partyAccount = party.customerCode || party.customerId || party.accountId || party.id || draft.partyAccount;
+      draft.place = party.place || party.city || draft.place;
+      draft.contactNo = party.mobile || party.phone || draft.contactNo;
+    }
+  }
+  setServiceDraft(type, draft);
+}
+
+function readServiceEntryLine(row) {
+  const readText = (field) => row.querySelector(`[data-line-field="${field}"]`)?.value?.trim() || "";
+  const readNumber = (field) => parseEntryNumber(row.querySelector(`[data-line-field="${field}"]`)?.value);
+  return normalizeServiceLine({
+    itemName: readText("itemName"),
+    description: readText("description"),
+    nos: readNumber("nos"),
+    gross: readNumber("gross"),
+    stone: readNumber("stone"),
+    net: readNumber("gross") - readNumber("stone"),
+    complaint: readText("complaint")
+  });
+}
+
+function updateServicePreview(row, line) {
+  const input = row.querySelector(`[data-line-field="net"]`);
+  if (input && document.activeElement !== input) input.value = numericValue(line.net);
+}
+
+function appendServiceLine(row) {
+  const type = currentServiceType();
+  const line = readServiceEntryLine(row);
+  if (!line.itemName && !line.description && !line.complaint && line.gross <= 0 && line.net <= 0) {
+    toast("Enter service item details before adding.");
+    return;
+  }
+  const draft = activeServiceDraft(type);
+  draft.lines.push(line);
+  setServiceDraft(type, draft);
+  state.audit.unshift(audit(`Added ${line.itemName || "service item"} to ${type.toLowerCase()} service job`));
+  render();
+  toast("Service item added.");
+}
+
+function updateServiceLineField(type, index, field, value) {
+  const draft = activeServiceDraft(type);
+  const line = draft.lines[Number(index)];
+  if (!line) return;
+  if (["nos", "gross", "stone", "net"].includes(field)) line[field] = parseEntryNumber(value);
+  else line[field] = value;
+  draft.lines[Number(index)] = normalizeServiceLine({
+    ...line,
+    net: field === "net" ? line.net : Number(line.gross || 0) - Number(line.stone || 0)
+  });
+  setServiceDraft(type, draft);
+}
+
+function deleteServiceLine(type, index) {
+  const draft = activeServiceDraft(type);
+  draft.lines.splice(Number(index), 1);
+  setServiceDraft(type, draft);
+  render();
+}
+
+function resetServiceJob(type) {
+  setServiceDraft(type, defaultServiceJob(type));
+  render();
+}
+
+function deleteServiceJob(type) {
+  const collection = type === "Close" ? "serviceClosures" : "serviceJobs";
+  const draft = activeServiceDraft(type);
+  state[collection] ||= [];
+  const index = state[collection].findIndex((item) => item.id === draft.id || item.entryNo === draft.entryNo);
+  if (index >= 0) state[collection].splice(index, 1);
+  setServiceDraft(type, defaultServiceJob(type));
+  state.audit.unshift(audit(`Deleted ${type.toLowerCase()} service job ${draft.entryNo}`));
+  saveState();
+  render();
+  toast("Service job deleted.");
+}
+
+function saveServiceJob(type) {
+  const collection = type === "Close" ? "serviceClosures" : "serviceJobs";
+  const draft = activeServiceDraft(type);
+  if (!draft.partyName && !draft.lines.length) {
+    toast("Enter party or service item before saving.");
+    return;
+  }
+  state[collection] ||= [];
+  const index = state[collection].findIndex((item) => item.id === draft.id || item.entryNo === draft.entryNo);
+  if (index >= 0) state[collection][index] = draft;
+  else state[collection].unshift(draft);
+  const totals = serviceFinancials(draft);
+  state.workLogs ||= [];
+  state.workLogs.unshift(normalizeWorkLog({
+    refNo: draft.entryNo,
+    date: draft.date,
+    workflow: "Service / Job",
+    action: type === "Close" ? "Close Service / Job" : "New Service / Job",
+    party: draft.partyName,
+    item: draft.lines[0]?.itemName || `${draft.lines.length} item(s)`,
+    qty: totals.nos,
+    gross: totals.gross,
+    issue: type === "New" ? totals.net : 0,
+    receive: type === "Close" ? totals.net : 0,
+    balance: totals.balance,
+    status: draft.jobStatus
+  }));
+  setServiceDraft(type, draft);
+  state.audit.unshift(audit(`Saved ${type.toLowerCase()} service job ${draft.entryNo}`));
+  saveState();
+  render();
+  toast(`${type === "Close" ? "Close service" : "New service"} saved.`);
 }
 
 function saveRefineryIssue() {
@@ -11796,28 +16459,43 @@ function handleAction(action, source) {
     authenticated = false;
     sessionStorage.removeItem("goldland-authenticated");
     render();
+    return;
   }
-  if (action === "close-modal") closeModal();
-  if (action === "open-rate") openRateModal();
-  if (action === "delete-line") deleteLine(source);
-  if (action === "remove-discount") removeDiscount(source);
-  if (action === "save-card-transactions") saveCardTransactions();
-  if (action === "open-bill") openBillModal();
-  if (action === "open-stock") openStockModal();
+  if (action === "close-modal") return closeModal();
+  if (action === "open-rate") return openRateModal();
+  if (action === "delete-line") return deleteLine(source);
+  if (action === "remove-discount") return removeDiscount(source);
+  if (action === "save-card-transactions") return saveCardTransactions();
+  if (action === "open-bill") return openBillModal();
+  if (action === "open-stock") return openStockModal();
+  if (action === "open-opening-stock") {
+    openOpeningStockEntry();
+    return;
+  }
   if (action === "open-stock-adjustment") {
     active = "Stock";
+    expandedNavGroups.add("Stock");
     stockView = "Stock Adjustments";
     render();
+    return;
+  }
+  if (action === "show-opening-stock") {
+    showOpeningStock();
+    return;
   }
   if (action === "open-transaction-gold-deposit") {
     active = "Stock";
+    expandedNavGroups.add("Stock");
     stockView = "Gold Deposit";
     render();
+    return;
   }
   if (action === "open-transaction-gold-withdrawal") {
     active = "Stock";
+    expandedNavGroups.add("Stock");
     stockView = "Gold Withdrawal";
     render();
+    return;
   }
   if (action === "open-party" || action === "open-customer") openPartyModal("Customer");
   if (action === "open-supplier") openPartyModal("Supplier");
@@ -11901,7 +16579,7 @@ function handleAction(action, source) {
     return;
   }
   if (action === "edit-complimentary-purchase" || action === "edit-complimentary-issue") {
-    toast("Fields are editable. Change values directly in the entry screen.");
+    openExistingRecordPicker();
     return;
   }
   if (action === "print-complimentary-purchase" || action === "print-complimentary-issue") {
@@ -11954,6 +16632,64 @@ function handleAction(action, source) {
   if (action.startsWith("add-billwise-row-")) addBillwiseRow(action.replace("add-billwise-row-", ""));
   if (action.startsWith("delete-billwise-row-")) deleteBillwiseRow(action.replace("delete-billwise-row-", ""), source.dataset.index);
   if (action.startsWith("auto-allocate-billwise-")) autoAllocateBillwise(action.replace("auto-allocate-billwise-", ""));
+  if (action.startsWith("new-bank-transaction-")) resetBankTransactionAction(action.replace("new-bank-transaction-", ""));
+  if (action.startsWith("refresh-bank-transaction-")) refreshBankTransactionAction(action.replace("refresh-bank-transaction-", ""));
+  if (action.startsWith("save-bank-transaction-")) saveBankTransactionAction(action.replace("save-bank-transaction-", ""));
+  if (action.startsWith("delete-bank-transaction-line-")) deleteBankTransactionLine(action.replace("delete-bank-transaction-line-", ""), source.dataset.index);
+  if (action.startsWith("delete-bank-transaction-")) deleteBankTransactionAction(action.replace("delete-bank-transaction-", ""));
+  if (action.startsWith("print-bank-transaction-")) printBankTransactionAction(action.replace("print-bank-transaction-", ""));
+  if (action.startsWith("edit-bank-transaction-")) toast("Fields are editable. Change values directly in the bank entry screen.");
+  if (action.startsWith("add-bank-transaction-line-")) addBankTransactionLine(action.replace("add-bank-transaction-line-", ""));
+  if (action.startsWith("new-pdc-")) return resetPdcAction(action.replace("new-pdc-", ""));
+  if (action.startsWith("refresh-pdc-")) return refreshPdcAction(action.replace("refresh-pdc-", ""));
+  if (action.startsWith("save-pdc-")) return savePdcAction(action.replace("save-pdc-", ""));
+  if (action.startsWith("delete-pdc-line-")) return deletePdcLine(action.replace("delete-pdc-line-", ""), source?.dataset.index);
+  if (action.startsWith("delete-pdc-")) return deletePdcAction(action.replace("delete-pdc-", ""));
+  if (action.startsWith("print-pdc-")) return printPdcAction(action.replace("print-pdc-", ""));
+  if (action.startsWith("add-pdc-line-")) return addPdcLine(action.replace("add-pdc-line-", ""));
+  if (action === "load-pdc-receipt") return loadPdcReceipt(source?.dataset.recordId);
+  if (action === "search-pdc-receipt") return searchPdcReceiptAction();
+  if (action === "refresh-journal-voucher") return refreshJournalVoucherAction();
+  if (action === "save-journal-voucher") return saveJournalVoucherAction();
+  if (action === "delete-journal-voucher-line") return deleteJournalVoucherLine(source?.dataset.index);
+  if (action === "delete-journal-voucher") return deleteJournalVoucherAction();
+  if (action === "print-journal-voucher") return printJournalVoucherAction();
+  if (action === "edit-journal-voucher") {
+    toast("Fields are editable. Change values directly in the journal voucher screen.");
+    return;
+  }
+  if (action === "add-journal-voucher-line") return addJournalVoucherLine();
+  if (action.startsWith("new-cash-voucher-")) return resetCashVoucherAction(action.replace("new-cash-voucher-", ""));
+  if (action.startsWith("refresh-cash-voucher-")) return refreshCashVoucherAction(action.replace("refresh-cash-voucher-", ""));
+  if (action.startsWith("save-cash-voucher-")) return saveCashVoucherAction(action.replace("save-cash-voucher-", ""));
+  if (action.startsWith("delete-cash-voucher-line-")) return deleteCashVoucherLine(action.replace("delete-cash-voucher-line-", ""), source.dataset.index);
+  if (action.startsWith("delete-cash-voucher-")) return deleteCashVoucherAction(action.replace("delete-cash-voucher-", ""));
+  if (action.startsWith("print-cash-voucher-")) return printCashVoucherAction(action.replace("print-cash-voucher-", ""));
+  if (action.startsWith("edit-cash-voucher-")) {
+    toast("Fields are editable. Change values directly in the cash voucher screen.");
+    return;
+  }
+  if (action.startsWith("add-cash-voucher-line-")) return addCashVoucherLine(action.replace("add-cash-voucher-line-", ""));
+  if (action === "new-direct-entry") return resetDirectEntryAction();
+  if (action === "refresh-direct-entry") return refreshDirectEntryAction();
+  if (action === "save-direct-entry") return saveDirectEntryAction();
+  if (action === "add-direct-entry-line") return addDirectEntryLine();
+  if (action === "delete-direct-entry-line") return deleteDirectEntryLine(source?.dataset.index);
+  if (action === "print-direct-entry") {
+    state.audit.unshift(audit("Printed Direct Entry"));
+    saveState();
+    window.print();
+    return;
+  }
+  if (action === "refresh-expense-entry") return refreshExpenseEntryAction();
+  if (action === "save-expense-entry") return saveExpenseEntryAction();
+  if (action === "edit-expense-entry") {
+    toast("Fields are editable. Change values directly in the expense entry screen.");
+    return;
+  }
+  if (action === "delete-expense-entry-line") return deleteExpenseEntryLine(source?.dataset.index);
+  if (action === "delete-expense-entry") return deleteExpenseEntryAction();
+  if (action === "add-expense-entry-line") return addExpenseEntryLine();
   if (action === "close-account-action") {
     accountView = "Account Ledger";
     render();
@@ -12022,6 +16758,20 @@ function handleAction(action, source) {
     workOrderView = "Sample";
     sampleWorkView = "Sample Issue";
     render();
+  } else if (action === "open-work-polishing") {
+    active = "Work Orders";
+    workOrderView = "Polishing";
+    render();
+  } else if (action === "open-service-new") {
+    active = "Work Orders";
+    workOrderView = "Service / Job";
+    serviceWorkView = "New Service / Job";
+    render();
+  } else if (action === "open-service-close") {
+    active = "Work Orders";
+    workOrderView = "Service / Job";
+    serviceWorkView = "Close Service / Job";
+    render();
   } else if (action.startsWith("open-work-")) {
     openWorkModal(action.replace("open-work-", ""));
   }
@@ -12034,6 +16784,9 @@ function handleAction(action, source) {
   if (action === "add-refinery-issue-line") appendEntryLine(source.closest("tr"));
   if (action === "add-melting-issue-line") appendEntryLine(source.closest("tr"));
   if (action === "add-sample-line") appendEntryLine(source.closest("tr"));
+  if (action === "add-service-line") appendEntryLine(source.closest("tr"));
+  if (action === "add-polishing-line") appendEntryLine(source.closest("tr"));
+  if (action === "add-polishing-stone") appendEntryLine(source.closest("tr"));
   if (action === "delete-smith-work-line") deleteSmithWorkLine(source.dataset.index);
   if (action === "delete-cash-smith-line") deleteCashWeightSmithLine(source.dataset.index);
   if (action === "delete-jeweller-work-line") deleteJewellerWorkLine(source.dataset.index);
@@ -12044,11 +16797,15 @@ function handleAction(action, source) {
   if (action === "delete-melting-issue-line") deleteMeltingIssueLine(source.dataset.index);
   if (action === "delete-sample-issue-line") deleteSampleLine("Issue", source.dataset.index);
   if (action === "delete-sample-return-line") deleteSampleLine("Return", source.dataset.index);
+  if (action === "delete-service-line") deleteServiceLine(currentServiceType(), source.dataset.index);
+  if (action === "delete-polishing-line") deletePolishingLine(source.dataset.index);
+  if (action === "delete-polishing-stone") deletePolishingStone(source.dataset.index);
   if (action === "save-smith-work") saveSmithWork();
   if (action === "save-cash-smith") saveCashWeightSmith();
   if (action === "save-jeweller-work") saveJewellerWork();
   if (action === "save-cash-jeweller") saveCashWeightJeweller();
   if (action === "save-stock-adjustment") saveStockAdjustment();
+  if (action === "save-opening-stock") saveOpeningStock();
   if (action === "save-gold-deposit") saveGoldDeposit("Deposit");
   if (action === "save-gold-withdrawal") saveGoldDeposit("Withdrawal");
   if (action === "save-refinery-issue") saveRefineryIssue();
@@ -12058,12 +16815,19 @@ function handleAction(action, source) {
   if (action === "save-melting-return") saveMeltingReturn();
   if (action === "save-sample-issue") saveSample("Issue");
   if (action === "save-sample-return") saveSample("Return");
+  if (action === "save-service-new") saveServiceJob("New");
+  if (action === "save-service-close") saveServiceJob("Close");
+  if (action === "save-polishing") savePolishing();
   if (action === "refresh-smith-work") resetSmithWork();
   if (action === "refresh-cash-smith") resetCashWeightSmith();
   if (action === "refresh-jeweller-work") resetJewellerWork();
   if (action === "refresh-cash-jeweller") resetCashWeightJeweller();
   if (action === "refresh-stock-adjustment") {
     stockAdjustmentDraft = defaultStockAdjustment();
+    render();
+  }
+  if (action === "refresh-opening-stock") {
+    openingStockDraft = defaultOpeningStockEntry();
     render();
   }
   if (action === "refresh-gold-deposit") {
@@ -12102,6 +16866,16 @@ function handleAction(action, source) {
     sampleReturnDraft = defaultSample("Return");
     render();
   }
+  if (action === "refresh-service-new") {
+    resetServiceJob("New");
+  }
+  if (action === "refresh-service-close") {
+    resetServiceJob("Close");
+  }
+  if (action === "refresh-polishing") {
+    polishingDraft = defaultPolishingEntry();
+    render();
+  }
   if (action === "delete-smith-work") {
     smithWorkDraft = defaultSmithWorkOrder();
     render();
@@ -12120,6 +16894,10 @@ function handleAction(action, source) {
   }
   if (action === "delete-stock-adjustment") {
     stockAdjustmentDraft = defaultStockAdjustment();
+    render();
+  }
+  if (action === "delete-opening-stock") {
+    openingStockDraft = defaultOpeningStockEntry(openingStockDraft?.openingDate || financialYearOpeningDate());
     render();
   }
   if (action === "delete-gold-deposit") {
@@ -12158,18 +16936,32 @@ function handleAction(action, source) {
     sampleReturnDraft = defaultSample("Return");
     render();
   }
+  if (action === "delete-service-new") {
+    deleteServiceJob("New");
+  }
+  if (action === "delete-service-close") {
+    deleteServiceJob("Close");
+  }
+  if (action === "delete-polishing") {
+    polishingDraft = defaultPolishingEntry();
+    render();
+  }
+  if (action === "find-service-job") {
+    toast("Saved service jobs are available in the Service / Job register.");
+  }
   if (action === "find-refinery-final") {
     toast("Select a pending refinery issue to load final return details.");
   }
   if (action === "find-melting-return") {
     toast("Select a pending melting issue to load return details.");
   }
-  if (action === "print-smith-work" || action === "print-cash-smith" || action === "print-jeweller-work" || action === "print-cash-jeweller" || action === "print-stock-adjustment" || action === "print-gold-deposit" || action === "print-sample") {
+  if (action === "print-smith-work" || action === "print-cash-smith" || action === "print-jeweller-work" || action === "print-cash-jeweller" || action === "print-stock-adjustment" || action === "print-opening-stock" || action === "print-gold-deposit" || action === "print-sample" || action === "print-service-job" || action === "print-polishing") {
     window.print();
-    state.audit.unshift(audit(`Printed ${action === "print-sample" ? sampleWorkView : (stockView === "Gold Deposit" || stockView === "Gold Withdrawal" ? stockView : smithWorkView)}`));
+    const printLabel = action === "print-sample" ? sampleWorkView : action === "print-service-job" ? serviceWorkView : action === "print-polishing" ? "Polishing" : (stockView === "Gold Deposit" || stockView === "Gold Withdrawal" ? stockView : smithWorkView);
+    state.audit.unshift(audit(`Printed ${printLabel}`));
     saveState();
   }
-  if (action === "close-stock-adjustment" || action === "close-gold-deposit") {
+  if (action === "close-stock-adjustment" || action === "close-opening-stock" || action === "close-gold-deposit") {
     stockView = "Stock Register";
     render();
   }
@@ -12233,10 +17025,12 @@ function handleAction(action, source) {
     toast("Bill saved. Press Enter in the entry row to add products.");
   }
   if (action === "edit-current-bill") {
-    toast("Editable fields are active. Change values directly in the row.");
+    openExistingRecordPicker();
+    return;
   }
   if (action === "pick-from-sales") {
-    toast("Pick-from-sales list will connect to saved invoices.");
+    openExistingRecordPicker("sales-only");
+    return;
   }
   if (["void-bill", "repost-bill", "previous-bill", "next-bill", "billing-settings", "billing-notes", "refresh", "close-billing"].includes(action)) {
     toast("Billing action ready for detailed workflow.");
@@ -12279,15 +17073,20 @@ function saveOrderAdvance(type) {
     orderId: order.id,
     orderEntryNo: order.entryNo,
     orderRefNo: order.refNo,
-    totalAmount: Number(draft.advanceAmount || 0) + Number(draft.exchangeAmount || 0),
-    totalWeight: Number(draft.advanceWeight || 0) + Number(draft.exchangeWeight || 0)
+    totalAmount: Number(draft.advanceAmount || 0),
+    totalWeight: 0
   }, type);
-  if (isRefund && record.refundAmount <= 0 && record.refundWeight <= 0) {
+  const availableBeforeRefund = orderAdvanceSummary(order, {}, "advance").netAdvance;
+  if (isRefund && record.refundAmount <= 0) {
     toast("Enter refund amount before saving.");
     return;
   }
-  if (!isRefund && record.totalAmount <= 0 && record.totalWeight <= 0) {
-    toast("Enter advance or exchange amount before saving.");
+  if (isRefund && record.refundAmount > availableBeforeRefund) {
+    toast(`Refund cannot exceed available advance ${money(availableBeforeRefund)}.`);
+    return;
+  }
+  if (!isRefund && record.totalAmount <= 0) {
+    toast("Enter additional advance amount before saving.");
     return;
   }
   if (isRefund) {
@@ -12401,6 +17200,167 @@ function workConfig(key) {
     adjustment: { workflow: "Stock Adjustment", actions: ["Addition", "Deduction", "Reconciliation"] }
   };
   return configs[key] || configs.adjustment;
+}
+
+function openExistingRecordPicker(filter = "current") {
+  existingRecordPickerItems = existingRecordsForCurrentScreen(filter);
+  if (!existingRecordPickerItems.length) {
+    toast("No existing records found for this screen.");
+    return;
+  }
+  document.body.insertAdjacentHTML("beforeend", `
+    <div class="modal-backdrop record-picker-backdrop">
+      <section class="modal record-picker-modal">
+        <div class="modal-titlebar">
+          <div>
+            <p class="eyebrow">Existing records</p>
+            <h2>Select Record To Edit</h2>
+            <p>Search customer, phone, bill number, entry number, or party name.</p>
+          </div>
+          <button type="button" class="icon-close" data-action="close-modal">x</button>
+        </div>
+        <div class="form-grid">
+          <section class="form-section wide">
+            <label class="search-field"><span>Search</span><input data-record-picker-search placeholder="Customer / phone / bill no" autofocus /></label>
+            <div data-record-picker-results>${existingRecordPickerTable(existingRecordPickerItems)}</div>
+          </section>
+        </div>
+        <footer>
+          <button type="button" class="secondary" data-action="close-modal">Cancel</button>
+        </footer>
+      </section>
+    </div>
+  `);
+  const modal = document.querySelector(".record-picker-modal");
+  modal.querySelectorAll("[data-action='close-modal']").forEach((button) => button.addEventListener("click", closeModal));
+  modal.querySelector("[data-record-picker-search]")?.addEventListener("input", (event) => {
+    const query = String(event.target.value || "").trim().toLowerCase();
+    const filtered = existingRecordPickerItems.filter((item) => item.searchText.includes(query));
+    modal.querySelector("[data-record-picker-results]").innerHTML = existingRecordPickerTable(filtered);
+    bindRecordPickerRows(modal);
+  });
+  bindRecordPickerRows(modal);
+}
+
+function bindRecordPickerRows(scope = document) {
+  scope.querySelectorAll("[data-load-existing-record]").forEach((button) => {
+    button.addEventListener("click", () => loadExistingRecord(button.dataset.loadExistingRecord));
+  });
+}
+
+function existingRecordPickerTable(items) {
+  const rows = items.map((item) => [
+    `<button type="button" class="text-button" data-load-existing-record="${item.key}">Load</button>`,
+    item.type,
+    item.entryNo || "-",
+    item.billNo || item.invoiceNo || "-",
+    item.date || "-",
+    item.party || "-",
+    item.phone || "-",
+    money(item.total || 0)
+  ]);
+  return rows.length
+    ? table(["", "Screen", "Entry No", "Bill / Invoice", "Date", "Customer / Party", "Phone", "Total"], rows)
+    : `<p class="soft-note">No matching records.</p>`;
+}
+
+function existingRecordsForCurrentScreen(filter = "current") {
+  const records = [];
+  const add = (type, storage, record, options = {}) => {
+    if (!record) return;
+    const key = `${storage}:${record.id || record.entryNo || records.length}`;
+    const party = record.customer || record.partyName || record.supplierSmith || record.staffName || "";
+    const phone = record.phone || record.customerMobile || "";
+    const entryNo = record.entryNo || record.returnEntryNo || record.refNo || "";
+    const billNo = record.billNo || record.invoiceNo || record.refNo || "";
+    const total = record.invoiceTotal || record.amount || record.total || record.totals?.invoiceTotal || sumLines(record.sections?.sales || record.lines || record.ornamentLines || []);
+    records.push({
+      key,
+      storage,
+      id: record.id,
+      type,
+      entryNo,
+      billNo,
+      invoiceNo: record.invoiceNo || "",
+      date: record.date || record.invoiceDate || "",
+      party,
+      phone,
+      total,
+      view: options.view,
+      searchText: [type, entryNo, billNo, record.invoiceNo, record.date, party, phone, record.customerId, record.customerCode].filter(Boolean).join(" ").toLowerCase()
+    });
+  };
+
+  if (filter === "sales-only") {
+    (state.bills || []).filter((bill) => !String(bill.type || "").toLowerCase().includes("purchase")).forEach((bill) => add("Sales Invoice", "bills", bill, { view: "Sales Invoice" }));
+    return records;
+  }
+
+  if (active === "Sales") {
+    if (salesView === "Sales Order") (state.salesOrders || []).forEach((order) => add("Sales Order", "salesOrders", order, { view: "Sales Order" }));
+    else (state.bills || []).filter((bill) => salesView === "Sales Return" ? bill.sections?.return?.length : !String(bill.type || "").toLowerCase().includes("purchase")).forEach((bill) => add(salesView, "bills", bill, { view: salesView }));
+  } else if (active === "Purchase") {
+    if (purchaseView === "Direct Purchase") (state.directPurchases || []).forEach((bill) => add("Direct Purchase", "directPurchases", bill, { view: purchaseView }));
+    else if (purchaseView === "Direct Purchase Return") (state.directPurchaseReturns || []).forEach((bill) => add("Direct Purchase Return", "directPurchaseReturns", bill, { view: purchaseView }));
+    else if (purchaseView === "Diamond Purchase") (state.diamondPurchases || []).forEach((bill) => add("Diamond Purchase", "diamondPurchases", bill, { view: purchaseView }));
+    else if (purchaseView === "Diamond Purchase Return") (state.diamondPurchaseReturns || []).forEach((bill) => add("Diamond Purchase Return", "diamondPurchaseReturns", bill, { view: purchaseView }));
+    else if (purchaseView === "DMD Stone Purchase") (state.dmdStonePurchases || []).forEach((bill) => add("DMD Stone Purchase", "dmdStonePurchases", bill, { view: purchaseView }));
+    else (state.bills || []).filter((bill) => String(bill.type || "").toLowerCase().includes("purchase")).forEach((bill) => add(purchaseView, "bills", bill, { view: purchaseView }));
+  } else if (active === "Work Orders" && workOrderView === "Complimentary Item") {
+    if (complimentaryView === "Complimentary Item Issue") {
+      (state.complimentaryIssues || []).forEach((record) => add("Complimentary Issue", "complimentaryIssues", record, { view: complimentaryView }));
+    } else {
+      (state.complimentaryPurchases || []).forEach((record) => add("Complimentary Purchase", "complimentaryPurchases", record, { view: complimentaryView }));
+    }
+  }
+  return records;
+}
+
+function loadExistingRecord(key) {
+  const item = existingRecordPickerItems.find((record) => record.key === key);
+  if (!item) return;
+  const list = state[item.storage];
+  const index = (list || []).findIndex((record) => record.id === item.id || record.entryNo === item.entryNo || record.billNo === item.billNo);
+  if (index < 0) {
+    toast("Record not found.");
+    return;
+  }
+  const [record] = list.splice(index, 1);
+  list.unshift(record);
+  if (item.storage === "salesOrders") {
+    active = "Sales";
+    expandedNavGroups.add("Sales");
+    salesView = "Sales Order";
+  } else if (item.storage === "complimentaryPurchases") {
+    complimentaryPurchaseDraft = normalizeComplimentaryPurchase(structuredClone(record));
+    complimentaryPurchaseSelectedRow = 0;
+    active = "Work Orders";
+    workOrderView = "Complimentary Item";
+    complimentaryView = "Complimentary Item Purchase";
+  } else if (item.storage === "complimentaryIssues") {
+    complimentaryIssueDraft = normalizeComplimentaryIssue(structuredClone(record));
+    complimentaryIssueSelectedRow = 0;
+    active = "Work Orders";
+    workOrderView = "Complimentary Item";
+    complimentaryView = "Complimentary Item Issue";
+  } else if (item.storage === "bills") {
+    if (String(record.type || "").toLowerCase().includes("purchase")) {
+      active = "Purchase";
+      expandedNavGroups.add("Purchase");
+      purchaseView = item.view || "Purchase Invoice";
+    } else {
+      active = "Sales";
+      expandedNavGroups.add("Sales");
+      salesView = item.view || "Sales Invoice";
+    }
+  } else {
+    active = "Purchase";
+    expandedNavGroups.add("Purchase");
+    purchaseView = item.view || purchaseView;
+  }
+  closeModal();
+  render();
+  toast(`Loaded ${item.entryNo || item.billNo || item.type} for editing.`);
 }
 
 function openPrintModal() {
@@ -12600,7 +17560,7 @@ function openBillModal() {
          ${input("entryNo", "Entry No, Ref No", `C${String(state.bills.length + 2034).padStart(5, "0")}`)}
          ${input("billNo", "Bill No", "20260521_1")}
          ${select("staffId", "Staff ID", state.staffs.map((staff) => staff.staffId))}
-         ${select("staffName", "Staff, Agent", state.staffs.map((staff) => staff.name))}
+         ${select("staffName", "Staff, Agent", staffNameOptions())}
          ${select("category", "Item Category", ["B2C", "B2B"])}
          ${select("prepareEinvoice", "Prepare eINVOICE", ["No", "Yes"])}
        </div>
@@ -12635,7 +17595,7 @@ function openBillModal() {
          ${input("pinCode", "PIN Code", "")}
          ${input("email", "Email Address", "", "email")}
          ${input("aadhaar", "Aadhar", "")}
-         ${select("agent", "Agent", miscOptions("agents", ["", ...state.staffs.map((staff) => staff.name)]))}
+         ${select("agent", "Agent", agentNameOptions())}
          ${select("customerStatus", "Status", ["Active", "Inactive"])}
          ${input("birthDate", "D-O-Birth", "26/12/2000")}
          ${input("joinDate", "Join", new Date().toLocaleDateString("en-GB"))}
@@ -12880,7 +17840,7 @@ function openPartyModal(type = "Customer", recordId = "") {
          ${input("mobile", "Mobile", existing?.mobile || "")}
          ${input("email", "Email Address", existing?.email || "", "email")}
          ${isCustomer ? input("aadhaar", "Aadhar", existing?.aadhaar || "") : ""}
-         ${isCustomer ? select("agent", "Agent", miscOptions("agents", ["", ...state.staffs.map((staff) => staff.name)]), existing?.agent || "") : ""}
+         ${isCustomer ? select("agent", "Agent", agentNameOptions(), existing?.agent || "") : ""}
          ${extraSupplierFields}
          ${(isCustomer || isSupplier) ? input("birthDate", "D-O-Birth", existing?.birthDate || "26/12/2000") : ""}
          ${(isCustomer || isSupplier) ? input("joinDate", "Join", existing?.joinDate || new Date().toLocaleDateString("en-GB")) : ""}

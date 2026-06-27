@@ -5,6 +5,6 @@
   "type": "module",
   "scripts": {
     "start": "node --preserve-symlinks-main server.mjs",
-    "test": "node --preserve-symlinks-main tests/smoke.test.mjs"
+    "test": "node --preserve-symlinks-main tests/smoke.test.mjs && node --preserve-symlinks-main tests/runtime.test.mjs"
   }
 }

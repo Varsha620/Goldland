@@ -707,6 +707,31 @@ create table stock_adjustment_lines (
   active boolean not null default true
 );
 
+create table opening_stock_entries (
+  id uuid primary key,
+  branch_id uuid not null references branches(id),
+  opening_date date not null,
+  status text not null default 'posted',
+  created_at timestamptz not null default now(),
+  financial_year text not null,
+  unique (branch_id, opening_date)
+);
+
+create table opening_stock_lines (
+  id uuid primary key,
+  opening_stock_entry_id uuid not null references opening_stock_entries(id) on delete cascade,
+  line_no integer not null default 1,
+  description text not null,
+  weight numeric(14, 3) not null default 0,
+  stone numeric(14, 3) not null default 0,
+  net_weight numeric(14, 3) not null default 0,
+  rate numeric(14, 4) not null default 0,
+  amount numeric(14, 2) not null default 0,
+  purity_percent numeric(8, 3) not null default 0,
+  pure_weight numeric(14, 3) not null default 0,
+  active boolean not null default true
+);
+
 create table gold_deposits (
   id uuid primary key,
   branch_id uuid not null references branches(id),
@@ -1204,6 +1229,257 @@ create table complimentary_item_issue_lines (
   unit text not null default 'Nos'
 );
 
+create table bank_transactions (
+  id uuid primary key,
+  branch_id uuid not null references branches(id),
+  transaction_type text not null check (transaction_type in ('deposit', 'withdrawal')),
+  voucher_no text,
+  ref_no text,
+  transaction_date date not null,
+  transaction_time time,
+  prepared_by uuid references employees(id),
+  cost_center text,
+  bank_account text not null,
+  handled_by uuid references employees(id),
+  show_all_account boolean not null default false,
+  no_print boolean not null default false,
+  rate_fixed boolean not null default false,
+  narration text,
+  total_amount numeric(14, 3) not null default 0,
+  created_at timestamptz not null default now(),
+  financial_year text not null
+);
+
+create table bank_transaction_lines (
+  id uuid primary key,
+  bank_transaction_id uuid not null references bank_transactions(id) on delete cascade,
+  line_no integer not null default 1,
+  head_id text,
+  account_head text not null,
+  amount numeric(14, 3) not null default 0,
+  remarks text,
+  voucher_no text,
+  voucher_date date
+);
+
+create table pdc_receipts (
+  id uuid primary key,
+  branch_id uuid not null references branches(id),
+  entry_no text,
+  ref_no text,
+  receipt_date date not null,
+  receipt_time time,
+  cheque_no text,
+  cheque_date date not null,
+  cheque_amount numeric(14, 2) not null default 0,
+  party_code text,
+  party_name text,
+  prepared_by uuid references employees(id),
+  prepared_by_code text,
+  received_by uuid references employees(id),
+  received_by_code text,
+  total_received numeric(14, 2) not null default 0,
+  status text not null default 'received',
+  created_at timestamptz not null default now(),
+  financial_year text not null
+);
+
+create table pdc_receipt_lines (
+  id uuid primary key,
+  pdc_receipt_id uuid not null references pdc_receipts(id) on delete cascade,
+  line_no integer not null default 1,
+  invoice_no text,
+  invoice_type text,
+  invoice_date date,
+  bill_amount numeric(14, 2) not null default 0,
+  paid numeric(14, 2) not null default 0,
+  received numeric(14, 2) not null default 0,
+  balance numeric(14, 2) not null default 0,
+  remark text,
+  cv_rid text
+);
+
+create table pdc_issues (
+  id uuid primary key,
+  branch_id uuid not null references branches(id),
+  entry_no text,
+  ref_no text,
+  issue_date date not null,
+  issue_time time,
+  bank_name text,
+  cheque_no text,
+  cheque_date date,
+  cheque_amount numeric(14, 2) not null default 0,
+  party_code text,
+  party_name text,
+  prepared_by uuid references employees(id),
+  prepared_by_code text,
+  received_by uuid references employees(id),
+  received_by_code text,
+  total_amount numeric(14, 2) not null default 0,
+  remark text,
+  status text not null default 'issued',
+  created_at timestamptz not null default now(),
+  financial_year text not null
+);
+
+create table pdc_issue_lines (
+  id uuid primary key,
+  pdc_issue_id uuid not null references pdc_issues(id) on delete cascade,
+  line_no integer not null default 1,
+  invoice_no text,
+  invoice_type text,
+  invoice_date date,
+  bill_amount numeric(14, 2) not null default 0,
+  paid numeric(14, 2) not null default 0,
+  received numeric(14, 2) not null default 0,
+  balance numeric(14, 2) not null default 0,
+  remark text,
+  cv_rid text
+);
+
+create table pdc_requests (
+  id uuid primary key,
+  branch_id uuid not null references branches(id),
+  entry_no text,
+  ref_no text,
+  request_date date not null,
+  request_time time,
+  cheque_no text,
+  cheque_date date,
+  cheque_amount numeric(14, 2) not null default 0,
+  party_code text,
+  party_name text,
+  prepared_by uuid references employees(id),
+  prepared_by_code text,
+  received_by uuid references employees(id),
+  received_by_code text,
+  total_amount numeric(14, 2) not null default 0,
+  remark text,
+  status text not null default 'requested',
+  created_at timestamptz not null default now(),
+  financial_year text not null
+);
+
+create table pdc_request_lines (
+  id uuid primary key,
+  pdc_request_id uuid not null references pdc_requests(id) on delete cascade,
+  line_no integer not null default 1,
+  invoice_no text,
+  invoice_type text,
+  invoice_date date,
+  bill_amount numeric(14, 2) not null default 0,
+  paid numeric(14, 2) not null default 0,
+  received numeric(14, 2) not null default 0,
+  balance numeric(14, 2) not null default 0,
+  remark text,
+  cv_rid text
+);
+
+create table cash_vouchers (
+  id uuid primary key,
+  branch_id uuid not null references branches(id),
+  voucher_type text not null check (voucher_type in ('receipt', 'payment')),
+  voucher_no text,
+  ref_no text,
+  voucher_date date not null,
+  voucher_time time,
+  prepared_by uuid references employees(id),
+  cost_center text,
+  cash_account text not null default 'Cash in Hand',
+  handled_by uuid references employees(id),
+  opening_balance numeric(14, 3) not null default 0,
+  show_all_account boolean not null default true,
+  enable_cash_account boolean not null default false,
+  no_print boolean not null default false,
+  rate_fixed boolean not null default false,
+  narration text,
+  total_amount numeric(14, 3) not null default 0,
+  closing_balance numeric(14, 3) not null default 0,
+  created_at timestamptz not null default now(),
+  financial_year text not null
+);
+
+create table cash_voucher_lines (
+  id uuid primary key,
+  cash_voucher_id uuid not null references cash_vouchers(id) on delete cascade,
+  line_no integer not null default 1,
+  head_id text,
+  account_head text not null,
+  amount numeric(14, 3) not null default 0,
+  discount numeric(14, 3) not null default 0,
+  remarks text,
+  voucher_no text,
+  voucher_date date
+);
+
+create table direct_entries (
+  id uuid primary key,
+  branch_id uuid not null references branches(id),
+  entry_no text not null,
+  mode text not null check (mode in ('Cash', 'Bank', 'Cash & Bank')),
+  cost_center text,
+  cash_bank text,
+  prepared_by uuid references employees(id),
+  repeat_last_head boolean not null default false,
+  repeat_last_narration boolean not null default false,
+  total_receipt numeric(14, 3) not null default 0,
+  total_payment numeric(14, 3) not null default 0,
+  balance numeric(14, 3) not null default 0,
+  created_at timestamptz not null default now(),
+  financial_year text not null
+);
+
+create table direct_entry_lines (
+  id uuid primary key,
+  direct_entry_id uuid not null references direct_entries(id) on delete cascade,
+  line_no integer not null default 1,
+  entry_date date not null,
+  account_head text,
+  receipt numeric(14, 3) not null default 0,
+  payment numeric(14, 3) not null default 0,
+  remark text
+);
+
+create table expense_entries (
+  id uuid primary key,
+  branch_id uuid not null references branches(id),
+  entry_no text not null,
+  ref_no text,
+  entry_date date not null,
+  entry_time time,
+  cost_center text,
+  cash_account text,
+  remarks text,
+  supplier text,
+  gstin text,
+  prepared_by uuid references employees(id),
+  supplier_type text not null default 'Local',
+  payment_mode text not null default 'Cash',
+  bill_amount numeric(14, 3) not null default 0,
+  gst_amount numeric(14, 3) not null default 0,
+  tds_amount numeric(14, 3) not null default 0,
+  invoice_total numeric(14, 3) not null default 0,
+  created_at timestamptz not null default now(),
+  financial_year text not null
+);
+
+create table expense_entry_lines (
+  id uuid primary key,
+  expense_entry_id uuid not null references expense_entries(id) on delete cascade,
+  line_no integer not null default 1,
+  ledger_head text,
+  bill_no text,
+  bill_date date,
+  hsn_code text,
+  taxable numeric(14, 3) not null default 0,
+  gst numeric(14, 3) not null default 0,
+  tds_percent numeric(7, 3) not null default 0,
+  tds numeric(14, 3) not null default 0,
+  total numeric(14, 3) not null default 0,
+  remarks text
+);
+
 create table schemes (
   id uuid primary key,
   branch_id uuid not null references branches(id),
@@ -1288,6 +1564,62 @@ create table custom_voucher_lines (
   amount numeric(14, 2) not null default 0,
   payment_date date not null,
   remarks text
+);
+
+create table polishing_entries (
+  id uuid primary key,
+  branch_id uuid not null references branches(id),
+  entry_no text not null,
+  ref_no text,
+  entry_date date not null,
+  entry_time time,
+  party_id uuid references parties(id),
+  party_name text,
+  prepared_by uuid references employees(id),
+  remarks text,
+  total_qty numeric(14, 3) not null default 0,
+  total_gross numeric(14, 3) not null default 0,
+  total_stone numeric(14, 3) not null default 0,
+  total_net numeric(14, 3) not null default 0,
+  stone_amount numeric(14, 2) not null default 0,
+  total_amount numeric(14, 2) not null default 0,
+  created_at timestamptz not null default now(),
+  financial_year text not null
+);
+
+create table polishing_lines (
+  id uuid primary key,
+  polishing_entry_id uuid not null references polishing_entries(id) on delete cascade,
+  line_no integer not null default 1,
+  item_id text,
+  barcode text,
+  item_name text,
+  qty numeric(14, 3) not null default 0,
+  gross_weight numeric(14, 3) not null default 0,
+  stone_weight numeric(14, 3) not null default 0,
+  net_weight numeric(14, 3) not null default 0,
+  active boolean not null default true
+);
+
+create table polishing_stones (
+  id uuid primary key,
+  polishing_entry_id uuid not null references polishing_entries(id) on delete cascade,
+  line_no integer not null default 1,
+  code text,
+  barcode text,
+  color_type text,
+  color_scale text,
+  shape text,
+  cut text,
+  clarity text,
+  sieve_size text,
+  carat_cent numeric(14, 3) not null default 0,
+  ct_type text not null default 'Cnt',
+  pcs numeric(14, 3) not null default 0,
+  purchase_rate numeric(14, 2) not null default 0,
+  selling_rate numeric(14, 2) not null default 0,
+  amount numeric(14, 2) not null default 0,
+  active boolean not null default true
 );
 
 create index idx_rate_history_active on rate_history(branch_id, commodity, grade, effective_at desc);

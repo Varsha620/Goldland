@@ -143,13 +143,34 @@ nav {
 }
 
 .subnav {
-  display: none;
+  max-height: 0;
+  overflow: hidden;
+  display: grid;
+  transition: max-height 0.25s ease-out, padding 0.25s ease-out;
   gap: 4px;
-  padding: 4px 0 6px 32px;
+  padding: 0 0 0 32px;
+  scrollbar-gutter: stable;
 }
 
 .nav-group.open .subnav {
-  display: grid;
+  max-height: min(640px, calc(100vh - 220px));
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px 0 6px 32px;
+}
+
+.subnav::-webkit-scrollbar {
+  width: 10px;
+}
+
+.subnav::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.subnav::-webkit-scrollbar-thumb {
+  border: 2px solid var(--deep);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.26);
 }
 
 .subnav-item {
@@ -245,9 +266,9 @@ svg {
   z-index: 5;
   display: grid;
   grid-template-columns: minmax(180px, 1fr) minmax(260px, 420px) minmax(330px, auto);
-  gap: 18px;
+  gap: 12px;
   align-items: center;
-  padding: 22px 28px;
+  padding: 8px 16px;
   background: rgba(247, 245, 239, 0.88);
   backdrop-filter: blur(18px);
   border-bottom: 1px solid var(--line);
@@ -260,7 +281,7 @@ p {
 }
 
 h1 {
-  font-size: 26px;
+  font-size: 18px;
   letter-spacing: 0;
 }
 
@@ -344,10 +365,10 @@ kbd {
   min-height: 0;
   min-width: 0;
   max-width: 100%;
-  padding: 28px;
+  padding: 12px;
   display: grid;
   align-content: start;
-  gap: 20px;
+  gap: 10px;
   overflow: auto;
 }
 
@@ -402,7 +423,7 @@ label span {
 }
 
 .panel {
-  padding: 20px;
+  padding: 12px;
   min-width: 0;
   max-width: 100%;
 }
@@ -412,7 +433,14 @@ label span {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 16px;
+  margin-bottom: 10px;
+}
+
+.panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .hero-panel {
@@ -2439,27 +2467,34 @@ tbody tr:hover td {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 18px;
+  gap: 10px;
+  padding: 6px 12px;
 }
 
 .module-switcher h2 {
-  margin-top: 3px;
+  margin-top: 0;
+  font-size: 14px;
+}
+
+.module-switcher .eyebrow {
+  display: none;
 }
 
 .module-tabs {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
 }
 
 .module-tab {
-  min-height: 36px;
-  padding: 0 14px;
+  min-height: 28px;
+  padding: 0 10px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 4px;
   background: #f4f6f2;
   color: var(--ink);
-  font-weight: 800;
+  font-weight: 700;
+  font-size: 11px;
   cursor: pointer;
 }
 
@@ -2481,20 +2516,22 @@ tbody tr:hover td {
 .entry-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
-  padding: 10px 12px;
+  padding: 6px 12px;
   border-bottom: 1px solid #d6dfd2;
   background: #fff;
 }
 
 .entry-actions .toolbar-button {
-  min-height: 34px;
-  padding: 0 12px;
+  min-height: 28px;
+  padding: 0 10px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 4px;
   background: #f4f6f2;
   color: var(--ink);
+  font-size: 11px;
+  font-weight: 700;
   cursor: pointer;
 }
 
@@ -2504,15 +2541,21 @@ tbody tr:hover td {
 
 .transaction-entry-header {
   display: grid;
-  grid-template-columns: minmax(360px, 0.85fr) minmax(360px, 1fr);
-  gap: 22px;
-  padding: 10px 12px;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 16px;
+  padding: 6px 10px;
   border-bottom: 2px solid #8aa27f;
   background: #f7faf4;
 }
 
+.transaction-entry-header .classic-fields {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px 10px;
+}
+
 .transaction-entry-header .classic-field {
-  grid-template-columns: 132px minmax(0, 1fr);
+  grid-template-columns: 105px minmax(0, 1fr);
 }
 
 .transaction-entry-header .classic-field input,
@@ -2528,7 +2571,7 @@ tbody tr:hover td {
 .diamond-purchase-header,
 .dmd-stone-purchase-header,
 .sales-order-header {
-  grid-template-columns: minmax(440px, 0.9fr) minmax(360px, 0.75fr);
+  grid-template-columns: 1.25fr 1fr;
   align-items: start;
 }
 
@@ -2540,7 +2583,9 @@ tbody tr:hover td {
 .diamond-purchase-header .classic-fields,
 .dmd-stone-purchase-header .classic-fields,
 .sales-order-header .classic-fields {
-  gap: 4px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px 10px;
 }
 
 .purchase-invoice-header .split-field .field-pair,
@@ -2823,6 +2868,328 @@ tbody tr:hover td {
   resize: none;
 }
 
+/* Form alignment cleanup for older transaction screens. These pages mix
+   paired inputs, checkboxes, and party dropdowns, so the grid must be allowed
+   to breathe instead of squeezing controls into fixed screenshot-era widths. */
+.transaction-entry-header,
+.sample-header,
+.smith-work-header,
+.stock-adjustment-header,
+.pdc-receipt-header,
+.pdc-request-header,
+.pdc-represent-header,
+.complimentary-header,
+.bank-transaction-header,
+.account-entry-header {
+  overflow: visible;
+}
+
+.transaction-entry-header .classic-field,
+.sample-header .classic-field,
+.smith-work-header .classic-field,
+.stock-adjustment-header .classic-field,
+.pdc-represent-panel .classic-field,
+.pdc-represent-panel .textarea-field {
+  grid-template-columns: minmax(118px, max-content) minmax(0, 1fr);
+  column-gap: 10px;
+  min-width: 0;
+}
+
+.transaction-entry-header .classic-field > span:first-child,
+.sample-header .classic-field > span:first-child,
+.smith-work-header .classic-field > span:first-child,
+.stock-adjustment-header .classic-field > span:first-child,
+.pdc-represent-panel .classic-field > span:first-child,
+.pdc-represent-panel .textarea-field > span:first-child {
+  min-width: 0;
+  overflow: visible;
+  white-space: nowrap;
+}
+
+.transaction-entry-header input,
+.transaction-entry-header select,
+.transaction-entry-header textarea,
+.sample-header input,
+.sample-header select,
+.sample-header textarea,
+.smith-work-header input,
+.smith-work-header select,
+.smith-work-header textarea,
+.stock-adjustment-header input,
+.stock-adjustment-header select,
+.stock-adjustment-header textarea,
+.pdc-represent-panel input,
+.pdc-represent-panel select,
+.pdc-represent-panel textarea {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.transaction-entry-header .field-pair,
+.sample-header .field-pair,
+.smith-work-header .field-pair,
+.stock-adjustment-header .field-pair,
+.pdc-receipt-header .field-pair,
+.pdc-request-header .field-pair,
+.pdc-represent-panel .field-pair {
+  min-width: 0;
+  grid-template-columns: minmax(84px, 0.75fr) minmax(112px, 1fr);
+  gap: 6px;
+}
+
+.transaction-entry-header .field-pair.short-code,
+.sample-header .field-pair.short-code,
+.smith-work-header .field-pair.short-code,
+.stock-adjustment-line .staff-pair,
+.pdc-represent-panel .field-pair.short-code,
+.pdc-represent-panel.left .split-field:nth-child(3) .field-pair,
+.pdc-request-header .left .split-field:nth-child(3) .field-pair,
+.pdc-receipt-header .right .field-pair {
+  grid-template-columns: minmax(72px, 92px) minmax(170px, 1fr);
+}
+
+.smith-work-header {
+  grid-template-columns: minmax(360px, 0.95fr) minmax(270px, 0.65fr) minmax(430px, 1fr);
+  align-items: center;
+  gap: 18px 28px;
+}
+
+.smith-work-header .classic-fields {
+  grid-template-columns: 1fr;
+  gap: 6px;
+  min-width: 0;
+}
+
+.smith-flags {
+  grid-template-columns: repeat(2, minmax(150px, max-content));
+  justify-content: center;
+  align-content: center;
+  gap: 10px 24px;
+}
+
+.smith-flags .checkbox-line {
+  min-height: 28px;
+  font-size: 20px;
+  white-space: nowrap;
+}
+
+.smith-flags .checkbox-line:first-child:last-child,
+.smith-flags .checkbox-line:nth-child(3) {
+  grid-column: 1 / -1;
+}
+
+.cash-smith-header {
+  grid-template-columns: minmax(360px, 0.9fr) minmax(160px, 0.35fr) minmax(430px, 1fr);
+}
+
+.cash-smith-header .on-account-line {
+  align-self: center;
+  justify-self: center;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.service-header {
+  grid-template-columns: minmax(500px, 0.9fr) minmax(520px, 1.1fr);
+  align-items: start;
+  gap: 18px 28px;
+}
+
+.service-header .classic-fields {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+.service-header .classic-field {
+  grid-template-columns: 128px minmax(0, 1fr);
+}
+
+.service-header .left .classic-field:nth-child(5) {
+  max-width: 242px;
+}
+
+.purchase-invoice-header,
+.purchase-return-header,
+.direct-purchase-header,
+.direct-purchase-return-header,
+.diamond-purchase-return-header,
+.diamond-purchase-header,
+.dmd-stone-purchase-header,
+.sales-order-header {
+  gap: 18px 32px;
+}
+
+.purchase-invoice-header .classic-field,
+.purchase-return-header .classic-field,
+.direct-purchase-header .classic-field,
+.direct-purchase-return-header .classic-field,
+.diamond-purchase-return-header .classic-field,
+.diamond-purchase-header .classic-field,
+.dmd-stone-purchase-header .classic-field,
+.sales-order-header .classic-field {
+  grid-template-columns: minmax(118px, max-content) minmax(0, 1fr);
+}
+
+.purchase-invoice-header .checkbox-line,
+.purchase-return-header .checkbox-line,
+.direct-purchase-header .checkbox-line,
+.sales-order-header .checkbox-line {
+  justify-self: start;
+  white-space: nowrap;
+}
+
+.purchase-return-header {
+  grid-template-columns: minmax(720px, 1.08fr) minmax(520px, 0.92fr);
+}
+
+.purchase-return-header .right {
+  grid-template-columns: 1fr;
+  gap: 7px;
+}
+
+.purchase-return-header .right .classic-field {
+  grid-template-columns: 150px minmax(0, 1fr);
+}
+
+.purchase-return-header .party-pair {
+  grid-template-columns: 22px minmax(260px, 1fr);
+  gap: 8px;
+}
+
+.purchase-return-header .right input,
+.purchase-return-header .right select {
+  min-width: 0;
+}
+
+.direct-purchase-header,
+.direct-purchase-return-header {
+  grid-template-columns: minmax(720px, 1.08fr) minmax(520px, 0.92fr);
+}
+
+.direct-purchase-header .left,
+.direct-purchase-return-header .left {
+  grid-template-columns: repeat(2, minmax(260px, 1fr));
+}
+
+.direct-purchase-header .right,
+.direct-purchase-return-header .right {
+  grid-template-columns: 1fr;
+  gap: 7px;
+}
+
+.direct-purchase-header .right .classic-field,
+.direct-purchase-return-header .right .classic-field {
+  grid-template-columns: 150px minmax(0, 1fr);
+}
+
+.direct-purchase-header .party-pair,
+.direct-purchase-return-header .party-pair {
+  grid-template-columns: 22px minmax(260px, 1fr);
+  gap: 8px;
+}
+
+.dmd-return-header,
+.dmd-wholesale-header {
+  grid-template-columns: minmax(430px, 0.9fr) minmax(360px, 0.65fr) minmax(430px, 0.9fr);
+  gap: 18px 28px;
+  align-items: start;
+  padding: 12px 16px;
+}
+
+.dmd-return-header .classic-fields,
+.dmd-wholesale-header .classic-fields {
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.dmd-return-header .classic-field,
+.dmd-wholesale-header .classic-field {
+  grid-template-columns: 132px minmax(0, 1fr);
+}
+
+.dmd-return-header .radio-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  padding-left: 132px;
+}
+
+.dmd-wholesale-header .checkbox-line {
+  justify-self: start;
+  min-height: 28px;
+  white-space: nowrap;
+}
+
+.dmd-return-entry .classic-entry-grid th,
+.dmd-wholesale-entry .classic-entry-grid th,
+.dmd-wholesale-ornament .classic-entry-grid th,
+.dmd-wholesale-stone .classic-entry-grid th,
+.sales-order-main .classic-entry-grid th {
+  height: 26px;
+  padding: 4px 6px;
+  font-size: 11px;
+  line-height: 1.15;
+  white-space: normal;
+  text-transform: none;
+}
+
+.dmd-return-entry .grid-input,
+.dmd-wholesale-entry .grid-input,
+.dmd-wholesale-ornament .grid-input,
+.dmd-wholesale-stone .grid-input,
+.sales-order-main .grid-input {
+  min-height: 27px;
+}
+
+.stock-adjustment-header {
+  grid-template-columns: minmax(420px, 0.8fr) minmax(520px, 1fr);
+  align-items: center;
+  gap: 24px;
+  min-height: 112px;
+  padding: 16px 22px 14px;
+}
+
+.stock-adjustment-line {
+  grid-template-columns: 130px minmax(0, 1fr);
+}
+
+.stock-adjustment-line > span:first-child {
+  min-width: 0;
+}
+
+.stock-adjustment-line .field-pair {
+  grid-template-columns: minmax(132px, 1fr) minmax(132px, 1fr);
+}
+
+.stock-adjustment-header .reason-box {
+  width: 100%;
+  min-height: 78px;
+}
+
+.pdc-represent-header {
+  grid-template-columns: minmax(470px, 1fr) minmax(470px, 1fr);
+  gap: 8px;
+  min-height: 0;
+  align-items: start;
+}
+
+.pdc-represent-panel {
+  padding: 10px 18px 18px;
+}
+
+.pdc-represent-panel .classic-field,
+.pdc-represent-panel .textarea-field {
+  grid-template-columns: 160px minmax(0, 1fr);
+}
+
+.pdc-represent-panel.left .split-field .field-pair {
+  grid-template-columns: minmax(140px, 1fr) minmax(140px, 1fr);
+}
+
+.pdc-represent-panel .textarea-field textarea {
+  width: 100%;
+}
+
 .gold-deposit-shell {
   background: #f8fbf7;
 }
@@ -2957,6 +3324,33 @@ tbody tr:hover td {
   border-bottom: 1px solid #d9ded8;
 }
 
+.refinery-header .classic-fields,
+.sample-header .classic-fields,
+.polishing-header .classic-fields {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  min-width: 0;
+}
+
+.refinery-header .classic-field,
+.sample-header .classic-field,
+.polishing-header .classic-field {
+  width: 100%;
+  min-width: 0;
+}
+
+.refinery-header .classic-field {
+  grid-template-columns: minmax(126px, max-content) minmax(0, 1fr);
+}
+
+.refinery-header .field-pair,
+.sample-header .field-pair,
+.polishing-header .field-pair {
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .refinery-header textarea {
   min-height: 58px;
   resize: vertical;
@@ -2974,20 +3368,182 @@ tbody tr:hover td {
   min-width: 1080px;
 }
 
+.refinery-issued-table table {
+  min-width: 920px;
+}
+
+.refinery-final-test-table table {
+  min-width: 930px;
+}
+
+.melting-return-issue-table table {
+  min-width: 920px;
+}
+
 .refinery-final-table table {
   min-width: 1180px;
 }
 
 .refinery-return-table .classic-detail-grid,
+.refinery-issued-table .classic-detail-grid,
+.refinery-final-test-table .classic-detail-grid,
+.melting-return-issue-table .classic-detail-grid,
 .refinery-final-table .classic-detail-grid {
   min-height: 300px;
 }
 
 .refinery-return-table .classic-detail-grid .table-wrap,
+.refinery-issued-table .classic-detail-grid .table-wrap,
+.refinery-final-test-table .classic-detail-grid .table-wrap,
+.melting-return-issue-table .classic-detail-grid .table-wrap,
 .refinery-final-table .classic-detail-grid .table-wrap {
   min-height: 300px;
   max-height: 430px;
   overflow: auto;
+}
+
+.refinery-issued-header {
+  background: #ead0ea;
+}
+
+.refinery-issued-header input[readonly] {
+  color: #273128;
+  background: #fff;
+}
+
+.prepared-by-readonly:disabled {
+  color: #273128;
+  background: #fff;
+  opacity: 1;
+  cursor: default;
+}
+
+.refinery-issued-header .issued-readout {
+  display: block;
+}
+
+.refinery-issued-header .issued-readout input {
+  width: 100%;
+}
+
+.refinery-issued-table {
+  background: #ead0ea;
+  padding: 0 16px 16px;
+}
+
+.refinery-issued-table .classic-detail-grid {
+  position: relative;
+  border: 1px solid #6f756f;
+  background: #fff;
+}
+
+.refinery-issued-table .table-wrap {
+  border: 0;
+}
+
+.refinery-issued-table th {
+  background: #ffe5bf;
+}
+
+.refinery-test-return-header {
+  grid-template-columns: minmax(360px, 410px) 86px minmax(360px, 390px);
+  gap: 24px;
+  background: #7fc8f2;
+}
+
+.refinery-test-return-header input[readonly] {
+  color: #273128;
+  background: #fff;
+}
+
+.refinery-test-touch {
+  align-self: end;
+  padding-bottom: 1px;
+}
+
+.refinery-test-touch input {
+  width: 86px;
+  height: 28px;
+  box-sizing: border-box;
+  border: 1px solid #9ca8ae;
+  padding: 0 6px;
+  text-align: right;
+  background: #fff;
+}
+
+.refinery-final-test-table {
+  padding: 0 16px 16px;
+  background: #7fc8f2;
+}
+
+.refinery-final-test-table .classic-detail-grid {
+  position: relative;
+  border: 1px solid #5d6b72;
+  background: #fff;
+}
+
+.refinery-final-test-table .table-wrap {
+  border: 0;
+}
+
+.refinery-final-test-table th {
+  background: #ffe5bf;
+}
+
+.refinery-final-issue-view.refinery-issued-header,
+.refinery-final-issue-view.refinery-issued-table {
+  background: #dfbee0;
+}
+
+.melting-return-issue-header {
+  grid-template-columns: minmax(360px, 410px) minmax(150px, 210px) minmax(320px, 360px);
+  gap: 28px;
+  background: #dfbee0;
+}
+
+.melting-return-issue-header input[readonly] {
+  color: #273128;
+  background: #fff;
+}
+
+.melting-issue-type-readout {
+  align-self: start;
+  padding-top: 2px;
+}
+
+.melting-issue-type-readout input {
+  width: 100%;
+  height: 28px;
+  box-sizing: border-box;
+  border: 1px solid #c9c9c9;
+  padding: 0 7px;
+}
+
+.melting-return-issue-table {
+  padding: 0 16px 16px;
+  background: #dfbee0;
+}
+
+.melting-return-issue-table .classic-detail-grid {
+  position: relative;
+  border: 1px solid #606860;
+  background: #fff;
+}
+
+.melting-return-issue-table .table-wrap {
+  border: 0;
+}
+
+.melting-return-issue-table th {
+  background: #ffe5bf;
+}
+
+.refinery-issued-empty {
+  position: absolute;
+  inset: 58px 12px auto;
+  color: #697069;
+  text-align: center;
+  pointer-events: none;
 }
 
 .refinery-work-bottom {
@@ -3127,6 +3683,89 @@ tbody tr:hover td {
   font-weight: 800;
 }
 
+.polishing-work-shell {
+  background: #f8fbf7;
+}
+
+.polishing-work-shell .body-toolbar {
+  background: linear-gradient(180deg, #fff 0%, #f5f0e4 100%);
+  border-bottom-color: #cfc4ae;
+}
+
+.polishing-header {
+  display: grid;
+  grid-template-columns: minmax(320px, 430px) minmax(360px, 430px);
+  justify-content: space-between;
+  gap: 20px;
+  padding: 14px 16px;
+  background: #fff;
+  border-bottom: 1px solid #d9ded8;
+}
+
+.polishing-header .right {
+  justify-self: end;
+}
+
+.polishing-item-entry table {
+  min-width: 1180px;
+}
+
+.polishing-stone-entry table {
+  min-width: 1450px;
+}
+
+.polishing-item-entry .classic-entry-grid th,
+.polishing-stone-entry .classic-entry-grid th {
+  background: #d9b6d9;
+}
+
+.polishing-item-entry .classic-detail-grid th {
+  background: #fff2d9;
+}
+
+.polishing-stone-entry .classic-detail-grid th {
+  background: #b7c9df;
+}
+
+.polishing-item-entry .classic-detail-grid,
+.polishing-item-entry .classic-detail-grid .table-wrap,
+.polishing-stone-entry .classic-detail-grid,
+.polishing-stone-entry .classic-detail-grid .table-wrap {
+  min-height: 150px;
+}
+
+.polishing-item-entry .classic-detail-grid .table-wrap,
+.polishing-stone-entry .classic-detail-grid .table-wrap {
+  max-height: 240px;
+  overflow: auto;
+}
+
+.polishing-bottom {
+  display: grid;
+  grid-template-columns: minmax(360px, 560px) auto;
+  gap: 20px;
+  align-items: end;
+  padding: 16px 10px;
+  background: #fff;
+  border-top: 1px solid #d9ded8;
+}
+
+.polishing-totals {
+  display: grid;
+  grid-template-columns: auto 150px;
+  gap: 8px;
+  align-items: center;
+  justify-self: end;
+}
+
+.polishing-totals input {
+  height: 30px;
+  border: 1px solid #9e9e9e;
+  background: #bfbfbf;
+  text-align: right;
+  font-weight: 800;
+}
+
 .mini-danger {
   border: 0;
   color: #c30000;
@@ -3139,11 +3778,14 @@ tbody tr:hover td {
 
 @media (max-width: 980px) {
   .sample-header,
-  .sample-bottom {
+  .sample-bottom,
+  .polishing-header,
+  .polishing-bottom {
     grid-template-columns: 1fr;
   }
 
-  .sample-total {
+  .sample-total,
+  .polishing-totals {
     justify-self: stretch;
   }
 }
@@ -3883,6 +4525,565 @@ tbody tr:hover td {
   text-align: right;
 }
 
+.bank-transaction-shell {
+  background: #f7f7f3;
+  min-height: calc(100vh - 118px);
+}
+
+.bank-transaction-toolbar {
+  border-bottom: 1px solid #c7b8a5;
+  background: linear-gradient(#f2eee7, #cdbba7);
+  padding: 6px 10px;
+}
+
+.bank-transaction-toolbar .toolbar-spacer {
+  flex: 1;
+}
+
+.bank-transaction-header {
+  display: grid;
+  grid-template-columns: minmax(360px, 1fr) minmax(360px, 1fr);
+  gap: clamp(24px, 12vw, 420px);
+  padding: 12px 18px;
+  background: #f5f5f2;
+  border-bottom: 1px solid #cfcfcf;
+}
+
+.bank-transaction-header .classic-fields {
+  display: grid;
+  gap: 8px;
+}
+
+.bank-transaction-header .classic-field {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.bank-transaction-header .field-pair {
+  display: grid;
+  grid-template-columns: minmax(100px, 1fr) minmax(100px, 1fr);
+  gap: 6px;
+}
+
+.bank-transaction-header input,
+.bank-transaction-header select,
+.bank-transaction-entry-grid input,
+.bank-transaction-table input,
+.bank-transaction-footer textarea {
+  border: 1px solid #8c8c8c;
+  border-radius: 0;
+  background: #fff;
+  min-height: 25px;
+  padding: 2px 6px;
+  font: inherit;
+}
+
+.bank-transaction-table-panel {
+  padding: 8px 10px 0;
+}
+
+.bank-transaction-entry-wrap,
+.bank-transaction-table-wrap {
+  overflow-x: auto;
+  background: #fff;
+}
+
+.bank-transaction-entry-wrap {
+  border: 1px solid #8d8d8d;
+  border-bottom: 0;
+}
+
+.bank-transaction-table-wrap {
+  min-height: 280px;
+  max-height: 46vh;
+  border: 1px solid #303030;
+}
+
+.bank-transaction-entry-grid,
+.bank-transaction-table {
+  width: 100%;
+  min-width: 1160px;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.bank-transaction-entry-grid th {
+  background: #b6c7de;
+  color: #041925;
+  font-weight: 500;
+  border: 1px solid #9ba9b9;
+  padding: 4px 6px;
+}
+
+.bank-transaction-table th {
+  background: #ffe5bd;
+  color: #161616;
+  font-weight: 500;
+  border: 1px solid #bca77f;
+  padding: 5px 6px;
+}
+
+.bank-transaction-entry-grid td,
+.bank-transaction-table td {
+  border: 1px solid #8c8c8c;
+  padding: 0;
+  background: #fff;
+}
+
+.bank-transaction-entry-grid input,
+.bank-transaction-table input {
+  width: 100%;
+  border: 0;
+}
+
+.bank-transaction-entry-grid .numeric,
+.bank-transaction-table .numeric {
+  text-align: right;
+}
+
+.bank-transaction-total-strip {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) 170px minmax(80px, 1fr);
+  align-items: center;
+  gap: 18px;
+  margin: 0 10px;
+  padding: 8px 14px;
+  background: #a8ecec;
+  border: 1px solid #7acaca;
+  color: #062c2d;
+}
+
+.bank-transaction-total-strip output {
+  text-align: right;
+  font-weight: 700;
+}
+
+.pdc-receipt-header {
+  grid-template-columns: minmax(420px, 0.95fr) minmax(360px, 0.8fr);
+  gap: clamp(28px, 14vw, 260px);
+}
+
+.pdc-receipt-header .field-pair {
+  grid-template-columns: minmax(122px, 1fr) minmax(122px, 1fr);
+}
+
+.pdc-receipt-header .right .field-pair {
+  grid-template-columns: 76px minmax(170px, 1fr);
+}
+
+.pdc-receipt-header input[readonly] {
+  background: #f9dddd;
+  color: #6b5a5a;
+}
+
+.pdc-receipt-table-panel {
+  padding-top: 6px;
+}
+
+.pdc-receipt-table-wrap {
+  min-height: 292px;
+  max-height: 52vh;
+}
+
+.pdc-receipt-table {
+  min-width: 1360px;
+}
+
+.pdc-receipt-table th {
+  height: 24px;
+  padding: 3px 6px;
+  text-transform: none;
+}
+
+.pdc-receipt-table td {
+  height: 28px;
+}
+
+.pdc-receipt-table .line-delete {
+  margin-left: 6px;
+}
+
+.pdc-receipt-total-strip {
+  grid-template-columns: minmax(160px, 1fr) 170px 170px;
+  margin-top: 0;
+  background: #a8ecec;
+}
+
+.pdc-receipt-register {
+  margin: 12px 10px 16px;
+  box-shadow: none;
+}
+
+.pdc-inline-heading {
+  margin: 0 0 8px;
+  padding: 0;
+}
+
+.pdc-issue-request-header .right .textarea-field textarea,
+.pdc-request-header .textarea-field textarea {
+  min-height: 136px;
+}
+
+.pdc-request-header {
+  grid-template-columns: minmax(420px, 0.95fr) minmax(380px, 0.95fr);
+}
+
+.pdc-request-header .left .split-field .field-pair {
+  grid-template-columns: minmax(122px, 1fr) minmax(122px, 1fr);
+}
+
+.pdc-request-header .left .split-field:nth-child(3) .field-pair {
+  grid-template-columns: 76px minmax(170px, 1fr);
+}
+
+.pdc-request-header .right input[readonly] {
+  background: #efefef;
+}
+
+.pdc-represent-header {
+  grid-template-columns: minmax(420px, 1fr) minmax(420px, 1fr);
+  gap: 4px;
+  min-height: calc(100vh - 146px);
+  padding: 6px 8px 14px;
+  align-items: stretch;
+}
+
+.pdc-represent-panel {
+  align-content: start;
+  gap: 8px;
+  padding: 8px 22px 16px 18px;
+  border: 1px solid #8f969a;
+  background: #fff;
+}
+
+.pdc-represent-panel .classic-field {
+  grid-template-columns: 150px minmax(0, 1fr);
+  margin: 0;
+}
+
+.pdc-represent-panel .classic-field > span:first-child {
+  color: #000;
+}
+
+.pdc-represent-panel input,
+.pdc-represent-panel select {
+  min-height: 27px;
+  border: 1px solid #b8b8b8;
+  border-radius: 0;
+  background: #fff;
+}
+
+.pdc-represent-panel input[readonly] {
+  background: #efefef;
+  color: #555;
+}
+
+.pdc-represent-panel.left .split-field .field-pair {
+  grid-template-columns: minmax(120px, 1fr) minmax(120px, 1fr);
+}
+
+.pdc-represent-panel.left .split-field:nth-child(3) .field-pair {
+  grid-template-columns: 76px minmax(170px, 1fr);
+}
+
+.pdc-represent-panel .textarea-field {
+  grid-template-columns: 150px minmax(0, 1fr);
+  align-items: start;
+}
+
+.pdc-represent-panel .textarea-field textarea {
+  min-height: 136px;
+  border: 1px solid #333;
+  border-radius: 0;
+  resize: vertical;
+}
+
+.bank-transaction-footer {
+  display: grid;
+  grid-template-columns: 210px minmax(320px, 1fr);
+  gap: 18px;
+  padding: 8px 12px 10px;
+  border-top: 1px solid #cfcfcf;
+  background: #f7f7f3;
+}
+
+.bank-transaction-checks {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+  align-content: start;
+}
+
+.bank-transaction-checks label,
+.bank-transaction-narration {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bank-transaction-checks strong {
+  color: #f11b1b;
+}
+
+.bank-transaction-narration {
+  align-items: stretch;
+}
+
+.bank-transaction-narration span {
+  padding-top: 4px;
+  min-width: 70px;
+}
+
+.bank-transaction-narration textarea {
+  flex: 1;
+  min-height: 64px;
+  resize: vertical;
+}
+
+.cash-voucher-entry-grid.receipt,
+.cash-voucher-table.receipt {
+  min-width: 1280px;
+}
+
+.cash-voucher-entry-grid.payment,
+.cash-voucher-table.payment {
+  min-width: 1160px;
+}
+
+.cash-voucher-total-strip.receipt {
+  grid-template-columns: minmax(140px, 1fr) 150px 90px 150px 90px 150px;
+}
+
+.cash-voucher-total-strip.payment {
+  grid-template-columns: minmax(140px, 1fr) 150px minmax(80px, 1fr);
+}
+
+.cash-voucher-numeric-danger {
+  color: #f00;
+}
+
+.cash-voucher-header select:disabled {
+  background: #e7e7e7;
+  color: #666;
+}
+
+@media (max-width: 900px) {
+  .cash-voucher-total-strip.receipt,
+  .cash-voucher-total-strip.payment {
+    grid-template-columns: 1fr 130px;
+  }
+}
+
+.account-entry-shell {
+  background: #f7f7f3;
+  min-height: calc(100vh - 118px);
+}
+
+.account-entry-toolbar {
+  border-bottom: 1px solid #c7b8a5;
+  background: linear-gradient(#f2eee7, #cdbba7);
+  padding: 6px 10px;
+}
+
+.account-entry-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid #cfcfcf;
+  background: #f5f5f2;
+}
+
+.direct-entry-header {
+  display: grid;
+  grid-template-columns: 280px minmax(320px, 1fr) minmax(320px, 1fr);
+  align-items: start;
+  gap: 20px;
+}
+
+.expense-entry-header {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) minmax(300px, 1.1fr) minmax(340px, 1fr);
+  gap: 18px;
+}
+
+.account-entry-header fieldset {
+  border: 1px solid #d5d0c6;
+  padding: 10px 12px 12px;
+  background: #fffdf8;
+}
+
+.account-entry-header legend {
+  padding: 0 6px;
+  font-weight: 700;
+}
+
+.direct-entry-mode {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: center;
+  padding: 8px 0;
+}
+
+.account-entry-header .classic-fields {
+  display: grid;
+  gap: 8px;
+}
+
+.account-entry-header .classic-field {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.account-entry-header .classic-field.split-field .field-pair {
+  display: grid;
+  grid-template-columns: minmax(90px, 1fr) minmax(90px, 1fr);
+  gap: 6px;
+}
+
+.account-entry-header .classic-field input,
+.account-entry-header .classic-field select,
+.account-entry-header textarea,
+.account-entry-grid input,
+.account-entry-table input,
+.account-entry-table select {
+  border: 1px solid #8c8c8c;
+  border-radius: 0;
+  background: #fff;
+  min-height: 25px;
+  padding: 2px 6px;
+  font: inherit;
+}
+
+.account-entry-header textarea {
+  width: 100%;
+  min-height: 104px;
+  resize: vertical;
+}
+
+.plain-check,
+.expense-type-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.expense-type-row {
+  justify-content: space-between;
+}
+
+.expense-type-row .classic-field {
+  flex: 1;
+}
+
+.account-entry-table-panel {
+  padding: 8px 10px 0;
+}
+
+.account-entry-entry-wrap,
+.account-entry-table-wrap {
+  overflow: auto;
+  background: #fff;
+}
+
+.account-entry-entry-wrap {
+  border: 1px solid #8d8d8d;
+  border-bottom: 0;
+}
+
+.account-entry-table-wrap {
+  min-height: 300px;
+  max-height: 48vh;
+  border: 1px solid #303030;
+}
+
+.account-entry-grid,
+.account-entry-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.direct-entry-grid,
+.direct-entry-table {
+  min-width: 1240px;
+}
+
+.expense-entry-grid,
+.expense-entry-table {
+  min-width: 1580px;
+}
+
+.account-entry-grid th {
+  background: #d8b5d9;
+  color: #111;
+  font-weight: 500;
+  border: 1px solid #bca2bd;
+  padding: 4px 6px;
+}
+
+.account-entry-table th {
+  background: #ffe5bd;
+  color: #161616;
+  font-weight: 500;
+  border: 1px solid #bca77f;
+  padding: 5px 6px;
+}
+
+.account-entry-grid td,
+.account-entry-table td {
+  border: 1px solid #8c8c8c;
+  padding: 0;
+  background: #fff;
+}
+
+.account-entry-grid input,
+.account-entry-table input {
+  width: 100%;
+  border: 0;
+}
+
+.account-entry-grid .numeric,
+.account-entry-table .numeric,
+.account-entry-table .auto-field {
+  text-align: right;
+}
+
+.account-entry-table .auto-field {
+  background: #f0f0f0;
+  color: #555;
+}
+
+.account-entry-total-strip,
+.expense-entry-summary {
+  display: grid;
+  align-items: center;
+  gap: 10px;
+  margin: 0 10px;
+  padding: 8px 12px;
+  border: 1px solid #7acaca;
+  background: #a8ecec;
+  color: #062c2d;
+}
+
+.account-entry-total-strip.three {
+  grid-template-columns: 130px 150px 130px 150px 90px 150px;
+}
+
+.expense-entry-summary {
+  grid-template-columns: 120px 130px 70px 130px 70px 130px 120px 150px;
+}
+
+.account-entry-total-strip output,
+.expense-entry-summary output {
+  text-align: right;
+  font-weight: 700;
+}
+
 .complimentary-shell {
   background: #f8faf8;
   min-height: calc(100vh - 118px);
@@ -4054,69 +5255,192 @@ tbody tr:hover td {
   font-weight: 700;
 }
 
+/* Shared bottom-panel alignment pass for billing, stock, work, and voucher screens. */
+.billing-bottom,
+.transaction-bottom-grid,
+.classic-billing-shell .billing-bottom,
+.gold-deposit-bottom,
+.sample-bottom,
+.polishing-bottom,
+.smith-work-bottom,
+.cash-smith-bottom,
+.refinery-work-bottom,
+.refinery-final-bottom,
+.complimentary-bottom,
+.classic-bottom-grid {
+  gap: 12px 18px;
+  padding: 14px 16px;
+  align-items: start;
+}
+
+.classic-billing-shell .billing-bottom,
+.transaction-bottom-grid {
+  grid-template-columns: minmax(260px, 0.85fr) minmax(320px, 1fr) minmax(300px, 0.9fr);
+}
+
+.transaction-bottom-grid .adjustments,
+.classic-billing-shell .adjustments,
+.classic-totals.compact,
+.bill-totals,
+.total-block,
+.smith-total-form {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
+
+.readout,
+.transaction-bottom-grid .adjustments .readout,
+.classic-billing-shell .adjustments .readout {
+  min-height: 28px;
+  align-items: center;
+}
+
+.transaction-bottom-grid .adjustments .readout,
+.classic-billing-shell .adjustments .readout,
+.total-block .readout,
+.bill-totals .readout {
+  grid-template-columns: minmax(118px, 1fr) minmax(112px, 150px);
+  gap: 6px;
+}
+
+.readout span,
+.classic-totals.compact label > span,
+.classic-field > span:first-child,
+.gold-deposit-readouts > span,
+.sample-total > span,
+.polishing-totals > span {
+  white-space: nowrap;
+}
+
+.readout strong,
+.transaction-bottom-grid .adjustments .readout strong,
+.classic-billing-shell .adjustments .readout strong,
+.classic-totals.compact input,
+.classic-totals.compact output,
+.gold-deposit-readouts input,
+.sample-total input,
+.polishing-totals input,
+.smith-inline-flags input,
+.cash-smith-total-line input,
+.smith-touch-card input,
+.smith-total-form input {
+  min-height: 26px;
+  height: 26px;
+  padding: 3px 8px;
+  line-height: 18px;
+  text-align: right;
+}
+
+.classic-field {
+  gap: 8px;
+}
+
+.field-pair,
+.sales-order-shell .readout.editable-readout .field-pair {
+  gap: 6px;
+  align-items: center;
+}
+
+.purchase-payment-lines {
+  padding-top: 8px;
+  align-self: start;
+}
+
+.gold-deposit-readouts,
+.sample-total,
+.polishing-totals {
+  gap: 6px;
+}
+
+.sample-remarks,
+.polishing-bottom .sample-remarks {
+  align-items: center;
+}
+
+.sample-remarks textarea,
+.smith-summary-left textarea,
+.gold-deposit-bottom .remarks-line input {
+  width: 100%;
+}
+
+.smith-work-bottom {
+  grid-template-columns: minmax(520px, 1fr) minmax(320px, 390px);
+}
+
+.complimentary-bottom {
+  grid-template-columns: minmax(360px, 1fr) minmax(280px, 340px);
+}
+
 .custom-voucher-shell {
-  background: #f8faf8;
+  background: #f7f8f8;
+  border: 1px solid #b7c9d6;
 }
 
 .custom-voucher-window-title {
-  padding: 6px 12px;
+  padding: 5px 12px;
   border-bottom: 1px solid #8e8e8e;
-  background: linear-gradient(#dff6fb, #9fd9e8);
+  background: #fff;
   font-weight: 600;
 }
 
 .custom-voucher-toolbar {
-  background: linear-gradient(#dff6fb, #9fd9e8);
-  border-bottom: 1px solid #7ebfd0;
+  background: linear-gradient(#d8ffff, #22d4c9);
+  border-bottom: 1px solid #2ab7b2;
 }
 
 .custom-voucher-header {
   display: grid;
   grid-template-columns: minmax(360px, 1fr) minmax(360px, 1fr);
-  gap: 24px;
-  padding: 14px 20px 10px;
+  gap: clamp(28px, 12vw, 220px);
+  padding: 12px 14px 8px;
 }
 
-.custom-voucher-entry-row {
-  display: grid;
-  grid-template-columns: 1.2fr 1fr 0.8fr 0.5fr 0.9fr 1.4fr auto;
-  gap: 8px;
-  align-items: end;
-  padding: 8px 20px 10px;
-  background: #f7dfe7;
-  border-top: 1px solid #caa;
-  border-bottom: 1px solid #caa;
+.custom-voucher-entry-wrap {
+  margin: 8px 14px 0;
+  overflow-x: auto;
 }
 
-.custom-voucher-entry-row label {
-  display: grid;
-  gap: 4px;
-  margin: 0;
-  font-size: 12px;
+.custom-voucher-entry-grid {
+  width: 100%;
+  min-width: 940px;
+  border-collapse: collapse;
 }
 
-.custom-voucher-entry-row label.wide {
-  grid-column: span 1;
+.custom-voucher-entry-grid th {
+  height: 27px;
+  border: 1px solid #f0d4d4;
+  background: #ffe6e9;
+  font-weight: 500;
 }
 
-.custom-voucher-entry-row input,
-.custom-voucher-entry-row select {
-  min-height: 26px;
-  border: 1px solid #a8a8a8;
-  padding: 2px 6px;
+.custom-voucher-entry-grid td {
+  height: 31px;
+  border: 1px solid #b8b8b8;
+  background: #fff;
+  padding: 0;
+}
+
+.custom-voucher-entry-grid input,
+.custom-voucher-entry-grid select {
+  width: 100%;
+  height: 28px;
+  border: 0;
+  box-sizing: border-box;
+  padding: 0 6px;
   background: #fff;
 }
 
-.custom-voucher-entry-row .numeric {
+.custom-voucher-entry-grid .numeric {
   text-align: right;
 }
 
 .custom-voucher-table-panel {
-  padding: 0 20px;
+  padding: 0 14px;
 }
 
 .custom-voucher-table-wrap {
-  min-height: 280px;
+  min-height: 240px;
   overflow: auto;
   border: 1px solid #8e8e8e;
   background: #fff;
@@ -4124,14 +5448,15 @@ tbody tr:hover td {
 
 .custom-voucher-table {
   width: 100%;
+  min-width: 940px;
   border-collapse: collapse;
 }
 
 .custom-voucher-table th {
   height: 28px;
   border: 1px solid #aaa;
-  background: #dff6fb;
-  font-weight: 600;
+  background: #b6f3f3;
+  font-weight: 500;
 }
 
 .custom-voucher-table td {
@@ -4154,10 +5479,12 @@ tbody tr:hover td {
 
 .custom-voucher-footer {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: auto 1fr auto;
   gap: 16px;
   align-items: center;
-  padding: 10px 20px 16px;
+  padding: 6px 14px 12px;
+  border-top: 1px solid #8fd6d3;
+  background: #e9ffff;
 }
 
 .custom-voucher-footer .confirm-delete {
@@ -4174,9 +5501,10 @@ tbody tr:hover td {
 
 .custom-voucher-total {
   display: grid;
-  grid-template-columns: 110px 120px;
+  grid-template-columns: 120px 1fr 130px;
   align-items: center;
   gap: 8px;
+  min-width: 360px;
 }
 
 .custom-voucher-total output {
@@ -4364,8 +5692,643 @@ tbody tr:hover td {
     overflow: visible;
   }
 
-  .invoice-copy table {
-    min-width: 0;
-    font-size: 11px;
+.invoice-copy table {
+  min-width: 0;
+  font-size: 11px;
+}
+}
+
+.opening-stock-shell {
+  padding: 0;
+  background: #f8fbf7;
+  border: 1px solid #4e7a82;
+}
+
+.opening-stock-title {
+  margin: 10px 24px 8px;
+  padding: 5px 12px;
+  text-align: center;
+  font-weight: 800;
+  font-style: italic;
+  background: #d6b37e;
+  color: #050505;
+}
+
+.opening-stock-controls {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 34px 10px;
+}
+
+.opening-stock-controls .inline-date-field {
+  display: inline-grid;
+  grid-template-columns: auto 150px;
+  align-items: center;
+  gap: 70px;
+}
+
+.opening-stock-controls input {
+  height: 25px;
+  border-radius: 0;
+  border: 1px solid #9aa6ad;
+}
+
+.compact-button {
+  height: 28px;
+  min-width: 92px;
+  padding: 3px 16px;
+}
+
+.opening-stock-grid-wrap {
+  margin: 0 24px;
+  border: 1px solid #303030;
+  overflow: auto;
+  max-height: min(60vh, 560px);
+  background: #fff;
+}
+
+.opening-stock-grid {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.opening-stock-grid th,
+.opening-stock-grid td {
+  border: 1px solid #8b8b8b;
+  padding: 0;
+}
+
+.opening-stock-grid th {
+  height: 20px;
+  background: #b8c9df;
+  font-weight: 500;
+  text-align: center;
+}
+
+.opening-stock-grid td {
+  height: 22px;
+  background: #fff;
+}
+
+.opening-stock-grid tbody tr:nth-child(even) td {
+  background: #c6c1f3;
+}
+
+.opening-stock-grid tr.selected .description-cell {
+  background: #0588d5;
+  color: #fff;
+}
+
+.opening-stock-grid .description-cell {
+  padding: 2px 5px;
+  white-space: nowrap;
+}
+
+.opening-stock-grid input {
+  width: 100%;
+  height: 22px;
+  border: 0;
+  background: transparent;
+  text-align: right;
+  font: inherit;
+  padding: 1px 5px;
+}
+
+.opening-stock-grid .readonly-cell {
+  color: #111;
+}
+
+.opening-stock-footer {
+  display: grid;
+  grid-template-columns: 1fr 130px 140px auto;
+  gap: 58px;
+  align-items: center;
+  margin: 8px 24px 0;
+  padding: 10px 14px 16px;
+  border-top: 2px solid #db002b;
+}
+
+.opening-stock-code {
+  justify-self: center;
+  width: 128px;
+  text-align: center;
+  background: #ffffef;
+}
+
+.opening-stock-total {
+  width: 140px;
+  text-align: right;
+  font-weight: 800;
+  background: #ffffef;
+}
+
+.classic-ok-button {
+  min-width: 96px;
+  height: 32px;
+  border: 1px solid #aaa;
+  background: linear-gradient(#eeeeee, #d5d5d5);
+  font-weight: 700;
+}
+
+/* Final transaction-form alignment overrides. Kept at the end so older
+   screen-specific rules cannot reintroduce squeezed or drifting headers. */
+.smith-work-header {
+  grid-template-columns: minmax(360px, 0.95fr) minmax(270px, 0.65fr) minmax(430px, 1fr);
+  align-items: center;
+  gap: 18px 28px;
+}
+
+.cash-smith-header {
+  grid-template-columns: minmax(360px, 0.9fr) minmax(160px, 0.35fr) minmax(430px, 1fr);
+}
+
+.service-header {
+  grid-template-columns: minmax(500px, 0.9fr) minmax(520px, 1.1fr);
+  align-items: start;
+  gap: 18px 28px;
+}
+
+.service-header .classic-fields {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+.service-header .classic-field {
+  grid-template-columns: 128px minmax(0, 1fr);
+}
+
+.purchase-return-header {
+  grid-template-columns: minmax(720px, 1.08fr) minmax(520px, 0.92fr);
+}
+
+.purchase-return-header .right {
+  grid-template-columns: 1fr;
+  gap: 7px;
+}
+
+.purchase-return-header .right .classic-field {
+  grid-template-columns: 150px minmax(0, 1fr);
+}
+
+.purchase-return-header .party-pair {
+  grid-template-columns: 22px minmax(260px, 1fr);
+  gap: 8px;
+}
+
+.purchase-invoice-header {
+  grid-template-columns: minmax(720px, 1.08fr) minmax(520px, 0.92fr);
+  align-items: start;
+  gap: 18px 32px;
+}
+
+.purchase-invoice-header .left {
+  grid-template-columns: repeat(2, minmax(260px, 1fr));
+  gap: 7px 16px;
+}
+
+.purchase-invoice-header .right {
+  grid-template-columns: 1fr;
+  gap: 7px;
+}
+
+.purchase-invoice-header .classic-field {
+  grid-template-columns: 150px minmax(0, 1fr);
+}
+
+.purchase-invoice-header .party-pair {
+  grid-template-columns: 22px minmax(260px, 1fr);
+  gap: 8px;
+}
+
+.direct-purchase-header,
+.direct-purchase-return-header {
+  grid-template-columns: minmax(720px, 1.08fr) minmax(520px, 0.92fr);
+}
+
+.direct-purchase-header .left,
+.direct-purchase-return-header .left {
+  grid-template-columns: repeat(2, minmax(260px, 1fr));
+}
+
+.direct-purchase-header .right,
+.direct-purchase-return-header .right {
+  grid-template-columns: 1fr;
+  gap: 7px;
+}
+
+.direct-purchase-header .right .classic-field,
+.direct-purchase-return-header .right .classic-field {
+  grid-template-columns: 150px minmax(0, 1fr);
+}
+
+.direct-purchase-header .party-pair,
+.direct-purchase-return-header .party-pair {
+  grid-template-columns: 22px minmax(260px, 1fr);
+  gap: 8px;
+}
+
+.dmd-return-header,
+.dmd-wholesale-header {
+  grid-template-columns: minmax(430px, 0.9fr) minmax(360px, 0.65fr) minmax(430px, 0.9fr);
+  gap: 18px 28px;
+  align-items: start;
+  padding: 12px 16px;
+}
+
+.dmd-return-header .classic-fields,
+.dmd-wholesale-header .classic-fields {
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.dmd-return-header .classic-field,
+.dmd-wholesale-header .classic-field {
+  grid-template-columns: 132px minmax(0, 1fr);
+}
+
+.dmd-return-header .radio-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  padding-left: 132px;
+}
+
+.dmd-wholesale-header .checkbox-line {
+  justify-self: start;
+  min-height: 28px;
+  white-space: nowrap;
+}
+
+.dmd-stone-purchase-header {
+  grid-template-columns: minmax(720px, 1.05fr) minmax(520px, 0.95fr);
+  align-items: start;
+  gap: 18px 32px;
+  padding: 12px 16px;
+}
+
+.dmd-stone-purchase-header .left {
+  grid-template-columns: repeat(2, minmax(260px, 1fr));
+  gap: 7px 16px;
+}
+
+.dmd-stone-purchase-header .right {
+  grid-template-columns: 1fr;
+  gap: 7px;
+}
+
+.dmd-stone-purchase-header .classic-field {
+  grid-template-columns: 150px minmax(0, 1fr);
+}
+
+.sales-order-header {
+  grid-template-columns: minmax(720px, 1.08fr) minmax(520px, 0.92fr);
+  align-items: start;
+  gap: 18px 32px;
+  padding: 12px 16px;
+}
+
+.sales-order-header .left {
+  grid-template-columns: repeat(2, minmax(260px, 1fr));
+  gap: 7px 16px;
+}
+
+.sales-order-header .right {
+  grid-template-columns: 1fr;
+  gap: 7px;
+}
+
+.sales-order-header .classic-field {
+  grid-template-columns: 150px minmax(0, 1fr);
+}
+
+.sales-order-header .party-pair {
+  grid-template-columns: 22px minmax(260px, 1fr);
+  gap: 8px;
+}
+
+.sales-order-header .field-pair {
+  grid-template-columns: minmax(132px, 1fr) minmax(132px, 1fr);
+}
+
+.sales-return-header {
+  grid-template-columns: minmax(560px, 0.95fr) minmax(520px, 1.05fr);
+  align-items: start;
+  gap: 18px 32px;
+  padding: 12px 16px;
+}
+
+.sales-return-header .classic-fields {
+  grid-template-columns: 1fr;
+  gap: 7px;
+}
+
+.sales-return-header .classic-field {
+  grid-template-columns: 150px minmax(0, 1fr);
+}
+
+.diamond-purchase-header,
+.diamond-purchase-return-header {
+  grid-template-columns: minmax(720px, 1.05fr) minmax(540px, 0.95fr);
+  align-items: start;
+  gap: 18px 32px;
+  padding: 12px 16px;
+}
+
+.diamond-purchase-header .left,
+.diamond-purchase-return-header .left {
+  grid-template-columns: repeat(2, minmax(260px, 1fr));
+  gap: 7px 16px;
+}
+
+.diamond-purchase-header .right,
+.diamond-purchase-return-header .right {
+  grid-template-columns: 1fr;
+  gap: 7px;
+}
+
+.diamond-purchase-header .classic-field,
+.diamond-purchase-return-header .classic-field {
+  grid-template-columns: 160px minmax(0, 1fr);
+}
+
+.diamond-purchase-header .field-pair,
+.diamond-purchase-return-header .field-pair {
+  grid-template-columns: minmax(132px, 1fr) minmax(132px, 1fr);
+  gap: 8px;
+}
+
+.diamond-purchase-header .smith-transfer-row,
+.diamond-purchase-return-header .smith-transfer-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  min-height: 28px;
+  padding-left: 160px;
+}
+
+.diamond-purchase-header .smith-transfer-row > span,
+.diamond-purchase-return-header .smith-transfer-row > span {
+  margin-left: -160px;
+  width: 150px;
+  white-space: nowrap;
+}
+
+.dmd-return-entry .classic-entry-grid th,
+.dmd-wholesale-entry .classic-entry-grid th,
+.dmd-wholesale-ornament .classic-entry-grid th,
+.dmd-wholesale-stone .classic-entry-grid th,
+.sales-order-main .classic-entry-grid th {
+  height: 26px;
+  padding: 4px 6px;
+  font-size: 11px;
+  line-height: 1.15;
+  white-space: normal;
+  text-transform: none;
+}
+
+.gold-deposit-header {
+  grid-template-columns: minmax(480px, 0.95fr) minmax(180px, 0.32fr) minmax(480px, 0.95fr);
+  align-items: center;
+  gap: 18px 32px;
+  min-height: 0;
+  padding: 14px 18px;
+}
+
+.gold-deposit-header .classic-fields {
+  grid-template-columns: 1fr;
+  gap: 8px;
+  min-width: 0;
+}
+
+.gold-deposit-header .classic-field {
+  grid-template-columns: 132px minmax(0, 1fr);
+}
+
+.gold-deposit-header .field-pair {
+  grid-template-columns: minmax(132px, 1fr) minmax(132px, 1fr);
+  gap: 8px;
+}
+
+.gold-deposit-header .middle {
+  justify-content: center;
+}
+
+.gold-deposit-header .gold-by-amount {
+  display: inline-flex;
+  align-items: center;
+  justify-self: center;
+  gap: 8px;
+  min-height: 30px;
+  white-space: nowrap;
+}
+
+.gold-deposit-header .right .classic-field {
+  grid-template-columns: 132px minmax(220px, 1fr);
+}
+
+.stock-adjustment-header {
+  grid-template-columns: minmax(420px, 0.8fr) minmax(520px, 1fr);
+  align-items: center;
+  gap: 24px;
+  min-height: 112px;
+  padding: 16px 22px 14px;
+}
+
+.stock-adjustment-line {
+  grid-template-columns: 130px minmax(0, 1fr);
+}
+
+.stock-adjustment-line .field-pair {
+  grid-template-columns: minmax(132px, 1fr) minmax(132px, 1fr);
+}
+
+.stock-adjustment-line .staff-pair,
+.field-pair.short-code,
+.transaction-entry-header .field-pair.short-code,
+.pdc-represent-panel .field-pair.short-code {
+  grid-template-columns: minmax(72px, 92px) minmax(170px, 1fr);
+}
+
+.pdc-represent-header {
+  grid-template-columns: minmax(470px, 1fr) minmax(470px, 1fr);
+  gap: 8px;
+  min-height: 0;
+  align-items: start;
+}
+
+.pdc-represent-panel {
+  padding: 10px 18px 18px;
+}
+
+.pdc-represent-panel .classic-field,
+.pdc-represent-panel .textarea-field {
+  grid-template-columns: 160px minmax(0, 1fr);
+}
+
+.pdc-represent-panel.left .split-field .field-pair {
+  grid-template-columns: minmax(140px, 1fr) minmax(140px, 1fr);
+}
+
+.transaction-entry-header input,
+.transaction-entry-header select,
+.transaction-entry-header textarea,
+.classic-field input,
+.classic-field select,
+.classic-field textarea {
+  min-width: 0;
+  max-width: 100%;
+}
+
+@media (max-width: 1180px) {
+  .smith-work-header,
+  .cash-smith-header,
+  .service-header,
+  .refinery-header,
+  .refinery-test-return-header,
+  .melting-return-issue-header,
+  .sample-header,
+  .polishing-header,
+  .purchase-invoice-header,
+  .purchase-return-header,
+  .direct-purchase-header,
+  .direct-purchase-return-header,
+  .dmd-return-header,
+  .dmd-wholesale-header,
+  .dmd-stone-purchase-header,
+  .sales-order-header,
+  .sales-return-header,
+  .diamond-purchase-header,
+  .diamond-purchase-return-header,
+  .gold-deposit-header,
+  .stock-adjustment-header,
+  .pdc-represent-header {
+    grid-template-columns: 1fr;
+  }
+
+  .smith-flags {
+    justify-content: start;
+  }
+
+  .service-header .classic-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .refinery-header .classic-fields,
+  .sample-header .classic-fields,
+  .polishing-header .classic-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .refinery-test-touch,
+  .melting-issue-type-readout,
+  .polishing-header .right {
+    width: 100%;
+    justify-self: stretch;
+  }
+
+  .purchase-invoice-header .left,
+  .direct-purchase-header .left,
+  .direct-purchase-return-header .left,
+  .dmd-stone-purchase-header .left,
+  .sales-order-header .left,
+  .diamond-purchase-header .left,
+  .diamond-purchase-return-header .left,
+  .gold-deposit-header .classic-fields {
+    grid-template-columns: repeat(2, minmax(220px, 1fr));
+  }
+
+  .diamond-purchase-header .smith-transfer-row,
+  .diamond-purchase-return-header .smith-transfer-row {
+    padding-left: 0;
+  }
+
+  .diamond-purchase-header .smith-transfer-row > span,
+  .diamond-purchase-return-header .smith-transfer-row > span {
+    margin-left: 0;
+    width: auto;
+  }
+
+  .gold-deposit-header .middle,
+  .gold-deposit-header .right {
+    grid-template-columns: 1fr;
+    justify-content: start;
+  }
+
+  .gold-deposit-header .gold-by-amount {
+    justify-self: start;
+  }
+}
+
+@media (max-width: 760px) {
+  .transaction-entry-header,
+  .sample-header,
+  .polishing-header,
+  .smith-work-header,
+  .stock-adjustment-header {
+    padding: 12px;
+    gap: 14px;
+  }
+
+  .transaction-entry-header .classic-fields,
+  .service-header .classic-fields,
+  .sample-header .classic-fields,
+  .polishing-header .classic-fields,
+  .smith-work-header .classic-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .transaction-entry-header .classic-field,
+  .sample-header .classic-field,
+  .polishing-header .classic-field,
+  .smith-work-header .classic-field,
+  .stock-adjustment-header .classic-field {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+
+  .transaction-entry-header .classic-field > span:first-child,
+  .sample-header .classic-field > span:first-child,
+  .polishing-header .classic-field > span:first-child,
+  .smith-work-header .classic-field > span:first-child,
+  .stock-adjustment-header .classic-field > span:first-child {
+    white-space: normal;
+  }
+
+  .transaction-entry-header .field-pair,
+  .sample-header .field-pair,
+  .polishing-header .field-pair,
+  .smith-work-header .field-pair,
+  .stock-adjustment-header .field-pair,
+  .transaction-entry-header .field-pair.short-code,
+  .sample-header .field-pair.short-code,
+  .smith-work-header .field-pair.short-code,
+  .stock-adjustment-line .staff-pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .opening-stock-controls {
+    align-items: flex-start;
+    flex-direction: column;
+    padding-inline: 18px;
+  }
+
+  .opening-stock-controls .inline-date-field {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .opening-stock-grid-wrap,
+  .opening-stock-footer,
+  .opening-stock-title {
+    margin-inline: 10px;
+  }
+
+  .opening-stock-footer {
+    grid-template-columns: 1fr;
+    gap: 8px;
   }
 }
