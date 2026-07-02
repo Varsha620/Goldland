@@ -1,8 +1,26 @@
 const ACCESS_PASSWORD = "goldland2026";
+const SALES_ITEMS = ["Sales Invoice", "Sales Return", "DMD Return/DMD OP", "DMD Sales WholeSales", "Sales Order", "Additional Order Advance", "Order Advance Refund"];
+const PURCHASE_ITEMS = ["Purchase Invoice", "Purchase Return", "Diamond Purchase", "Diamond Purchase Return", "Direct Purchase", "Direct Purchase Return", "DMD Stone Purchase"];
 const WORK_ORDER_ITEMS = ["Smith", "Jeweller", "Refining", "Sample", "Polishing", "Service / Job", "Complimentary Item"];
+const ACCOUNT_ITEMS = ["Account Ledger", "Cash Receipt", "Cash Payment", "Bank Deposit", "Bank Withdrawal", "Journal Voucher", "PDC Transactions", "Direct Entry", "Expense Entry", "Bill Wise Collection", "Bill Wise Payment", "Discount in Credit Note", "Discount in Debit Note", "Custom Voucher"];
+const MANAGEMENT_ITEMS = ["Customers", "Suppliers", "Smiths", "Refiners", "Employees", "Item Category", "Miscellaneous", "Item Creation", "Account Creation"];
 const EXPANDABLE_NAVS = new Set(["Sales", "Purchase", "Stock", "Work Orders", "Accounts", "Management"]);
 const OPENING_STOCK_VIEW = "Opening Stock Account Entry";
 const STOCK_ITEMS = ["Stock Register", "Barcode Entry", OPENING_STOCK_VIEW, "Stock Adjustments", "Item Transfer", "Gold Deposit", "Gold Withdrawal"];
+const REPORT_MENU_GROUPS = [
+  { title: "Stock", items: ["Stock", "Stock Ledger", "Stock Register", "Stock Adjustment", "Sample Issue/Return"] },
+  { title: "Sales", items: ["Sales", "Sales Profit", "Sales Return", "Exchange", "Sales Order"] },
+  { title: "Purchase", items: ["Purchase", "Purchase Return", "Direct Gold Purchase", "Direct Gold Purchase Return"] },
+  { title: "Diamond", items: ["Diamond"] },
+  { title: "Transfers", items: ["Transfers"] },
+  { title: "Barcode", items: ["Barcode Entry", "Barcode/HUID Stock Report"] },
+  { title: "Tax", items: ["Tax Reports", "GST Invoice Export"] },
+  { title: "Bills", items: ["Bills Reports", "Bills Payables", "Today's Dues"] },
+  { title: "Cash/Accounts", items: ["Cash Point", "Discount Voucher", "Party Ledger"] },
+  { title: "Service/Job", items: ["Service / Job", "Complementary Items"] },
+  { title: "Day End", items: ["Day end Report", "Day Summary", "Audit Trail", "Rate History", "Scheme Member Ledger"] }
+];
+const PINNED_REPORTS = ["Day Summary", "Stock", "Sales", "Bills Reports", "Tax Reports", "Day end Report"];
 const DEMO_DATA_VERSION = 1;
 
 const seed = {
@@ -144,6 +162,7 @@ const seed = {
       gstin: "",
       panCardNo: "",
       paymentMode: "Cash",
+      returnType: "Sales Return",
       addition: 0,
       discount: 0,
       tdsTcs: 0,
@@ -304,6 +323,8 @@ const seed = {
   ]
 };
 
+const DMD_RETURN_TYPES = ["Sales Return", "Opening Stock", "Local Purchase"];
+
 let state = null;
 state = loadState();
 state = ensureDemoData(state);
@@ -364,6 +385,10 @@ let existingRecordPickerItems = [];
 let customVoucherDraft = null;
 let customVoucherEntryDraft = null;
 let customVoucherConfirmDelete = true;
+let selectedReport = "Day Summary";
+let reportSearch = "";
+let globalMenuSearch = "";
+let recentReportItems = [];
 let authenticated = sessionStorage.getItem("goldland-authenticated") === "true";
 
 function rate(type, grade, price, time, reason) {
@@ -1313,6 +1338,7 @@ function normalizeDmdReturnBill(bill = {}) {
     gstin: bill.gstin || "",
     panCardNo: bill.panCardNo || "",
     paymentMode: bill.paymentMode || "Cash",
+    returnType: DMD_RETURN_TYPES.includes(bill.returnType) ? bill.returnType : "Sales Return",
     addition: Number(bill.addition || 0),
     discount: Number(bill.discount || 0),
     tdsTcs: Number(bill.tdsTcs || 0),
@@ -1323,7 +1349,7 @@ function normalizeDmdReturnBill(bill = {}) {
     partyName: bill.partyName || "",
     addToStock: bill.addToStock !== false,
     lines: legacyLines,
-    ornamentLines: ornamentSource.map((line) => normalizeDmdWholesaleLine(line, { returnMode: true })),
+    ornamentLines: ornamentSource.map((line) => normalizeDmdWholesaleLine(line, { returnMode: true, returnType: bill.returnType || "Sales Return" })),
     diamondLines: (bill.diamondLines || []).map(normalizeDmdStoneLine)
   };
 }
@@ -1601,8 +1627,11 @@ function calculateDmdWholesaleLine(line = {}, options = {}) {
   const purchaseMaking = netWeight * Number(line.purMc || 0);
   const salesMaking = netWeight * Number(line.salesMc || 0);
   if (options.returnMode) {
-    const total = Math.round(goldAmount + vaAmount + stoneAmount + diamondAmount + purchaseMaking);
-    return { ...line, netWeight, goldAmount, vaAmount, stoneAmount, diamondAmount, purchaseMaking, salesMaking, total, salesAmt: 0, amount: total };
+    const returnType = DMD_RETURN_TYPES.includes(options.returnType || line.returnType) ? (options.returnType || line.returnType) : "Sales Return";
+    const baseTotal = goldAmount + vaAmount + stoneAmount + diamondAmount;
+    const returnMaking = returnType === "Sales Return" ? salesMaking : purchaseMaking;
+    const total = Math.round(baseTotal + returnMaking);
+    return { ...line, returnType, netWeight, goldAmount, vaAmount, stoneAmount, diamondAmount, purchaseMaking, salesMaking, total, salesAmt: 0, amount: total };
   }
   const salesAmt = Math.round(goldAmount + vaAmount + stoneAmount + diamondAmount + salesMaking);
   return { ...line, netWeight, goldAmount, vaAmount, stoneAmount, diamondAmount, purchaseMaking, salesMaking, total: salesAmt, salesAmt, amount: salesAmt };
@@ -3575,6 +3604,15 @@ function render() {
   bindEvents();
 }
 
+function renderAndFocus(selector) {
+  render();
+  const field = document.querySelector(selector);
+  if (!field) return;
+  field.focus();
+  const end = field.value.length;
+  field.setSelectionRange?.(end, end);
+}
+
 function loginScreen() {
   return `
     <main class="login-shell">
@@ -3607,12 +3645,8 @@ function appShell() {
 
 function sidebar() {
   const nav = ["Dashboard", "Schemes", "Reports"];
-  const salesItems = ["Sales Invoice", "Sales Return", "DMD Return/DMD OP", "DMD Sales WholeSales", "Sales Order", "Additional Order Advance", "Order Advance Refund"];
-  const purchaseItems = ["Purchase Invoice", "Purchase Return", "Diamond Purchase", "Diamond Purchase Return", "Direct Purchase", "Direct Purchase Return", "DMD Stone Purchase"];
   const stockItems = STOCK_ITEMS;
   const workItems = WORK_ORDER_ITEMS;
-  const accountItems = ["Account Ledger", "Cash Receipt", "Cash Payment", "Bank Deposit", "Bank Withdrawal", "Journal Voucher", "PDC Transactions", "Direct Entry", "Expense Entry", "Bill Wise Collection", "Bill Wise Payment", "Discount in Credit Note", "Discount in Debit Note", "Custom Voucher"];
-  const managementItems = ["Customers", "Suppliers", "Smiths", "Refiners", "Employees", "Item Category", "Miscellaneous", "Item Creation", "Account Creation"];
   const isGroupOpen = (name) => expandedNavGroups.has(name);
   return `
     <aside class="sidebar">
@@ -3628,13 +3662,13 @@ function sidebar() {
         <div class="nav-group ${isGroupOpen("Sales") ? "open" : ""}">
           <button class="nav ${active === "Sales" ? "active" : ""}" data-nav="Sales">${icon("Billing")}<span>Sales</span><span class="chevron">⌄</span></button>
           <div class="subnav">
-            ${salesItems.map((item) => `<button class="subnav-item ${active === "Sales" && salesView === item ? "active" : ""}" data-sales-section="${item}">${item}</button>`).join("")}
+            ${SALES_ITEMS.map((item) => `<button class="subnav-item ${active === "Sales" && salesView === item ? "active" : ""}" data-sales-section="${item}">${item}</button>`).join("")}
           </div>
         </div>
         <div class="nav-group ${isGroupOpen("Purchase") ? "open" : ""}">
           <button class="nav ${active === "Purchase" ? "active" : ""}" data-nav="Purchase">${icon("Transactions")}<span>Purchase</span><span class="chevron">⌄</span></button>
           <div class="subnav">
-            ${purchaseItems.map((item) => `<button class="subnav-item ${active === "Purchase" && purchaseView === item ? "active" : ""}" data-purchase-section="${item}">${item}</button>`).join("")}
+            ${PURCHASE_ITEMS.map((item) => `<button class="subnav-item ${active === "Purchase" && purchaseView === item ? "active" : ""}" data-purchase-section="${item}">${item}</button>`).join("")}
           </div>
         </div>
         <div class="nav-group ${isGroupOpen("Stock") ? "open" : ""}">
@@ -3652,13 +3686,13 @@ function sidebar() {
         <div class="nav-group ${isGroupOpen("Accounts") ? "open" : ""}">
           <button class="nav ${active === "Accounts" ? "active" : ""}" data-nav="Accounts">${icon("Accounts")}<span>Accounts</span><span class="chevron">v</span></button>
           <div class="subnav">
-            ${accountItems.map((item) => `<button class="subnav-item ${active === "Accounts" && accountView === item ? "active" : ""}" data-account-section="${item}">${item}</button>`).join("")}
+            ${ACCOUNT_ITEMS.map((item) => `<button class="subnav-item ${active === "Accounts" && accountView === item ? "active" : ""}" data-account-section="${item}">${item}</button>`).join("")}
           </div>
         </div>
         <div class="nav-group ${isGroupOpen("Management") ? "open" : ""}">
           <button class="nav ${active === "Management" ? "active" : ""}" data-nav="Management">${icon("Management")}<span>Management</span><span class="chevron">⌄</span></button>
           <div class="subnav">
-            ${managementItems.map((item) => `<button class="subnav-item ${active === "Management" && managementView === item ? "active" : ""}" data-management="${item}">${item}</button>`).join("")}
+            ${MANAGEMENT_ITEMS.map((item) => `<button class="subnav-item ${active === "Management" && managementView === item ? "active" : ""}" data-management="${item}">${item}</button>`).join("")}
           </div>
         </div>
         ${nav.slice(1).map((item) => `<button class="nav ${active === item ? "active" : ""}" data-nav="${item}">${icon(item)}<span>${item}</span></button>`).join("")}
@@ -3677,17 +3711,19 @@ function topbar() {
     .filter((item) => item.type === "Gold")
     .map((item) => `${item.grade} ${money(item.price)}/g`)
     .join(" | ");
+  const title = active === "Management" ? managementView : active === "Sales" ? salesView : active === "Purchase" ? purchaseView : active === "Stock" ? stockView : active === "Work Orders" ? (workOrderView === "Complimentary Item" ? complimentaryView : workOrderView) : active === "Accounts" ? accountView : active === "Reports" ? selectedReport || "Reports" : active;
 
   return `
     <header class="topbar">
       <div>
         <p class="eyebrow">Local-first shop system</p>
-        <h1>${active === "Management" ? managementView : active === "Sales" ? salesView : active === "Purchase" ? purchaseView : active === "Stock" ? stockView : active === "Work Orders" ? (workOrderView === "Complimentary Item" ? complimentaryView : workOrderView) : active === "Accounts" ? accountView : active}</h1>
+        <h1>${title}</h1>
       </div>
       <label class="command">
-        <span>Search</span>
-        <input id="search" placeholder="customer, bill, HUID, ledger..." />
+        <span>Find</span>
+        <input id="search" data-global-menu-search placeholder="menu, report, bill, HUID..." value="${escapeHtml(globalMenuSearch)}" autocomplete="off" />
         <kbd>Ctrl K</kbd>
+        ${globalSearchResults()}
       </label>
       <div class="topbar-rate-area">
         <div class="rate-strip">${rateText}</div>
@@ -3751,17 +3787,15 @@ function dashboard() {
 }
 
 function sales() {
-  const salesItems = ["Sales Invoice", "Sales Return", "DMD Return/DMD OP", "DMD Sales WholeSales", "Sales Order", "Additional Order Advance", "Order Advance Refund"];
   return `
-    ${moduleSwitcher("Sales", salesItems, salesView, "data-sales-section")}
+    ${moduleSwitcher("Sales", SALES_ITEMS, salesView, "data-sales-section")}
     ${salesView === "Sales Return" ? salesReturn() : salesView === "DMD Return/DMD OP" ? dmdReturn() : salesView === "DMD Sales WholeSales" ? dmdWholesale() : salesView === "Sales Order" ? salesOrder() : salesView === "Additional Order Advance" ? additionalOrderAdvance() : salesView === "Order Advance Refund" ? orderAdvanceRefund() : billing()}
   `;
 }
 
 function purchase() {
-  const purchaseItems = ["Purchase Invoice", "Purchase Return", "Diamond Purchase", "Diamond Purchase Return", "Direct Purchase", "Direct Purchase Return", "DMD Stone Purchase"];
   return `
-    ${moduleSwitcher("Purchase", purchaseItems, purchaseView, "data-purchase-section")}
+    ${moduleSwitcher("Purchase", PURCHASE_ITEMS, purchaseView, "data-purchase-section")}
     ${purchaseView === "Purchase Return" ? purchaseReturn() : purchaseView === "Purchase Invoice" ? purchaseEntry() : purchaseView === "Diamond Purchase" ? diamondPurchase() : purchaseView === "Diamond Purchase Return" ? diamondPurchaseReturn() : purchaseView === "Direct Purchase" ? directPurchase() : purchaseView === "Direct Purchase Return" ? directPurchaseReturn() : purchaseView === "DMD Stone Purchase" ? dmdStonePurchase() : purchaseAddon(purchaseView)}
   `;
 }
@@ -7901,7 +7935,6 @@ function schemes() {
 }
 
 function accounts() {
-  const accountItems = ["Account Ledger", "Cash Receipt", "Cash Payment", "Bank Deposit", "Bank Withdrawal", "Journal Voucher", "PDC Transactions", "Direct Entry", "Expense Entry", "Bill Wise Collection", "Bill Wise Payment", "Discount in Credit Note", "Discount in Debit Note", "Custom Voucher"];
   const accountBody = accountView === "Account Ledger" ? `
     <section class="panel">
       <div class="panel-head">
@@ -7915,7 +7948,7 @@ function accounts() {
     </section>
   ` : accountActionPage(accountView);
   return `
-    ${moduleSwitcher("Accounts", accountItems, accountView, "data-account-section")}
+    ${moduleSwitcher("Accounts", ACCOUNT_ITEMS, accountView, "data-account-section")}
     ${accountBody}
   `;
 }
@@ -10269,16 +10302,108 @@ function customVoucherRegisterPanel() {
 }
 
 function reports() {
+  const matches = filteredMenuItems(reportSearch, 200).filter((item) => item.module === "Reports");
+  const pinned = PINNED_REPORTS.map((name) => reportQuickButton(name, "pin")).join("");
+  const recent = recentReportItems.length
+    ? recentReportItems.map((name) => reportQuickButton(name, "recent")).join("")
+    : `<p class="soft-note">Opened reports will appear here during the session.</p>`;
   return `
-    <section class="grid report-grid">
-      ${reportCard("Day Summary", "Sales, purchases, collections, payments and cash balance")}
-      ${reportCard("Stock Ledger", "Opening, additions, deductions, closing and reconciliation")}
-      ${reportCard("GST Invoice Export", "Accountant-ready Excel/PDF output")}
-      ${reportCard("Rate History", "All intraday approved rate updates", "open-rate")}
-      ${reportCard("Scheme Member Ledger", "Member collections, refunds and balances")}
-      ${reportCard("Audit Trail", "Every sensitive action by time")}
+    <section class="panel report-center-hero">
+      <div>
+        <p class="eyebrow">Reports</p>
+        <h2>Searchable report center</h2>
+        <p>Old report names are preserved, but grouped so the full menu does not crowd the main sidebar.</p>
+      </div>
+      <label class="report-search">
+        <span>Find report</span>
+        <input data-report-search value="${escapeHtml(reportSearch)}" placeholder="sales profit, barcode, day end..." autocomplete="off" />
+      </label>
     </section>
-    <section class="panel"><div class="panel-head"><h2>Audit Trail</h2></div>${table(["Time", "User", "Action"], state.audit.map((a) => [a.time, a.user, a.action]))}</section>
+    <section class="report-quick-grid">
+      <article class="panel report-quick-panel">
+        <div class="panel-head"><h2>Pinned</h2></div>
+        <div class="report-pill-row">${pinned}</div>
+      </article>
+      <article class="panel report-quick-panel">
+        <div class="panel-head"><h2>Recent</h2></div>
+        <div class="report-pill-row">${recent}</div>
+      </article>
+    </section>
+    ${reportSearch.trim() ? `
+      <section class="panel report-search-results-panel">
+        <div class="panel-head"><h2>Search Results</h2></div>
+        <div class="report-result-list">
+          ${matches.length ? matches.map((item) => reportResultButton(item)).join("") : `<p class="soft-note">No matching reports found.</p>`}
+        </div>
+      </section>
+    ` : ""}
+    <section class="report-module-grid">
+      ${REPORT_MENU_GROUPS.map(reportGroupCard).join("")}
+    </section>
+    <section class="panel report-preview-panel">
+      <div class="panel-head">
+        <h2>${escapeHtml(selectedReport)}</h2>
+        <div class="panel-actions">
+          <button class="secondary" data-action="export-report">Export</button>
+          <button class="primary" data-action="print-now">Print</button>
+        </div>
+      </div>
+      ${reportPreview(selectedReport)}
+    </section>
+  `;
+}
+
+function reportQuickButton(name, kind) {
+  const label = kind === "pin" ? "Pinned" : "Recent";
+  return `<button class="report-pill ${selectedReport === name ? "active" : ""}" data-report-item="${escapeHtml(name)}"><span>${escapeHtml(name)}</span><small>${label}</small></button>`;
+}
+
+function reportResultButton(item) {
+  return `
+    <button class="report-result" data-report-item="${escapeHtml(item.label)}">
+      <span>${escapeHtml(item.label)}</span>
+      <small>${escapeHtml(item.group)}</small>
+    </button>
+  `;
+}
+
+function reportGroupCard(group) {
+  return `
+    <details class="report-group" ${group.items.includes(selectedReport) ? "open" : ""}>
+      <summary>
+        <span>${escapeHtml(group.title)}</span>
+        <small>${group.items.length} reports</small>
+      </summary>
+      <div class="report-group-items">
+        ${group.items.map((item) => `
+          <button class="report-row ${selectedReport === item ? "active" : ""}" data-report-item="${escapeHtml(item)}">
+            <span>${escapeHtml(item)}</span>
+            <small>Open</small>
+          </button>
+        `).join("")}
+      </div>
+    </details>
+  `;
+}
+
+function reportPreview(name) {
+  if (name === "Audit Trail") {
+    return table(["Time", "User", "Action"], state.audit.map((a) => [a.time, a.user, a.action]));
+  }
+  if (name === "Rate History") {
+    return rateTimeline();
+  }
+  const group = REPORT_MENU_GROUPS.find((item) => item.items.includes(name))?.title || "Reports";
+  return `
+    <div class="report-placeholder">
+      <strong>${escapeHtml(name)}</strong>
+      <p>${escapeHtml(group)} report screen placeholder. Final columns, filters, Excel/PDF output and print format will be completed during production report implementation.</p>
+      <div class="report-placeholder-grid">
+        ${readout("Menu Group", group)}
+        ${readout("Status", "Planned")}
+        ${readout("Output", "View / Print / Export")}
+      </div>
+    </div>
   `;
 }
 
@@ -10338,10 +10463,11 @@ function classicBillHeader(bill) {
         <label class="classic-checkbox"><input type="checkbox" ${bill.prepareEinvoice ? "checked" : ""} /> <span>Prepare eINVOICE</span></label>
       </div>
       <div class="classic-fields right">
-        ${classicField("Cust ID", bill.customerId || "")}
-        ${classicField("Customer Name", bill.customer || "")}
-        ${classicField("Address", bill.address || "")}
-        ${classicField("Phone", bill.phone || "")}
+        ${customerLookupField("Cust ID", "customerId", bill.customerId || "")}
+        ${customerLookupField("Customer Name", "customer", bill.customer || "")}
+        ${customerLookupField("Address", "address", bill.address || "")}
+        ${customerLookupField("Phone", "phone", bill.phone || "")}
+        ${customerQuickAddButton()}
       </div>
     </div>
   `;
@@ -10361,10 +10487,11 @@ function salesOrderHeader(order) {
         ${classicField("Introducer", order.introducer || "")}
       </div>
       <div class="classic-fields right">
-        <label class="classic-field party-check-field"><span>Cust ID</span><span class="field-pair party-pair"><input type="checkbox" ${order.customerId ? "checked" : ""} /><input value="${order.customerId || ""}" /></span></label>
-        ${classicField("Customer Name", order.customer || "")}
-        ${classicField("Address", order.address || "")}
-        ${classicField("Phone", order.phone || "")}
+        <label class="classic-field party-check-field"><span>Cust ID</span><span class="field-pair party-pair"><input type="checkbox" ${order.customerId ? "checked" : ""} /><input data-customer-field="customerId" data-customer-lookup value="${order.customerId || ""}" list="customer-lookup-options" /></span></label>
+        ${customerLookupField("Customer Name", "customer", order.customer || "")}
+        ${customerLookupField("Address", "address", order.address || "")}
+        ${customerLookupField("Phone", "phone", order.phone || "")}
+        ${customerQuickAddButton()}
       </div>
     </div>
     <input type="hidden" class="order-due-date-value" value="${dueDateValue}" />
@@ -10376,6 +10503,28 @@ function classicField(label, value, type = "text") {
     return `<label class="classic-field"><span>${label}</span><select><option ${value === "B2C" ? "selected" : ""}>B2C</option><option ${value === "B2B" ? "selected" : ""}>B2B</option></select></label>`;
   }
   return `<label class="classic-field"><span>${label}</span><input value="${value ?? ""}" /></label>`;
+}
+
+function customerLookupField(label, field, value = "") {
+  const lookup = ["customerId", "customer", "phone"].includes(field) ? " data-customer-lookup list=\"customer-lookup-options\"" : "";
+  return `<label class="classic-field"><span>${label}</span><input data-customer-field="${field}"${lookup} value="${value ?? ""}" /></label>`;
+}
+
+function customerQuickAddButton() {
+  return `<button type="button" class="text-button customer-quick-add" data-action="quick-add-customer">New Customer</button>${customerLookupDatalist()}`;
+}
+
+function customerLookupDatalist() {
+  const options = customerLookupOptions().map((value) => `<option value="${pdcAttr(value)}"></option>`).join("");
+  return `<datalist id="customer-lookup-options">${options}</datalist>`;
+}
+
+function customerLookupOptions() {
+  const values = [];
+  (state.parties || []).filter((party) => party.type === "Customer").forEach((party) => {
+    [party.customerCode, party.id, party.name, party.phone, party.mobile].filter(Boolean).forEach((value) => values.push(String(value)));
+  });
+  return [...new Set(values)];
 }
 
 function classicSelectField(label, field, value, options) {
@@ -10397,10 +10546,11 @@ function purchaseInvoiceHeader(bill) {
         <label class="classic-field"><span>Prepared By</span>${staffDropdownCell("staffName", bill?.staffName || bill?.preparedBy || "")}</label>
       </div>
       <div class="classic-fields right">
-        <label class="classic-field party-check-field"><span>Party</span><span class="field-pair party-pair"><input type="checkbox" ${bill?.partyChecked ? "checked" : ""} /><input value="${bill?.customerId || ""}" /></span></label>
-        ${classicField("Name", bill?.customer || bill?.partyName || "")}
-        ${classicField("Address", bill?.address || "")}
-        ${classicField("Phone", bill?.phone || "")}
+        <label class="classic-field party-check-field"><span>Party</span><span class="field-pair party-pair"><input type="checkbox" ${bill?.partyChecked ? "checked" : ""} /><input data-customer-field="customerId" data-customer-lookup value="${bill?.customerId || ""}" list="customer-lookup-options" /></span></label>
+        ${customerLookupField("Name", "customer", bill?.customer || bill?.partyName || "")}
+        ${customerLookupField("Address", "address", bill?.address || "")}
+        ${customerLookupField("Phone", "phone", bill?.phone || "")}
+        ${customerQuickAddButton()}
       </div>
     </div>
   `;
@@ -10445,9 +10595,10 @@ function directPurchaseHeader(bill, options = {}) {
       </div>
       <div class="classic-fields right">
         <label class="classic-field party-check-field"><span>Party</span><span class="field-pair party-pair"><input type="checkbox" ${bill.partyChecked ? "checked" : ""} /><input value="${bill.partyId || ""}" /></span></label>
-        ${classicField("Name", bill.partyName || "")}
-        ${classicField("Address", bill.address || "")}
-        ${classicField("Phone", bill.phone || "")}
+        ${customerLookupField("Name", "customer", bill.partyName || "")}
+        ${customerLookupField("Address", "address", bill.address || "")}
+        ${customerLookupField("Phone", "phone", bill.phone || "")}
+        ${customerQuickAddButton()}
       </div>
     </div>
   `;
@@ -10723,10 +10874,11 @@ function dmdReturnHeader(bill) {
         </div>
       </div>
       <div class="classic-fields right">
-        ${classicField("Cust ID", bill.customerId)}
-        ${classicField("Customer Name", bill.customer)}
+        ${customerLookupField("Cust ID", "customerId", bill.customerId)}
+        ${customerLookupField("Customer Name", "customer", bill.customer)}
         ${classicField("GSTIN", bill.gstin)}
         ${classicField("Pan Card No", bill.panCardNo)}
+        ${customerQuickAddButton()}
       </div>
     </div>
   `;
@@ -10743,11 +10895,13 @@ function dmdWholesaleHeader(bill) {
       <div class="classic-fields middle">
         ${classicField("Invoice Date", bill.invoiceDate)}
         <label class="checkbox-line"><input type="checkbox" ${bill.addToStock ? "checked" : ""} /> Add to Stock</label>
+        <label class="classic-field"><span>Return Type</span><select data-dmd-return-field="returnType">${DMD_RETURN_TYPES.map((type) => `<option ${type === (bill.returnType || "Sales Return") ? "selected" : ""}>${type}</option>`).join("")}</select></label>
       </div>
       <div class="classic-fields right">
-        ${classicField("Customer", bill.customer)}
-        ${classicField("Party Name", bill.partyName)}
+        ${customerLookupField("Customer", "customer", bill.customer)}
+        ${customerLookupField("Party Name", "customer", bill.partyName)}
         <label class="classic-field"><span>Prepared By</span>${staffDropdownCell("preparedBy", bill.preparedBy)}</label>
+        ${customerQuickAddButton()}
       </div>
     </div>
   `;
@@ -11949,6 +12103,108 @@ function reportCard(title, body, action = "export-report") {
   return `<article class="report-card"><strong>${title}</strong><span>${body}</span><button class="text-button" data-action="${action}">Open</button></article>`;
 }
 
+function escapeHtml(value = "") {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function menuSearchItems() {
+  const items = [
+    { label: "Dashboard", module: "Dashboard", group: "Main Menu", target: "nav:Dashboard" },
+    { label: "Schemes", module: "Schemes", group: "Main Menu", target: "nav:Schemes" },
+    { label: "Reports", module: "Reports", group: "Main Menu", target: "nav:Reports" },
+    ...SALES_ITEMS.map((label) => ({ label, module: "Sales", group: "Sales", target: `sales:${label}` })),
+    ...PURCHASE_ITEMS.map((label) => ({ label, module: "Purchase", group: "Purchase", target: `purchase:${label}` })),
+    ...STOCK_ITEMS.map((label) => ({ label, module: "Stock", group: "Stock", target: `stock:${label}` })),
+    ...WORK_ORDER_ITEMS.map((label) => ({ label, module: "Work Orders", group: "Work Orders", target: `work:${label}` })),
+    ...ACCOUNT_ITEMS.map((label) => ({ label, module: "Accounts", group: "Accounts", target: `account:${label}` })),
+    ...MANAGEMENT_ITEMS.map((label) => ({ label, module: "Management", group: "Management", target: `management:${label}` }))
+  ];
+  REPORT_MENU_GROUPS.forEach((group) => {
+    group.items.forEach((label) => {
+      items.push({ label, module: "Reports", group: group.title, target: `report:${label}` });
+    });
+  });
+  return items;
+}
+
+function filteredMenuItems(query, limit = 8) {
+  const clean = String(query || "").trim().toLowerCase();
+  if (!clean) return [];
+  return menuSearchItems()
+    .filter((item) => `${item.label} ${item.module} ${item.group}`.toLowerCase().includes(clean))
+    .slice(0, limit);
+}
+
+function globalSearchResults() {
+  const matches = filteredMenuItems(globalMenuSearch, 6);
+  if (globalMenuSearch.trim().length < 2 || !matches.length) return "";
+  return `
+    <div class="command-results">
+      ${matches.map((item, index) => `
+        <button type="button" class="command-result" data-menu-target="${escapeHtml(item.target)}">
+          <span>${escapeHtml(item.label)}</span>
+          <small>${escapeHtml(item.module)} / ${escapeHtml(item.group)}</small>
+        </button>
+      `).join("")}
+    </div>
+  `;
+}
+
+function openMenuTarget(target) {
+  const [kind, ...rest] = String(target || "").split(":");
+  const value = rest.join(":");
+  if (!kind || !value) return;
+  globalMenuSearch = "";
+  if (kind === "nav") {
+    active = value;
+  }
+  if (kind === "sales") {
+    active = "Sales";
+    expandedNavGroups.add("Sales");
+    salesView = value;
+  }
+  if (kind === "purchase") {
+    active = "Purchase";
+    expandedNavGroups.add("Purchase");
+    purchaseView = value;
+  }
+  if (kind === "stock") {
+    active = "Stock";
+    expandedNavGroups.add("Stock");
+    stockView = value;
+  }
+  if (kind === "work") {
+    active = "Work Orders";
+    expandedNavGroups.add("Work Orders");
+    workOrderView = value;
+  }
+  if (kind === "account") {
+    active = "Accounts";
+    expandedNavGroups.add("Accounts");
+    accountView = value;
+  }
+  if (kind === "management") {
+    active = "Management";
+    expandedNavGroups.add("Management");
+    managementView = value;
+  }
+  if (kind === "report") {
+    selectReport(value);
+  }
+  render();
+}
+
+function selectReport(name) {
+  active = "Reports";
+  selectedReport = name || "Day Summary";
+  recentReportItems = [selectedReport, ...recentReportItems.filter((item) => item !== selectedReport)].slice(0, 5);
+}
+
 function field(label, value) {
   return `<label><span>${label}</span><input value="${value}" /></label>`;
 }
@@ -12025,6 +12281,35 @@ function bindEvents() {
     state.audit.unshift(audit("Unlocked Goldland system"));
     saveState();
     render();
+  });
+
+  document.querySelector("[data-global-menu-search]")?.addEventListener("input", (event) => {
+    globalMenuSearch = event.currentTarget.value;
+    renderAndFocus("[data-global-menu-search]");
+  });
+
+  document.querySelector("[data-global-menu-search]")?.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    const first = filteredMenuItems(globalMenuSearch, 1)[0];
+    if (!first) return;
+    event.preventDefault();
+    openMenuTarget(first.target);
+  });
+
+  document.querySelectorAll("[data-menu-target]").forEach((button) => {
+    button.addEventListener("click", () => openMenuTarget(button.dataset.menuTarget));
+  });
+
+  document.querySelector("[data-report-search]")?.addEventListener("input", (event) => {
+    reportSearch = event.currentTarget.value;
+    renderAndFocus("[data-report-search]");
+  });
+
+  document.querySelectorAll("[data-report-item]").forEach((button) => {
+    button.addEventListener("click", () => {
+      selectReport(button.dataset.reportItem);
+      render();
+    });
   });
 
   document.querySelectorAll("[data-nav]").forEach((button) => {
@@ -12183,6 +12468,8 @@ function bindEvents() {
   setupEntryGridCalculations();
   setupSavedLineEditing();
   setupBillEnterNavigation();
+  setupBillCustomerLookup();
+  setupDmdReturnScreens();
   setupOrderAdvanceScreens();
   setupSmithWorkScreens();
   setupOpeningStockScreen();
@@ -14123,6 +14410,98 @@ function setupOrderAdvanceScreens() {
   });
 }
 
+function setupDmdReturnScreens() {
+  document.querySelectorAll("[data-dmd-return-field]").forEach((field) => {
+    field.addEventListener("change", () => {
+      state.dmdReturns ||= [normalizeDmdReturnBill()];
+      const bill = normalizeDmdReturnBill({ ...state.dmdReturns[0], [field.dataset.dmdReturnField]: field.value });
+      state.dmdReturns[0] = bill;
+      render();
+    });
+  });
+}
+
+function setupBillCustomerLookup() {
+  document.querySelectorAll("[data-customer-field]").forEach((field) => {
+    field.addEventListener("input", () => updateCurrentCustomerField(field));
+    field.addEventListener("change", () => {
+      updateCurrentCustomerField(field);
+      const match = findCustomerLookupMatch(field.value);
+      if (match) {
+        applyCustomerToCurrentBill(match, field.closest(".classic-billing-shell, .transaction-entry-header"));
+        render();
+      }
+    });
+    field.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter") return;
+      const match = findCustomerLookupMatch(field.value);
+      if (!match) return;
+      event.preventDefault();
+      applyCustomerToCurrentBill(match, field.closest(".classic-billing-shell, .transaction-entry-header"));
+      render();
+    });
+  });
+}
+
+function updateCurrentCustomerField(field) {
+  const bill = currentCustomerBill(field.closest(".classic-billing-shell, .transaction-entry-header"));
+  if (!bill) return;
+  const key = field.dataset.customerField;
+  const value = field.value;
+  if (key === "customer") {
+    bill.customer = value;
+    bill.partyName = value;
+  } else if (key === "customerId") {
+    bill.customerId = value;
+    bill.customerCode = value;
+    bill.partyId = value;
+  } else {
+    bill[key] = value;
+  }
+}
+
+function findCustomerLookupMatch(value = "") {
+  const key = String(value || "").trim().toLowerCase();
+  if (!key) return null;
+  return (state.parties || []).find((party) => {
+    if (party.type !== "Customer") return false;
+    return [party.customerCode, party.id, party.name, party.phone, party.mobile].some((candidate) => String(candidate || "").trim().toLowerCase() === key);
+  }) || null;
+}
+
+function currentCustomerBill(scope) {
+  if (scope?.closest?.(".sales-order-shell") || scope?.classList?.contains("sales-order-header")) return salesOrderBill();
+  if (scope?.closest?.(".direct-purchase-return-shell")) return state.directPurchaseReturns?.[0];
+  if (scope?.closest?.(".direct-purchase-shell")) return state.directPurchases?.[0];
+  if (scope?.closest?.(".dmd-return-shell")) return state.dmdReturns?.[0];
+  if (scope?.closest?.(".dmd-wholesale-shell")) return state.dmdWholesales?.[0];
+  if (scope?.closest?.(".purchase-entry-shell")) return purchaseBill();
+  return state.bills?.[0] || null;
+}
+
+function applyCustomerToCurrentBill(customer, scope) {
+  const bill = currentCustomerBill(scope);
+  if (!bill) return;
+  const code = customer.customerCode || customer.customerId || customer.id || "";
+  bill.customerId = code;
+  bill.customerCode = code;
+  bill.partyId = code;
+  bill.customer = customer.name || "";
+  bill.partyName = customer.name || "";
+  bill.address = customer.address || "";
+  bill.phone = customer.phone || customer.mobile || "";
+  bill.customerMobile = customer.mobile || customer.phone || "";
+  bill.customerEmail = customer.email || "";
+  bill.customerPlace = customer.place || "";
+  bill.customerCity = customer.city || "";
+  bill.customerState = customer.state || bill.customerState || "KERALA";
+  bill.customerCountry = customer.country || bill.customerCountry || "INDIA";
+  bill.customerPanGst = customer.panGst || customer.gstin || "";
+  bill.customerPinCode = customer.pinCode || "";
+  state.audit.unshift(audit(`Loaded customer ${customer.name || code}`));
+  saveState();
+}
+
 function updateOrderAdvanceDraft(draft, field, value) {
   const numericFields = ["goldRateGram", "goldRateEightGram", "advanceAmount", "refundAmount"];
   draft[field] = numericFields.includes(field) ? parseEntryNumber(value) : value;
@@ -14606,6 +14985,7 @@ function readDmdWholesaleEntryLine(row) {
   const readNumber = (field) => parseEntryNumber(row.querySelector(`[data-line-field="${field}"]`)?.value);
   const readText = (field) => row.querySelector(`[data-line-field="${field}"]`)?.value || "";
   const returnMode = Boolean(row.closest(".dmd-return-ornament"));
+  const returnType = row.closest(".dmd-return-shell")?.querySelector("[data-dmd-return-field='returnType']")?.value || state.dmdReturns?.[0]?.returnType || "Sales Return";
   return normalizeDmdWholesaleLine({
     itemId: readText("itemId"),
     itemDescription: readText("itemDescription"),
@@ -14621,8 +15001,9 @@ function readDmdWholesaleEntryLine(row) {
     dmdWgt: readNumber("dmdWgt"),
     stnSPrice: readNumber("stnSPrice"),
     purMc: readNumber("purMc"),
-    salesMc: readNumber("salesMc")
-  }, { returnMode });
+    salesMc: readNumber("salesMc"),
+    returnType
+  }, { returnMode, returnType });
 }
 
 function updateDmdWholesalePreview(row, line) {
@@ -16498,6 +16879,7 @@ function handleAction(action, source) {
     return;
   }
   if (action === "open-party" || action === "open-customer") openPartyModal("Customer");
+  if (action === "quick-add-customer") return openQuickCustomerModal(source);
   if (action === "open-supplier") openPartyModal("Supplier");
   if (action === "open-smith") openPartyModal("Smith");
   if (action === "open-refiner") openPartyModal("Refiner");
@@ -17746,6 +18128,30 @@ function upsertCustomerFromBill(bill) {
   state.parties.unshift(normalizeParty(customer));
 }
 
+function openQuickCustomerModal(source) {
+  const scope = source?.closest?.(".classic-billing-shell, .transaction-entry-header");
+  const bill = currentCustomerBill(scope) || {};
+  openModal(
+    "Add Customer",
+    "Create the customer record and fill it back into the current bill.",
+    `<section class="form-section wide">
+       <h3>Customer Details</h3>
+       <div class="form-section-grid compact">
+         ${input("customerCode", "Cust ID", bill.customerId || nextCustomerId())}
+         ${input("name", "Customer Name", bill.customer || bill.partyName || "", "text", "required")}
+         ${input("phone", "Phone", bill.phone || bill.customerMobile || "", "tel", "required")}
+         ${input("address", "Address", bill.address || "")}
+         ${input("place", "Place", bill.customerPlace || "")}
+         ${input("city", "City", bill.customerCity || "")}
+         ${select("state", "State", ["KERALA", "TAMIL NADU", "KARNATAKA", "OTHER"], bill.customerState || "KERALA")}
+         ${input("panGst", "PAN/GST", bill.customerPanGst || "")}
+       </div>
+     </section>`,
+    "Save Customer",
+    "quickCustomer"
+  );
+}
+
 function openStockModal() {
   openModal(
     "Add New Item",
@@ -18402,6 +18808,38 @@ const formHandlers = {
     }
     managementSelection.itemMaster = item.itemId;
     saveAndClose(existingIndex >= 0 ? "Item master updated." : "Item master saved.");
+  },
+  quickCustomer(event) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const customer = normalizeParty({
+      id: form.get("customerCode") || nextCustomerId(),
+      customerCode: form.get("customerCode") || nextCustomerId(),
+      type: "Customer",
+      name: form.get("name"),
+      phone: form.get("phone"),
+      mobile: form.get("phone"),
+      address: form.get("address"),
+      place: form.get("place"),
+      city: form.get("city"),
+      state: form.get("state") || "KERALA",
+      country: "INDIA",
+      panGst: form.get("panGst"),
+      status: "Active"
+    });
+    const existingIndex = state.parties.findIndex((party) => party.type === "Customer" && (
+      party.customerCode === customer.customerCode ||
+      party.id === customer.id ||
+      (customer.phone && (party.phone === customer.phone || party.mobile === customer.phone)) ||
+      party.name === customer.name
+    ));
+    if (existingIndex >= 0) state.parties[existingIndex] = normalizeParty({ ...state.parties[existingIndex], ...customer });
+    else state.parties.unshift(customer);
+    applyCustomerToCurrentBill(customer, document.querySelector(".classic-billing-shell, .transaction-entry-header"));
+    closeModal();
+    saveState();
+    render();
+    toast(existingIndex >= 0 ? "Customer updated and loaded." : "Customer added and loaded.");
   },
   party(event) {
     event.preventDefault();

@@ -290,6 +290,7 @@ h2 {
 }
 
 .command {
+  position: relative;
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
@@ -298,6 +299,46 @@ h2 {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 8px;
+}
+
+.command-results {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+
+.command-result {
+  display: grid;
+  gap: 2px;
+  min-height: 40px;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--ink);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.command-result:hover {
+  background: #f4f6f2;
+}
+
+.command-result span {
+  font-weight: 800;
+}
+
+.command-result small {
+  color: var(--muted);
 }
 
 .command input,
@@ -918,6 +959,190 @@ tbody tr:hover td {
 
 .report-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.report-center-hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px;
+  padding: 18px;
+}
+
+.report-center-hero p:last-child {
+  margin-top: 6px;
+  color: var(--muted);
+}
+
+.report-search {
+  display: grid;
+  gap: 6px;
+  min-width: min(360px, 100%);
+}
+
+.report-search span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.report-search input {
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 12px;
+  background: #fff;
+}
+
+.report-quick-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.report-quick-panel {
+  padding: 14px;
+}
+
+.report-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.report-pill {
+  display: grid;
+  gap: 2px;
+  min-height: 42px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: #fbfcfa;
+  text-align: left;
+  cursor: pointer;
+}
+
+.report-pill:hover,
+.report-pill.active {
+  border-color: #ead8a8;
+  background: #fff8e2;
+}
+
+.report-pill span,
+.report-result span,
+.report-row span {
+  font-weight: 800;
+}
+
+.report-pill small,
+.report-result small,
+.report-row small {
+  color: var(--muted);
+}
+
+.report-search-results-panel,
+.report-preview-panel {
+  padding: 14px;
+}
+
+.report-result-list {
+  display: grid;
+  gap: 6px;
+}
+
+.report-result,
+.report-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: #fbfcfa;
+  text-align: left;
+  cursor: pointer;
+}
+
+.report-result:hover,
+.report-row:hover,
+.report-row.active {
+  border-color: #ead8a8;
+  background: #fff8e2;
+}
+
+.report-module-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.report-group {
+  border: 1px solid rgba(223, 229, 223, 0.9);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.report-group summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 46px;
+  padding: 0 14px;
+  cursor: pointer;
+  font-weight: 900;
+  list-style: none;
+}
+
+.report-group summary::-webkit-details-marker {
+  display: none;
+}
+
+.report-group summary::after {
+  content: "+";
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.report-group[open] summary::after {
+  content: "-";
+}
+
+.report-group summary small {
+  margin-left: auto;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.report-group-items {
+  display: grid;
+  gap: 6px;
+  padding: 0 12px 12px;
+}
+
+.report-placeholder {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfa;
+}
+
+.report-placeholder p {
+  color: var(--muted);
+}
+
+.report-placeholder-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .party-grid {
@@ -3090,34 +3315,45 @@ tbody tr:hover td {
 
 .dmd-return-header,
 .dmd-wholesale-header {
-  grid-template-columns: minmax(430px, 0.9fr) minmax(360px, 0.65fr) minmax(430px, 0.9fr);
-  gap: 18px 28px;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.68fr) minmax(0, 1fr);
+  gap: 12px 16px;
   align-items: start;
-  padding: 12px 16px;
+  padding: 10px 12px;
+  max-width: 100%;
 }
 
 .dmd-return-header .classic-fields,
 .dmd-wholesale-header .classic-fields {
   grid-template-columns: 1fr;
   gap: 8px;
+  min-width: 0;
 }
 
 .dmd-return-header .classic-field,
 .dmd-wholesale-header .classic-field {
-  grid-template-columns: 132px minmax(0, 1fr);
+  grid-template-columns: minmax(96px, 120px) minmax(0, 1fr);
+  min-width: 0;
 }
 
 .dmd-return-header .radio-row {
   display: flex;
   flex-wrap: wrap;
   gap: 10px 16px;
-  padding-left: 132px;
+  padding-left: 120px;
 }
 
 .dmd-wholesale-header .checkbox-line {
   justify-self: start;
   min-height: 28px;
-  white-space: nowrap;
+  white-space: normal;
+}
+
+.dmd-return-header input,
+.dmd-return-header select,
+.dmd-wholesale-header input,
+.dmd-wholesale-header select {
+  min-width: 0;
+  width: 100%;
 }
 
 .dmd-return-entry .classic-entry-grid th,
@@ -5524,7 +5760,8 @@ tbody tr:hover td {
   .overview,
   .workflow-grid,
   .report-grid,
-  .transaction-grid {
+  .transaction-grid,
+  .report-module-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -5533,8 +5770,14 @@ tbody tr:hover td {
   .bill-header-groups,
   .billing-focus-grid,
   .classic-bill-header,
-  .classic-billing-shell .billing-bottom {
+  .classic-billing-shell .billing-bottom,
+  .report-quick-grid,
+  .report-placeholder-grid {
     grid-template-columns: 1fr;
+  }
+
+  .report-center-hero {
+    flex-direction: column;
   }
 
   .classic-total-strip {
@@ -5598,6 +5841,9 @@ tbody tr:hover td {
   .overview,
   .workflow-grid,
   .report-grid,
+  .report-module-grid,
+  .report-quick-grid,
+  .report-placeholder-grid,
   .transaction-grid,
   .party-grid,
   .bill-header-grid,
@@ -5932,55 +6178,76 @@ tbody tr:hover td {
 
 .dmd-return-header,
 .dmd-wholesale-header {
-  grid-template-columns: minmax(430px, 0.9fr) minmax(360px, 0.65fr) minmax(430px, 0.9fr);
-  gap: 18px 28px;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.68fr) minmax(0, 1fr);
+  gap: 12px 16px;
   align-items: start;
-  padding: 12px 16px;
+  padding: 10px 12px;
+  max-width: 100%;
 }
 
 .dmd-return-header .classic-fields,
 .dmd-wholesale-header .classic-fields {
   grid-template-columns: 1fr;
   gap: 8px;
+  min-width: 0;
 }
 
 .dmd-return-header .classic-field,
 .dmd-wholesale-header .classic-field {
-  grid-template-columns: 132px minmax(0, 1fr);
+  grid-template-columns: minmax(96px, 120px) minmax(0, 1fr);
+  min-width: 0;
 }
 
 .dmd-return-header .radio-row {
   display: flex;
   flex-wrap: wrap;
   gap: 10px 16px;
-  padding-left: 132px;
+  padding-left: 120px;
 }
 
 .dmd-wholesale-header .checkbox-line {
   justify-self: start;
   min-height: 28px;
-  white-space: nowrap;
+  white-space: normal;
+}
+
+.dmd-return-header input,
+.dmd-return-header select,
+.dmd-wholesale-header input,
+.dmd-wholesale-header select {
+  min-width: 0;
+  width: 100%;
 }
 
 .dmd-stone-purchase-header {
-  grid-template-columns: minmax(720px, 1.05fr) minmax(520px, 0.95fr);
+  grid-template-columns: minmax(0, 1.05fr) minmax(300px, 0.95fr);
   align-items: start;
-  gap: 18px 32px;
-  padding: 12px 16px;
+  gap: 12px 16px;
+  padding: 10px 12px;
+  max-width: 100%;
 }
 
 .dmd-stone-purchase-header .left {
-  grid-template-columns: repeat(2, minmax(260px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 7px 16px;
+  min-width: 0;
 }
 
 .dmd-stone-purchase-header .right {
   grid-template-columns: 1fr;
   gap: 7px;
+  min-width: 0;
 }
 
 .dmd-stone-purchase-header .classic-field {
-  grid-template-columns: 150px minmax(0, 1fr);
+  grid-template-columns: minmax(110px, 136px) minmax(0, 1fr);
+  min-width: 0;
+}
+
+.dmd-stone-purchase-header input,
+.dmd-stone-purchase-header select {
+  min-width: 0;
+  width: 100%;
 }
 
 .sales-order-header {
@@ -6241,6 +6508,13 @@ tbody tr:hover td {
     grid-template-columns: repeat(2, minmax(220px, 1fr));
   }
 
+  .dmd-return-header,
+  .dmd-wholesale-header,
+  .dmd-stone-purchase-header {
+    gap: 10px;
+    padding: 10px;
+  }
+
   .diamond-purchase-header .smith-transfer-row,
   .diamond-purchase-return-header .smith-transfer-row {
     padding-left: 0;
@@ -6330,5 +6604,15 @@ tbody tr:hover td {
   .opening-stock-footer {
     grid-template-columns: 1fr;
     gap: 8px;
+  }
+
+  .dmd-return-header .radio-row {
+    padding-left: 0;
+  }
+
+  .dmd-return-header .classic-field,
+  .dmd-wholesale-header .classic-field,
+  .dmd-stone-purchase-header .classic-field {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
