@@ -2696,6 +2696,383 @@ tbody tr:hover td {
   border-top: 1px solid #b6b6b6;
 }
 
+.sales-report {
+  position: relative;
+  background: #fff;
+}
+
+.sales-report-toolbar {
+  position: relative;
+  min-height: 46px;
+  gap: 7px;
+}
+
+.sales-report-toolbar .classic-tool {
+  width: 45px;
+  min-width: 45px;
+}
+
+.sales-green-input {
+  width: 98px;
+  height: 22px;
+  margin-left: auto;
+  border: 1px solid #0c9a36;
+  background: #00c837;
+}
+
+.sales-report-select {
+  width: 200px;
+  min-height: 25px;
+  border: 1px solid #0075d6;
+  background: #ffe7e7;
+  color: #000;
+  font: 13px Arial, sans-serif;
+}
+
+.sales-report-title {
+  min-height: 82px;
+  gap: 8px;
+}
+
+.sales-report-title h4 {
+  margin: 0;
+  color: #000;
+  font: 16px Arial, sans-serif;
+  font-weight: 400;
+}
+
+.sales-report-title span {
+  color: #000;
+  font: 14px Arial, sans-serif;
+}
+
+.sales-date-popup {
+  position: absolute;
+  top: 38px;
+  right: 36px;
+  z-index: 40;
+  width: 232px;
+  display: grid;
+  gap: 5px;
+  padding: 9px 9px 8px;
+  border: 1px solid #9a1972;
+  background: linear-gradient(#f7d6f3, #cc24a3);
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.25);
+  color: #000;
+  font: 14px Arial, sans-serif;
+}
+
+.sales-date-popup label {
+  display: grid;
+  grid-template-columns: 42px 1fr 26px;
+  align-items: center;
+  gap: 5px;
+}
+
+.sales-date-popup input {
+  min-width: 0;
+  height: 23px;
+  border: 1px solid #9a9a9a;
+  background: #fff4ff;
+  color: #000;
+  font: 14px Arial, sans-serif;
+}
+
+.sales-date-popup button {
+  min-height: 23px;
+  border: 1px solid #9a9a9a;
+  background: #f5f5f5;
+  color: #268f3b;
+  font-weight: 700;
+}
+
+.sales-date-set {
+  width: 124px;
+  justify-self: center;
+  background: #9ff7e9 !important;
+  color: #000 !important;
+}
+
+.sales-report-empty {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  place-content: center;
+  border-top: 1px solid #000;
+  background: #fff;
+  color: #555;
+  font: 15px Arial, sans-serif;
+}
+
+.sales-report-grid-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow: auto;
+}
+
+.sales-report-grid {
+  min-width: 1320px;
+}
+
+.sales-item-wise-grid {
+  min-width: 3400px;
+}
+
+.sales-report-grid th:first-child,
+.sales-report-grid td:first-child {
+  width: 34px;
+}
+
+.sales-report-grid th:nth-child(2),
+.sales-report-grid td:nth-child(2) {
+  width: 105px;
+}
+
+.sales-report-grid th:nth-child(3),
+.sales-report-grid td:nth-child(3),
+.sales-report-grid th:nth-child(4),
+.sales-report-grid td:nth-child(4) {
+  width: 120px;
+}
+
+.sales-report-grid th:nth-child(5),
+.sales-report-grid td:nth-child(5) {
+  width: 210px;
+}
+
+.sales-report-grid th:nth-child(n+6),
+.sales-report-grid td:nth-child(n+6) {
+  width: 105px;
+}
+
+.sales-summary-grid,
+.sales-weight-grid {
+  min-width: 980px;
+}
+
+.sales-day-summary-grid {
+  min-width: 1520px;
+}
+
+.sales-month-summary-grid {
+  min-width: 1520px;
+}
+
+.sales-day-summary-grid th:first-child,
+.sales-day-summary-grid td:first-child,
+.sales-month-summary-grid th:first-child,
+.sales-month-summary-grid td:first-child {
+  width: 38px;
+}
+
+.sales-day-summary-grid th:nth-child(2),
+.sales-day-summary-grid td:nth-child(2),
+.sales-month-summary-grid th:nth-child(2),
+.sales-month-summary-grid td:nth-child(2) {
+  width: 105px;
+}
+
+.sales-day-summary-grid th:nth-child(n+3),
+.sales-day-summary-grid td:nth-child(n+3),
+.sales-month-summary-grid th:nth-child(n+3),
+.sales-month-summary-grid td:nth-child(n+3) {
+  width: 100px;
+}
+
+.sales-item-day-summary-grid {
+  min-width: 1040px;
+}
+
+.sales-item-summary-grid {
+  min-width: 1040px;
+}
+
+.sales-item-day-summary-grid th:first-child,
+.sales-item-day-summary-grid td:first-child,
+.sales-item-summary-grid th:first-child,
+.sales-item-summary-grid td:first-child {
+  width: 38px;
+}
+
+.sales-item-day-summary-grid th:nth-child(2),
+.sales-item-day-summary-grid td:nth-child(2),
+.sales-item-summary-grid th:nth-child(2),
+.sales-item-summary-grid td:nth-child(2) {
+  width: 100px;
+}
+
+.sales-item-day-summary-grid th:nth-child(n+3),
+.sales-item-day-summary-grid td:nth-child(n+3),
+.sales-item-summary-grid th:nth-child(n+3),
+.sales-item-summary-grid td:nth-child(n+3) {
+  width: 100px;
+}
+
+.sales-report-grid tbody tr.date-header-row td {
+  background: #087ad1;
+  color: #fff;
+  font-style: italic;
+}
+
+.sales-report-grid tbody tr.day-total-row td {
+  font-weight: 800;
+  background: #f5fff7;
+}
+
+.sales-report-grid tbody tr.grand-total-row td {
+  font-weight: 800;
+  background: #ff744e;
+}
+
+.sales-weight-net-grid {
+  min-width: 1100px;
+}
+
+.sales-weight-net-grid th:first-child,
+.sales-weight-net-grid td:first-child {
+  width: 38px;
+}
+
+.sales-weight-net-grid th:nth-child(2),
+.sales-weight-net-grid td:nth-child(2),
+.sales-weight-net-grid th:nth-child(3),
+.sales-weight-net-grid td:nth-child(3),
+.sales-weight-net-grid th:nth-child(4),
+.sales-weight-net-grid td:nth-child(4),
+.sales-weight-net-grid th:nth-child(6),
+.sales-weight-net-grid td:nth-child(6),
+.sales-weight-net-grid th:nth-child(7),
+.sales-weight-net-grid td:nth-child(7),
+.sales-weight-net-grid th:nth-child(8),
+.sales-weight-net-grid td:nth-child(8),
+.sales-weight-net-grid th:nth-child(9),
+.sales-weight-net-grid td:nth-child(9),
+.sales-weight-net-grid th:nth-child(10),
+.sales-weight-net-grid td:nth-child(10),
+.sales-weight-net-grid th:nth-child(11),
+.sales-weight-net-grid td:nth-child(11) {
+  width: 100px;
+}
+
+.sales-weight-net-grid th:nth-child(5),
+.sales-weight-net-grid td:nth-child(5) {
+  width: 150px;
+}
+
+.sales-item-wise-grid th:first-child,
+.sales-item-wise-grid td:first-child {
+  width: 38px;
+}
+
+.sales-item-wise-grid th:nth-child(2),
+.sales-item-wise-grid td:nth-child(2),
+.sales-item-wise-grid th:nth-child(3),
+.sales-item-wise-grid td:nth-child(3),
+.sales-item-wise-grid th:nth-child(4),
+.sales-item-wise-grid td:nth-child(4),
+.sales-item-wise-grid th:nth-child(6),
+.sales-item-wise-grid td:nth-child(6),
+.sales-item-wise-grid th:nth-child(7),
+.sales-item-wise-grid td:nth-child(7),
+.sales-item-wise-grid th:nth-child(9),
+.sales-item-wise-grid td:nth-child(9),
+.sales-item-wise-grid th:nth-child(10),
+.sales-item-wise-grid td:nth-child(10),
+.sales-item-wise-grid th:nth-child(11),
+.sales-item-wise-grid td:nth-child(11),
+.sales-item-wise-grid th:nth-child(13),
+.sales-item-wise-grid td:nth-child(13),
+.sales-item-wise-grid th:nth-child(14),
+.sales-item-wise-grid td:nth-child(14),
+.sales-item-wise-grid th:nth-child(15),
+.sales-item-wise-grid td:nth-child(15),
+.sales-item-wise-grid th:nth-child(16),
+.sales-item-wise-grid td:nth-child(16),
+.sales-item-wise-grid th:nth-child(17),
+.sales-item-wise-grid td:nth-child(17),
+.sales-item-wise-grid th:nth-child(18),
+.sales-item-wise-grid td:nth-child(18),
+.sales-item-wise-grid th:nth-child(19),
+.sales-item-wise-grid td:nth-child(19),
+.sales-item-wise-grid th:nth-child(20),
+.sales-item-wise-grid td:nth-child(20),
+.sales-item-wise-grid th:nth-child(21),
+.sales-item-wise-grid td:nth-child(21),
+.sales-item-wise-grid th:nth-child(22),
+.sales-item-wise-grid td:nth-child(22),
+.sales-item-wise-grid th:nth-child(23),
+.sales-item-wise-grid td:nth-child(23),
+.sales-item-wise-grid th:nth-child(24),
+.sales-item-wise-grid td:nth-child(24),
+.sales-item-wise-grid th:nth-child(25),
+.sales-item-wise-grid td:nth-child(25),
+.sales-item-wise-grid th:nth-child(29),
+.sales-item-wise-grid td:nth-child(29),
+.sales-item-wise-grid th:nth-child(30),
+.sales-item-wise-grid td:nth-child(30),
+.sales-item-wise-grid th:nth-child(31),
+.sales-item-wise-grid td:nth-child(31),
+.sales-item-wise-grid th:nth-child(32),
+.sales-item-wise-grid td:nth-child(32),
+.sales-item-wise-grid th:nth-child(33),
+.sales-item-wise-grid td:nth-child(33) {
+  width: 100px;
+}
+
+.sales-item-wise-grid th:nth-child(5),
+.sales-item-wise-grid td:nth-child(5),
+.sales-item-wise-grid th:nth-child(8),
+.sales-item-wise-grid td:nth-child(8),
+.sales-item-wise-grid th:nth-child(12),
+.sales-item-wise-grid td:nth-child(12),
+.sales-item-wise-grid th:nth-child(26),
+.sales-item-wise-grid td:nth-child(26),
+.sales-item-wise-grid th:nth-child(27),
+.sales-item-wise-grid td:nth-child(27),
+.sales-item-wise-grid th:nth-child(28),
+.sales-item-wise-grid td:nth-child(28) {
+  width: 150px;
+}
+
+.sales-bill-wise-grid,
+.sales-pending-grid {
+  min-width: 1180px;
+}
+
+.sales-bill-wise-grid {
+  min-width: 3650px;
+}
+
+.sales-bill-wise-grid th:first-child,
+.sales-bill-wise-grid td:first-child {
+  width: 38px;
+}
+
+.sales-bill-wise-grid th:nth-child(2),
+.sales-bill-wise-grid td:nth-child(2),
+.sales-bill-wise-grid th:nth-child(3),
+.sales-bill-wise-grid td:nth-child(3),
+.sales-bill-wise-grid th:nth-child(4),
+.sales-bill-wise-grid td:nth-child(4),
+.sales-bill-wise-grid th:nth-child(5),
+.sales-bill-wise-grid td:nth-child(5),
+.sales-bill-wise-grid th:nth-child(6),
+.sales-bill-wise-grid td:nth-child(6),
+.sales-bill-wise-grid th:nth-child(n+8),
+.sales-bill-wise-grid td:nth-child(n+8) {
+  width: 100px;
+}
+
+.sales-bill-wise-grid th:nth-child(7),
+.sales-bill-wise-grid td:nth-child(7),
+.sales-bill-wise-grid th:nth-child(33),
+.sales-bill-wise-grid td:nth-child(33),
+.sales-bill-wise-grid th:nth-child(34),
+.sales-bill-wise-grid td:nth-child(34) {
+  width: 150px;
+}
+
 .party-grid {
   display: grid;
   gap: 20px;

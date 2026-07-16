@@ -8,6 +8,38 @@ const EXPANDABLE_NAVS = new Set(["Sales", "Purchase", "Stock", "Work Orders", "A
 const OPENING_STOCK_VIEW = "Opening Stock Account Entry";
 const STOCK_ITEMS = ["Stock Register", "Barcode Entry", OPENING_STOCK_VIEW, "Stock Adjustments", "Item Transfer", "Gold Deposit", "Gold Withdrawal"];
 const STOCK_CURRENT_REPORTS = ["Item Wise", "Barcode Wise", "Category Wise", "Product Wise", "Diamond Stock", "Type Wise", "Stock Compare", "Other Location Stock"];
+const SALES_REPORT_OPTIONS = [
+  "Item Wise",
+  "Bill Wise",
+  "Bill Wise 0 Discount",
+  "Weight Report",
+  "Weight Report Net",
+  "Day Summary",
+  "Item Wise Day Summary",
+  "Item Wise Summary",
+  "Month Summary",
+  "Category Wise",
+  "Category Summary",
+  "Salesman Wise",
+  "Salesman Summary",
+  "Salesman Weight Summary",
+  "Salesman Category Summary",
+  "Salesman Category Summary - Net",
+  "Agent Wise",
+  "Agent Summary",
+  "Brand Wise",
+  "Brand Summary",
+  "Day Report",
+  "Sold and Pending",
+  "DMD WH Sales Summary",
+  "DMD WH Sales Details",
+  "CASHPOINT Pending",
+  "By Payment Mode",
+  "By Payment Mode With Sales Amount",
+  "Sales By Weight",
+  "Customer Details",
+  "MC Report Summary"
+];
 const STOCK_REPORT_MENU = [
   { title: "Stock", items: ["CurrentStock", "Opening Stock", "Stock Reconciliation", "Reconciliation Crosstab", "Stock Ledger", "Smith/Jeweller Stock"] },
   { title: "CurrentStock", items: STOCK_CURRENT_REPORTS }
@@ -530,7 +562,8 @@ let selectedReport = "";
 let reportSearch = "";
 let globalMenuSearch = "";
 let recentReportItems = [];
-let stockReportOptions = { includeZero: false, groupByType: false, groupByItem: false, noFirmName: false, pageSize: "A4", barcodeType: "", categoryType: "", diamondType: "", typeType: "", summary: false, reconciliationType: "All", reconciliationOption: "", reconciliationIgnoreZero: true, crosstabMode: "Summary", crosstabItem: "All", crosstabPrintSummarized: false, stockLedgerFrom: "13/07/2026", stockLedgerTo: "13/07/2026", stockLedgerItem: "ANKLET", stockLedgerBarcodeWise: false };
+let stockReportOptions = { includeZero: false, groupByType: false, groupByItem: false, noFirmName: false, pageSize: "A4", barcodeType: "", categoryType: "", diamondType: "", typeType: "", summary: false, reportDateOpen: false, reportFrom: "13/07/2026", reportTo: "13/07/2026", reconciliationType: "All", reconciliationOption: "", reconciliationIgnoreZero: true, crosstabMode: "Summary", crosstabItem: "All", crosstabPrintSummarized: false, stockLedgerFrom: "13/07/2026", stockLedgerTo: "13/07/2026", stockLedgerItem: "ANKLET", stockLedgerBarcodeWise: false };
+let salesReportOptions = { option: "Item Wise", shown: false, dateOpen: false, from: "01/01/2025", to: "16/07/2026" };
 let classicColumnMenu = null;
 let classicColumnFilters = {};
 let classicColumnSorts = {};
@@ -10616,6 +10649,9 @@ function reportPreview(name) {
   if (name === "CurrentStock" || STOCK_CURRENT_REPORTS.includes(name)) {
     return currentStockReportScreen(name);
   }
+  if (isSalesReport(name)) {
+    return salesReportScreen(name);
+  }
   if (STOCK_REPORT_MENU[0].items.includes(name)) {
     return stockReportSubmenuScreen(name);
   }
@@ -10631,6 +10667,751 @@ function reportPreview(name) {
       </div>
     </div>
   `;
+}
+
+function isSalesReport(name) {
+  return ["Sales", "Sales Profit", "Sales Return"].includes(name);
+}
+
+function salesReportScreen(name) {
+  return `
+    <div class="classic-report-layout focused-classic-report">
+      ${salesReportSubmenus(name)}
+      <section class="classic-stock-report sales-report">
+        ${salesReportToolbar()}
+        <header class="classic-report-title sales-report-title">
+          <h3>MT GOLD LAND</h3>
+          <h4>M.T.PLAZA,OOTY ROAD EDAKKARA</h4>
+          <h2>${escapeHtml(salesReportOptions.option)}&nbsp; From ${escapeHtml(displaySalesDate(salesReportOptions.from))}&nbsp; To ${escapeHtml(displaySalesDate(salesReportOptions.to))}</h2>
+        </header>
+        ${salesReportOptions.shown ? salesReportBody(name) : salesReportBlankState()}
+      </section>
+    </div>
+  `;
+}
+
+function salesReportSubmenus(activeReport) {
+  return `
+    <div class="report-submenu-stack sales-report-submenus">
+      <div class="report-submenu-row">
+        <strong>Sales Reports</strong>
+        ${["Sales", "Sales Profit", "Sales Return"].map((item) => `
+          <button class="${activeReport === item ? "active" : ""}" data-report-item="${escapeHtml(item)}">${escapeHtml(item)}</button>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function salesReportToolbar() {
+  const tools = [
+    ["SHOW", "sales-report-show"], ["PRINT", "print-now"], ["DIRECT PRINT", "print-now"], ["EXCEL", "export-report"], ["SAVE AS", "export-report"], ["DATE", "sales-report-date"],
+    ["FIRST", "noop"], ["PREV", "noop"], ["NEXT", "noop"], ["LAST", "noop"], ["VIEW/HIDE", "noop"], ["ZOOM IN", "noop"], ["DEFAULT", "noop"], ["ZOOM OUT", "noop"], ["CLOSE", "sales-report-close"]
+  ];
+  return `
+    <div class="classic-report-toolbar sales-report-toolbar">
+      <div class="classic-tool-buttons">
+        ${tools.map(([label, action]) => `<button class="classic-tool" data-action="${action}"><strong>${toolbarGlyph(label)}</strong><span>${escapeHtml(label)}</span></button>`).join("")}
+      </div>
+      <label class="classic-a4"><input type="checkbox" checked />A4</label>
+      <span class="sales-green-input"></span>
+      <select class="sales-report-select" data-sales-report-option>
+        ${SALES_REPORT_OPTIONS.map((item) => `<option value="${escapeHtml(item)}" ${salesReportOptions.option === item ? "selected" : ""}>${escapeHtml(item)}</option>`).join("")}
+      </select>
+      ${salesReportOptions.dateOpen ? salesDatePopup() : ""}
+    </div>
+  `;
+}
+
+function salesDatePopup() {
+  return `
+    <div class="sales-date-popup">
+      <label><span>From</span><input data-sales-date-field="from" value="${escapeHtml(displaySalesDate(salesReportOptions.from))}" /><button data-action="sales-date-prev">◄</button></label>
+      <label><span>To</span><input data-sales-date-field="to" value="${escapeHtml(displaySalesDate(salesReportOptions.to))}" /><button data-action="sales-date-today">▲</button></label>
+      <button class="sales-date-set" data-action="sales-date-set">SET</button>
+    </div>
+  `;
+}
+
+function salesReportBlankState() {
+  return `
+    <div class="sales-report-empty">
+      <p>Select a Sales report option and click <strong>SHOW</strong> to load data.</p>
+    </div>
+  `;
+}
+
+function salesReportBody(name) {
+  const config = salesReportConfig(name, salesReportOptions.option);
+  return salesReportTable(config.columns, config.rows, config.gridClass, config.totals);
+}
+
+function salesReportTable(columns, rows, gridClass = "", totals = null) {
+  return `
+    <div class="classic-report-grid-wrap sales-report-grid-wrap">
+      <table class="classic-report-grid sales-report-grid ${gridClass}">
+        <thead>
+          <tr>
+            <th></th>
+            ${columns.map((column) => `<th>${escapeHtml(column.label)}</th>`).join("")}
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.length ? rows.map((row, index) => `
+            <tr class="${[index === 0 ? "selected" : "", row.rowClass || ""].filter(Boolean).join(" ")}">
+              <td>${index + 1}</td>
+              ${columns.map((column) => `<td class="${column.numeric ? "num" : ""}">${escapeHtml(column.format ? column.format(row[column.key], row) : row[column.key] ?? "")}</td>`).join("")}
+            </tr>
+          `).join("") : `<tr><td colspan="${columns.length + 1}">No data found for the selected report and date range.</td></tr>`}
+        </tbody>
+        ${totals ? `
+          <tfoot>
+            <tr>
+              <td>*${rows.length + 1}</td>
+              ${columns.map((column) => `<td class="${column.numeric ? "num" : ""}">${column.total ? escapeHtml(column.format ? column.format(totals[column.key], totals) : totals[column.key] ?? "") : ""}</td>`).join("")}
+            </tr>
+          </tfoot>
+        ` : ""}
+      </table>
+    </div>
+  `;
+}
+
+function salesReportConfig(reportName, option) {
+  const rows = salesReportSourceRows(reportName);
+  if (option === "Bill Wise" || option === "Bill Wise 0 Discount" || option === "Day Report" || option === "Customer Details") return salesBillWiseConfig(rows, option);
+  if (option.includes("Summary") || option.includes("Payment Mode") || ["Day Summary", "Month Summary", "Category Summary", "Salesman Summary", "Agent Summary", "Brand Summary", "By Payment Mode", "MC Report Summary"].includes(option)) return salesSummaryConfig(rows, option);
+  if (option.includes("Weight")) return salesWeightConfig(rows, option);
+  if (option.includes("DMD WH")) return salesDmdConfig(option);
+  if (option === "Sold and Pending" || option === "CASHPOINT Pending") return salesPendingConfig(option);
+  return salesItemWiseConfig(rows, option);
+}
+
+function salesReportSourceRows(reportName) {
+  const bills = (state.bills || [])
+    .filter((bill) => !String(bill.type || "").toLowerCase().includes("purchase"))
+    .filter((bill) => isDateWithinPeriod(bill.date, salesReportOptions.from, salesReportOptions.to));
+  const sourceBills = reportName === "Sales Return"
+    ? bills.filter((bill) => (bill.sections?.return || []).length)
+    : bills;
+  return sourceBills.flatMap((bill) => {
+    const financials = billFinancials(bill);
+    const salesLines = reportName === "Sales Return" ? (bill.sections?.return || []) : (bill.sections?.sales?.length ? bill.sections.sales : [bill.line].filter(Boolean));
+    return salesLines.map((line, index) => {
+      const clean = normalizeBillLine(line, line.amount || line.itemTotal || 0, bill, reportName === "Sales Return" ? "return" : "sales");
+      return {
+        bill,
+        sl: index + 1,
+        date: bill.date,
+        entryNo: bill.entryNo || bill.id,
+        billNo: bill.billNo || bill.entryNo || "",
+        customerId: bill.customerId || "",
+        customer: bill.customer || bill.partyName || "",
+        staffId: bill.staffId || "",
+        staffName: bill.staffName || "",
+        paymentMode: bill.paymentMode || Object.entries(normalizePaymentBreakup(bill.paymentBreakup)).filter(([, value]) => Number(value) > 0).map(([key]) => key.toUpperCase()).join(", ") || "Cash",
+        branchNo: bill.entryNo || bill.id || "",
+        branchEntryNo: salesBranchEntryNo(bill, index),
+        partyName: bill.customer || bill.partyName || "",
+        itemId: itemIdForSalesItem(clean.itemName),
+        itemType: clean.goldType || clean.itemType || salesItemType(clean.itemName),
+        salesMode: bill.paymentMode || (Number(financials.balance || 0) > 0 ? "Credit" : "Cash"),
+        itemName: clean.itemName || "",
+        description: clean.description || "",
+        barcode: clean.barcode || "",
+        category: bill.itemCategory || itemCategoryForName(clean.itemName),
+        brand: clean.brand || "MT GOLD",
+        agent: bill.customerAgent || "Direct",
+        qty: Number(clean.qty || 0),
+        gross: Number(clean.gross || 0),
+        wastage: Number(clean.wastage || 0),
+        stone: Number(clean.stone || 0),
+        net: Number(clean.net || 0),
+        rate: Number(clean.rate || 0),
+        va: Number(clean.va || 0),
+        mc: Number(clean.makingCharge || clean.totalMc || 0),
+        stoneAmount: Number(clean.stoneCharge || clean.stoneAmount || 0),
+        dmdAmount: Number(clean.dmdAmount || 0),
+        goldAmount: Number(clean.metalValue || clean.amount || clean.itemTotal || 0),
+        taxable: Number(clean.amount || clean.itemTotal || 0) - Number(clean.tax || 0),
+        cess: Number(clean.cessAmount || 0),
+        dmdCarat: Number(clean.dmdWgt || clean.diamondWeight || clean.dmdCarat || 0),
+        itemTotal: Number(clean.itemTotal || clean.amount || 0),
+        model: clean.model || "",
+        size: clean.size || "",
+        actualVaPerc: Number(clean.actualVaPerc ?? clean.va ?? 0),
+        counter: clean.counter || bill.counter || "Main",
+        tax: Number(clean.tax || 0),
+        discount: Number(clean.discount || bill.discount || 0),
+        amount: Number(clean.amount || clean.itemTotal || 0),
+        invoiceTotal: financials.invoiceTotal,
+        cashReceived: financials.cashReceived,
+        balance: financials.balance
+      };
+    });
+  });
+}
+
+function salesBranchEntryNo(bill, index) {
+  const iso = toDateInputValue(bill.date);
+  const compact = iso.replaceAll("-", "");
+  const entry = String(bill.entryNo || bill.billNo || index + 1).replace(/\D/g, "") || String(index + 1);
+  return `${compact}_${entry}`;
+}
+
+function itemIdForSalesItem(name = "") {
+  const direct = ITEM_WISE_CLOSING_STOCK.find((item) => item.name.toLowerCase() === String(name).toLowerCase());
+  if (direct) return direct.itemId;
+  const fuzzy = ITEM_WISE_CLOSING_STOCK.find((item) => String(name).toLowerCase().includes(item.name.toLowerCase()) || item.name.toLowerCase().includes(String(name).toLowerCase()));
+  return fuzzy?.itemId || String(name || "").slice(0, 3).toUpperCase();
+}
+
+function salesItemType(name = "") {
+  const item = ITEM_WISE_CLOSING_STOCK.find((row) => row.name.toLowerCase() === String(name).toLowerCase());
+  if (item?.itemType === "Diamond") return "18ct";
+  if (item?.itemType === "Silver") return "Silver";
+  return "22ct";
+}
+
+function itemCategoryForName(name = "") {
+  const text = String(name).toLowerCase();
+  if (text.includes("diamond")) return "Diamond";
+  if (text.includes("silver")) return "Silver";
+  if (text.includes("old")) return "Old Gold";
+  return "Gold";
+}
+
+function salesItemWiseConfig(rows) {
+  const columns = salesItemWiseColumns();
+  return {
+    gridClass: "sales-item-wise-grid",
+    columns,
+    rows,
+    totals: salesTotalsForColumns(rows, columns)
+  };
+}
+
+function salesItemWiseColumns() {
+  return [
+    { key: "branchNo", label: "brancheno" },
+    { key: "branchEntryNo", label: "BRANCHEN" },
+    { key: "date", label: "Date" },
+    { key: "partyName", label: "PartyName" },
+    { key: "itemName", label: "item_Name" },
+    { key: "itemId", label: "itemID" },
+    { key: "description", label: "Description" },
+    { key: "category", label: "item_Categ" },
+    { key: "itemType", label: "item_Type" },
+    { key: "salesMode", label: "sMode" },
+    { key: "qty", label: "Nos", numeric: true, total: true, format: (value) => numberValue(value, 0) },
+    { key: "gross", label: "Gross", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "wastage", label: "Wastage", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "stone", label: "Stone", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "net", label: "Net", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "rate", label: "Irate", numeric: true, total: true, format: (value) => trimMoney(value) },
+    { key: "goldAmount", label: "Gold_Amou", numeric: true, total: true, format: (value) => trimMoney(value) },
+    { key: "stoneAmount", label: "StoneAmou", numeric: true, total: true, format: (value) => trimMoney(value) },
+    { key: "mc", label: "MakeCharg", numeric: true, total: true, format: (value) => trimMoney(value) },
+    { key: "dmdAmount", label: "DmdAmour", numeric: true, total: true, format: (value) => trimMoney(value) },
+    { key: "taxable", label: "Taxable", numeric: true, total: true, format: (value) => trimMoney(value) },
+    { key: "tax", label: "TaxAmount", numeric: true, total: true, format: (value) => trimMoney(value) },
+    { key: "cess", label: "Cess", numeric: true, total: true, format: (value) => trimMoney(value) },
+    { key: "dmdCarat", label: "Dmd_Carat", numeric: true, total: true, format: (value) => numberValue(value, 2) },
+    { key: "itemTotal", label: "ITotal", numeric: true, total: true, format: (value) => trimMoney(value) },
+    { key: "staffName", label: "SmanName" },
+    { key: "barcode", label: "barcode" },
+    { key: "va", label: "VaPer", numeric: true, total: true, format: (value) => numberValue(value, 2) },
+    { key: "model", label: "Model" },
+    { key: "size", label: "Size" },
+    { key: "actualVaPerc", label: "Actual VaP", numeric: true, total: true, format: (value) => numberValue(value, 2) },
+    { key: "counter", label: "Counter" }
+  ];
+}
+
+function salesTotalsForColumns(rows, columns) {
+  const totals = {};
+  columns.filter((column) => column.total).forEach((column) => {
+    totals[column.key] = rows.reduce((sum, row) => sum + Number(row[column.key] || 0), 0);
+  });
+  return totals;
+}
+
+function salesBillWiseConfig(rows, option) {
+  const billRows = salesBillWiseRows(rows).filter((row) => option !== "Bill Wise 0 Discount" || Number(row.discount || row.flatDiscount || 0) === 0);
+  const columns = salesBillWiseColumns();
+  return {
+    gridClass: "sales-bill-wise-grid",
+    columns,
+    rows: billRows,
+    totals: salesTotalsForColumns(billRows, columns)
+  };
+}
+
+function salesBillWiseRows(rows) {
+  return uniqueSalesBills(rows).map((bill) => {
+    const relatedRows = rows.filter((row) => row.bill === bill);
+    const financials = billFinancials(bill);
+    const totals = bill.totals || {};
+    const adjustments = bill.adjustments || {};
+    const breakup = normalizePaymentBreakup(bill.paymentBreakup);
+    const explicitPayment = breakup.cash + breakup.gpay + breakup.card + breakup.bank + breakup.other;
+    const cashReceived = explicitPayment > 0 ? breakup.cash + breakup.gpay + breakup.other : financials.cashReceived;
+    const bank = breakup.bank + breakup.card;
+    const billAmount = Number(totals.billAmount ?? totals.invoiceTotal ?? financials.invoiceTotal ?? 0);
+    const roundOff = Number(totals.billAmountRoundOff || Math.round(financials.invoiceTotal) - financials.invoiceTotal || 0);
+    return {
+      entryNo: bill.entryNo || bill.id || "",
+      branchEntryNo: salesBranchEntryNo(bill, 0),
+      date: bill.date || "",
+      mode: bill.paymentMode || (financials.balance > 0 ? "Credit" : "Cash"),
+      party: bill.customerId || bill.customerCode || "",
+      partyName: bill.customer || bill.partyName || "",
+      grossWeight: sumField(relatedRows, "gross"),
+      stoneWeight: sumField(relatedRows, "stone"),
+      netWeight: sumField(relatedRows, "net"),
+      salesTotal: financials.salesTotal,
+      dmdAmount: Number(totals.dmdAmount || sumField(relatedRows, "dmdAmount")),
+      taxableAmount: financials.salesTotal - financials.taxTotal,
+      tax: financials.taxTotal,
+      cessAmount: sumField(relatedRows, "cess"),
+      addition: Number(totals.addition || 0),
+      discount: Number(bill.discount || 0),
+      mcCharge: sumField(relatedRows, "mc"),
+      flatDiscount: Number(totals.flatDiscount || bill.discount || 0),
+      rateDiffDiscount: Number(totals.rateDifference || 0),
+      billAmount,
+      returnAmount: financials.returnTotal,
+      exchange: financials.exchangeTotal,
+      orderAdvance: Number(adjustments.salesOrder || 0),
+      ledgerBalance: Number(totals.ledgerBalance || 0),
+      coupon: Number(adjustments.coupon || 0),
+      bank,
+      roundOff,
+      toReceive: financials.invoiceTotal,
+      cashReceived,
+      balance: financials.balance,
+      agent: bill.customerAgent || "",
+      soldBy: bill.staffName || "",
+      address: bill.address || "",
+      phone: bill.phone || bill.customerMobile || "",
+      dueDate: bill.dueDate || bill.date || "",
+      branchId: bill.branchId || "Main"
+    };
+  });
+}
+
+function salesBillWiseColumns() {
+  const moneyColumn = (key, label) => ({ key, label, numeric: true, total: true, format: (value) => trimMoney(value) });
+  return [
+    { key: "entryNo", label: "EntryNo" },
+    { key: "branchEntryNo", label: "BRANCHEN" },
+    { key: "date", label: "Date" },
+    { key: "mode", label: "Mode" },
+    { key: "party", label: "Party" },
+    { key: "partyName", label: "Party Name" },
+    { key: "grossWeight", label: "GrossWght", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "stoneWeight", label: "StnWght", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "netWeight", label: "NetWght", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    moneyColumn("salesTotal", "SalesTotal"),
+    moneyColumn("dmdAmount", "DmdAmour"),
+    moneyColumn("taxableAmount", "TaxableAm"),
+    moneyColumn("tax", "Tax"),
+    moneyColumn("cessAmount", "CessAmt"),
+    moneyColumn("addition", "Addition"),
+    moneyColumn("discount", "Discount"),
+    moneyColumn("mcCharge", "Mc_Charge"),
+    moneyColumn("flatDiscount", "FlatDiscoun"),
+    moneyColumn("rateDiffDiscount", "RateDiff_Di"),
+    moneyColumn("billAmount", "BillAmount"),
+    moneyColumn("returnAmount", "Return"),
+    moneyColumn("exchange", "Exchange"),
+    moneyColumn("orderAdvance", "OrderAdvar"),
+    moneyColumn("ledgerBalance", "ledgerBalan"),
+    moneyColumn("coupon", "Coupen"),
+    moneyColumn("bank", "Bank"),
+    moneyColumn("roundOff", "RoundOff"),
+    moneyColumn("toReceive", "To Receive"),
+    moneyColumn("cashReceived", "CashReceive"),
+    moneyColumn("balance", "Balance"),
+    { key: "agent", label: "Agent" },
+    { key: "soldBy", label: "SoldBy" },
+    { key: "address", label: "Address" },
+    { key: "phone", label: "Phone" },
+    { key: "dueDate", label: "DueDate" },
+    { key: "branchId", label: "BranchID" }
+  ];
+}
+
+function salesSummaryConfig(rows, option) {
+  if (option === "Day Summary") return salesDaySummaryConfig(rows);
+  if (option === "Month Summary") return salesMonthSummaryConfig(rows);
+  if (option === "Item Wise Day Summary") return salesItemWiseDaySummaryConfig(rows);
+  if (option === "Item Wise Summary") return salesItemWiseSummaryConfig(rows);
+  const key = option.includes("Day") ? "date" : option.includes("Month") ? "month" : option.includes("Category") ? "category" : option.includes("Salesman") ? "staffName" : option.includes("Agent") ? "agent" : option.includes("Brand") ? "brand" : option.includes("Payment") ? "paymentMode" : option.includes("MC") ? "itemName" : "itemName";
+  const summaryRows = summarizeSalesRows(rows, key);
+  return {
+    gridClass: "sales-summary-grid",
+    columns: [
+      { key: "label", label: salesSummaryLabel(key) },
+      { key: "bills", label: "Bills", numeric: true, format: (value) => numberValue(value, 0) },
+      { key: "nos", label: "Nos", numeric: true, format: (value) => numberValue(value, 0) },
+      { key: "gross", label: "Gross", numeric: true, format: (value) => numberValue(value, 3) },
+      { key: "net", label: "Net", numeric: true, format: (value) => numberValue(value, 3) },
+      { key: "mc", label: "MC", numeric: true, format: (value) => trimMoney(value) },
+      { key: "discount", label: "Discount", numeric: true, format: (value) => trimMoney(value) },
+      { key: "amount", label: "Amount", numeric: true, format: (value) => trimMoney(value) }
+    ],
+    rows: summaryRows
+  };
+}
+
+function salesSummaryLabel(key) {
+  return ({ date: "Date", month: "Month", category: "Category", staffName: "Salesman", agent: "Agent", brand: "Brand", paymentMode: "PaymentMode", itemName: "Name" })[key] || "Name";
+}
+
+function summarizeSalesRows(rows, key) {
+  const grouped = new Map();
+  rows.forEach((row) => {
+    const label = key === "month" ? formatSalesMonth(row.date) : (row[key] || "Not Set");
+    const item = grouped.get(label) || { label, billIds: new Set(), bills: 0, nos: 0, gross: 0, net: 0, mc: 0, discount: 0, amount: 0 };
+    item.billIds.add(row.bill?.id || row.billNo);
+    item.nos += Number(row.qty || 0);
+    item.gross += Number(row.gross || 0);
+    item.net += Number(row.net || 0);
+    item.mc += Number(row.mc || 0);
+    item.discount += Number(row.discount || 0);
+    item.amount += Number(row.amount || 0);
+    item.bills = item.billIds.size;
+    grouped.set(label, item);
+  });
+  return [...grouped.values()].map(({ billIds, ...row }) => row);
+}
+
+function salesItemWiseDaySummaryConfig(rows) {
+  const columns = salesItemWiseDaySummaryColumns();
+  const reportRows = salesItemWiseDaySummaryRows(rows);
+  return {
+    gridClass: "sales-item-day-summary-grid",
+    columns,
+    rows: reportRows
+  };
+}
+
+function salesItemWiseSummaryConfig(rows) {
+  const columns = salesItemWiseDaySummaryColumns();
+  const reportRows = salesItemWiseSummaryRows(rows);
+  return {
+    gridClass: "sales-item-summary-grid",
+    columns,
+    rows: reportRows
+  };
+}
+
+function salesItemWiseSummaryRows(rows) {
+  const grouped = new Map();
+  rows.forEach((row) => {
+    const item = grouped.get(row.itemName) || emptySalesItemDayTotal(row.itemName);
+    addSalesItemDayValues(item, row);
+    grouped.set(row.itemName, item);
+  });
+  const output = [...grouped.values()];
+  const total = emptySalesItemDayTotal("", "day-total-row");
+  output.forEach((row) => addSalesItemDayValues(total, row));
+  if (output.length) output.push(total);
+  return output;
+}
+
+function salesItemWiseDaySummaryRows(rows) {
+  const byDate = new Map();
+  rows.forEach((row) => {
+    const dateBucket = byDate.get(row.date) || [];
+    dateBucket.push(row);
+    byDate.set(row.date, dateBucket);
+  });
+  const output = [];
+  const grand = emptySalesItemDayTotal("Grand Total", "grand-total-row");
+  [...byDate.entries()].forEach(([date, dateRows]) => {
+    output.push({ itemName: date, rowClass: "date-header-row" });
+    const grouped = new Map();
+    dateRows.forEach((row) => {
+      const item = grouped.get(row.itemName) || emptySalesItemDayTotal(row.itemName);
+      addSalesItemDayValues(item, row);
+      grouped.set(row.itemName, item);
+    });
+    const dayTotal = emptySalesItemDayTotal("Day Total", "day-total-row");
+    [...grouped.values()].forEach((item) => {
+      output.push(item);
+      addSalesItemDayValues(dayTotal, item);
+      addSalesItemDayValues(grand, item);
+    });
+    output.push(dayTotal);
+  });
+  if (output.length) output.push(grand);
+  return output;
+}
+
+function emptySalesItemDayTotal(itemName, rowClass = "") {
+  return { itemName, nos: 0, gross: 0, wastage: 0, stone: 0, stoneCrg: 0, mcVa: 0, tmc: 0, net: 0, total: 0, rowClass };
+}
+
+function addSalesItemDayValues(target, row) {
+  target.nos += Number(row.nos ?? row.qty ?? 0);
+  target.gross += Number(row.gross || 0);
+  target.wastage += Number(row.wastage || 0);
+  target.stone += Number(row.stone || 0);
+  target.stoneCrg += Number(row.stoneCrg ?? row.stoneAmount ?? 0);
+  target.mcVa += Number(row.mcVa ?? row.mc ?? 0);
+  target.tmc += Number(row.tmc ?? (Number(row.mc || 0) + Number(row.stoneAmount || 0)));
+  target.net += Number(row.net || 0);
+  target.total += Number(row.total ?? row.itemTotal ?? row.amount ?? 0);
+}
+
+function salesItemWiseDaySummaryColumns() {
+  return [
+    { key: "itemName", label: "ItemName" },
+    { key: "nos", label: "NoS", numeric: true, format: (value, row) => row.rowClass === "date-header-row" ? "" : numberValue(value, 0) },
+    { key: "gross", label: "Gross", numeric: true, format: (value, row) => row.rowClass === "date-header-row" ? "" : numberValue(value, 3) },
+    { key: "wastage", label: "Wastage", numeric: true, format: (value, row) => row.rowClass === "date-header-row" ? "" : numberValue(value, 3) },
+    { key: "stone", label: "Stone", numeric: true, format: (value, row) => row.rowClass === "date-header-row" ? "" : numberValue(value, 3) },
+    { key: "stoneCrg", label: "Stone_Crg", numeric: true, format: (value, row) => row.rowClass === "date-header-row" ? "" : numberValue(value, 3) },
+    { key: "mcVa", label: "MC/VA", numeric: true, format: (value, row) => row.rowClass === "date-header-row" ? "" : numberValue(value, 3) },
+    { key: "tmc", label: "TMC", numeric: true, format: (value, row) => row.rowClass === "date-header-row" ? "" : numberValue(value, 3) },
+    { key: "net", label: "Net", numeric: true, format: (value, row) => row.rowClass === "date-header-row" ? "" : numberValue(value, 3) },
+    { key: "total", label: "Total", numeric: true, format: (value, row) => row.rowClass === "date-header-row" ? "" : numberValue(value, 3) }
+  ];
+}
+
+function salesWeightConfig(rows, option) {
+  if (option === "Weight Report Net") return salesWeightReportNetConfig(rows);
+  const filtered = option.includes("Net") ? rows.filter((row) => row.net !== 0) : rows;
+  return {
+    gridClass: "sales-weight-grid",
+    columns: [
+      { key: "date", label: "Date" },
+      { key: "itemName", label: "ItemName" },
+      { key: "category", label: "Category" },
+      { key: "qty", label: "Nos", numeric: true, format: (value) => numberValue(value, 0) },
+      { key: "gross", label: "Gross", numeric: true, format: (value) => numberValue(value, 3) },
+      { key: "stone", label: "Stone", numeric: true, format: (value) => numberValue(value, 3) },
+      { key: "net", label: "Net", numeric: true, format: (value) => numberValue(value, 3) },
+      { key: "amount", label: "Amount", numeric: true, format: (value) => trimMoney(value) }
+    ],
+    rows: filtered
+  };
+}
+
+function salesWeightReportNetConfig(rows) {
+  const billRows = salesWeightReportNetRows(rows);
+  const columns = salesWeightReportNetColumns();
+  return {
+    gridClass: "sales-weight-net-grid",
+    columns,
+    rows: billRows,
+    totals: salesTotalsForColumns(billRows, columns)
+  };
+}
+
+function salesWeightReportNetRows(rows) {
+  return uniqueSalesBills(rows).map((bill) => {
+    const relatedRows = rows.filter((row) => row.bill === bill);
+    return {
+      entryNo: bill.entryNo || bill.id || "",
+      branchEntryNo: salesBranchEntryNo(bill, 0),
+      date: bill.date || "",
+      partyName: bill.customer || bill.partyName || "",
+      qty: sumField(relatedRows, "qty"),
+      column1: "Sales",
+      grossWeight: sumField(relatedRows, "gross"),
+      wastage: sumField(relatedRows, "wastage"),
+      stoneWeight: sumField(relatedRows, "stone"),
+      netWeight: sumField(relatedRows, "net")
+    };
+  }).filter((row) => row.netWeight !== 0 || row.grossWeight !== 0 || row.qty !== 0);
+}
+
+function salesWeightReportNetColumns() {
+  return [
+    { key: "entryNo", label: "EntryNo" },
+    { key: "branchEntryNo", label: "BRANCHEN" },
+    { key: "date", label: "Date" },
+    { key: "partyName", label: "Party Name" },
+    { key: "qty", label: "Qty", numeric: true, total: true, format: (value) => numberValue(value, 0) },
+    { key: "column1", label: "Column1" },
+    { key: "grossWeight", label: "Gross_Weig", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "wastage", label: "Wastage", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "stoneWeight", label: "Stone_Weig", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "netWeight", label: "Net_Weight", numeric: true, total: true, format: (value) => numberValue(value, 3) }
+  ];
+}
+
+function salesDaySummaryConfig(rows) {
+  const billRows = salesBillWiseRows(rows);
+  const columns = salesDaySummaryColumns();
+  const summaryRows = salesDaySummaryRows(billRows);
+  return {
+    gridClass: "sales-day-summary-grid",
+    columns,
+    rows: summaryRows,
+    totals: salesTotalsForColumns(summaryRows, columns)
+  };
+}
+
+function salesMonthSummaryConfig(rows) {
+  const billRows = salesBillWiseRows(rows);
+  const columns = salesMonthSummaryColumns();
+  const summaryRows = salesMonthSummaryRows(billRows);
+  return {
+    gridClass: "sales-month-summary-grid",
+    columns,
+    rows: summaryRows,
+    totals: salesTotalsForColumns(summaryRows, columns)
+  };
+}
+
+function salesMonthSummaryRows(billRows) {
+  const monthlyRows = billRows.map((row) => ({ ...row, date: formatSalesMonth(row.date) }));
+  return salesDaySummaryRows(monthlyRows).map((row) => ({ month: row.date, ...row }));
+}
+
+function salesMonthSummaryColumns() {
+  return salesDaySummaryColumns().map((column) => column.key === "date" ? { ...column, key: "month", label: "Month" } : column);
+}
+
+function salesDaySummaryRows(billRows) {
+  const grouped = new Map();
+  billRows.forEach((row) => {
+    const item = grouped.get(row.date) || {
+      date: row.date,
+      invoiceTotal: 0,
+      exchange: 0,
+      returnAmount: 0,
+      orderAmount: 0,
+      couponAmount: 0,
+      bankAmount: 0,
+      gstAmount: 0,
+      additionAmount: 0,
+      discountAmount: 0,
+      schemeDiscount: 0,
+      rateDiffDiscount: 0,
+      billAmount: 0,
+      cashReceived: 0,
+      billBalance: 0
+    };
+    item.invoiceTotal += Number(row.salesTotal || 0);
+    item.exchange += Number(row.exchange || 0);
+    item.returnAmount += Number(row.returnAmount || 0);
+    item.orderAmount += Number(row.orderAdvance || 0);
+    item.couponAmount += Number(row.coupon || 0);
+    item.bankAmount += Number(row.bank || 0);
+    item.gstAmount += Number(row.tax || 0);
+    item.additionAmount += Number(row.addition || 0);
+    item.discountAmount += Number(row.discount || row.flatDiscount || 0);
+    item.schemeDiscount += Number(row.schemeDiscount || 0);
+    item.rateDiffDiscount += Number(row.rateDiffDiscount || 0);
+    item.billAmount += Number(row.billAmount || 0);
+    item.cashReceived += Number(row.cashReceived || 0);
+    item.billBalance += Number(row.balance || 0);
+    grouped.set(row.date, item);
+  });
+  return [...grouped.values()];
+}
+
+function salesDaySummaryColumns() {
+  const amount = (key, label) => ({ key, label, numeric: true, total: true, format: (value) => numberValue(value, 3) });
+  return [
+    { key: "date", label: "Date" },
+    amount("invoiceTotal", "InvoiceTota"),
+    amount("exchange", "Exchange"),
+    amount("returnAmount", "Return_Am"),
+    amount("orderAmount", "Order_Amt"),
+    amount("couponAmount", "Coupen_Am"),
+    amount("bankAmount", "Bank_Amt"),
+    amount("gstAmount", "Gst_Amt"),
+    amount("additionAmount", "Addition_An"),
+    amount("discountAmount", "Discount_A"),
+    amount("schemeDiscount", "SchemeDisc"),
+    amount("rateDiffDiscount", "RateDiffDisc"),
+    amount("billAmount", "Bill_Amt"),
+    amount("cashReceived", "Cash_Rece"),
+    amount("billBalance", "BillBalance")
+  ];
+}
+
+function salesDmdConfig(option) {
+  const rows = (state.dmdWholesales || [])
+    .filter((bill) => isDateWithinPeriod(bill.date || bill.invoiceDate, salesReportOptions.from, salesReportOptions.to))
+    .flatMap((bill) => (bill.lines || []).length ? bill.lines.map((line) => ({ bill, line })) : [{ bill, line: {} }])
+    .map(({ bill, line }) => ({
+      date: bill.date || bill.invoiceDate || "",
+      invoiceNo: bill.invoiceNo || bill.entryNo || "",
+      partyName: bill.partyName || bill.customer || "",
+      itemName: line.itemName || line.itemDescription || "DMD Wholesale",
+      nos: Number(line.nos || line.qty || 0),
+      gross: Number(line.gross || line.grossWeight || 0),
+      net: Number(line.net || line.netWeight || 0),
+      amount: Number(line.amount || line.itemTotal || bill.cashPayment || 0)
+    }));
+  return {
+    gridClass: "sales-dmd-grid",
+    columns: [
+      { key: "date", label: "Date" },
+      { key: "invoiceNo", label: "InvoiceNo" },
+      { key: "partyName", label: "Party" },
+      { key: "itemName", label: option.includes("Details") ? "ItemName" : "Summary" },
+      { key: "nos", label: "Nos", numeric: true, format: (value) => numberValue(value, 0) },
+      { key: "gross", label: "Gross", numeric: true, format: (value) => numberValue(value, 3) },
+      { key: "net", label: "Net", numeric: true, format: (value) => numberValue(value, 3) },
+      { key: "amount", label: "Amount", numeric: true, format: (value) => trimMoney(value) }
+    ],
+    rows
+  };
+}
+
+function salesPendingConfig(option) {
+  const bills = uniqueSalesBills(salesReportSourceRows("Sales"));
+  return {
+    gridClass: "sales-pending-grid",
+    columns: [
+      { key: "date", label: "Date" },
+      { key: "billNo", label: "BillNo" },
+      { key: "customer", label: "Customer" },
+      { key: "invoiceTotal", label: "InvoiceTotal", numeric: true, format: (value) => trimMoney(value) },
+      { key: "cashReceived", label: "Received", numeric: true, format: (value) => trimMoney(value) },
+      { key: "balance", label: "Pending", numeric: true, format: (value) => trimMoney(value) },
+      { key: "status", label: "Status" }
+    ],
+    rows: bills.map((bill) => {
+      const financials = billFinancials(bill);
+      return { ...bill, ...financials, status: financials.balance > 0 ? "Pending" : "Sold" };
+    }).filter((row) => option !== "CASHPOINT Pending" || row.balance > 0)
+  };
+}
+
+function uniqueSalesBills(rows) {
+  return [...new Map(rows.map((row) => [row.bill?.id || row.billNo, row.bill])).values()].filter(Boolean);
+}
+
+function formatSalesMonth(dateValue) {
+  const iso = toDateInputValue(dateValue);
+  const date = new Date(iso);
+  return date.toLocaleString("en-US", { month: "short", year: "numeric" });
+}
+
+function displaySalesDate(value) {
+  const iso = toDateInputValue(value);
+  const [year, month, day] = iso.split("-");
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return `${Number(day).toString().padStart(2, "0")}-${months[Number(month) - 1]}-${year}`;
+}
+
+function normalizeSalesDateInput(value) {
+  const text = String(value || "").trim();
+  const named = text.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
+  if (named) {
+    const months = { jan: "01", feb: "02", mar: "03", apr: "04", may: "05", jun: "06", jul: "07", aug: "08", sep: "09", oct: "10", nov: "11", dec: "12" };
+    return `${named[1].padStart(2, "0")}/${months[named[2].toLowerCase()] || "01"}/${named[3]}`;
+  }
+  return formatDisplayDate(toDateInputValue(text));
 }
 
 function currentStockReportScreen(name) {
@@ -10682,7 +11463,7 @@ function stockReconciliationScreen() {
         ${stockReconciliationToolbar()}
         <header class="classic-report-title reconciliation-title">
           <h3>MT GOLD LAND</h3>
-          <h2>${stockReportOptions.reconciliationOption ? `Stock Reconciliation Report for the Period From 13-07-2026 TO 13-07-2026` : "Reconciliation"}</h2>
+          <h2>${stockReportOptions.reconciliationOption ? `Stock Reconciliation Report for the Period From ${displaySalesDate(stockReportOptions.reportFrom)} TO ${displaySalesDate(stockReportOptions.reportTo)}` : "Reconciliation"}</h2>
         </header>
         ${stockReconciliationBody()}
       </section>
@@ -10722,7 +11503,7 @@ function stockReconciliationToolbar() {
   return `
     <div class="classic-report-toolbar reconciliation-toolbar">
       <div class="classic-tool-buttons">
-        ${tools.map(([label, action]) => `<button class="classic-tool" data-action="${action === "PRINT" ? "print-now" : action === "EXCEL" ? "export-report" : "noop"}"><strong>${toolbarGlyph(label)}</strong><span>${escapeHtml(label)}</span></button>`).join("")}
+        ${tools.map(([label, action]) => `<button class="classic-tool" data-action="${action === "PRINT" ? "print-now" : action === "EXCEL" ? "export-report" : action === "DATE" ? "stock-report-date" : "noop"}"><strong>${toolbarGlyph(label)}</strong><span>${escapeHtml(label)}</span></button>`).join("")}
       </div>
       <label class="reconciliation-type-label">Type</label>
       <select class="reconciliation-type-select" data-stock-report-select="reconciliationType">
@@ -10733,12 +11514,13 @@ function stockReconciliationToolbar() {
         ${options.map((item) => `<option value="${escapeHtml(item)}" ${stockReportOptions.reconciliationOption === item ? "selected" : ""}>${escapeHtml(item || "Select Report")}</option>`).join("")}
       </select>
       <label class="reconciliation-ignore-zero"><input type="checkbox" checked data-stock-report-option="reconciliationIgnoreZero" /> Ignore Zero</label>
+      ${stockReportOptions.reportDateOpen ? stockReportDatePopup() : ""}
     </div>
   `;
 }
 
 function stockReconciliationCrosstabScreen() {
-  const rows = crosstabRows();
+  const rows = stockReportDateIncludesMovement() ? crosstabRows() : [];
   const itemOptions = ["All", ...rows.map((row) => row.itemName)];
   const selectedItem = itemOptions.includes(stockReportOptions.crosstabItem) ? stockReportOptions.crosstabItem : "All";
   const visibleRows = selectedItem === "All" ? rows : rows.filter((row) => row.itemName === selectedItem);
@@ -10750,7 +11532,7 @@ function stockReconciliationCrosstabScreen() {
         <header class="crosstab-title">
           <h3>MT GOLD LAND</h3>
           <div>
-            <strong>13-07-2026 To 13-07-2026</strong>
+            <strong>${escapeHtml(displaySalesDate(stockReportOptions.reportFrom))} To ${escapeHtml(displaySalesDate(stockReportOptions.reportTo))}</strong>
             <h2>STOCK RECONCILIATION</h2>
           </div>
           <label><input type="checkbox" data-stock-report-option="crosstabPrintSummarized" ${stockReportOptions.crosstabPrintSummarized ? "checked" : ""} /> Print Summarized Row</label>
@@ -10788,13 +11570,14 @@ function stockReconciliationCrosstabToolbar(itemOptions, selectedItem) {
         ${["Summary", "Detailed"].map((item) => `<option value="${escapeHtml(item)}" ${stockReportOptions.crosstabMode === item ? "selected" : ""}>${escapeHtml(item)}</option>`).join("")}
       </select>
       <div class="classic-tool-buttons">
-        ${tools.slice(4).map(([label, action]) => `<button class="classic-tool" data-action="${action === "PRINT" ? "print-now" : action === "EXCEL" ? "export-report" : "noop"}"><strong>${toolbarGlyph(label)}</strong><span>${escapeHtml(label)}</span></button>`).join("")}
+        ${tools.slice(4).map(([label, action]) => `<button class="classic-tool" data-action="${action === "PRINT" ? "print-now" : action === "EXCEL" ? "export-report" : action === "DATE" ? "stock-report-date" : "noop"}"><strong>${toolbarGlyph(label)}</strong><span>${escapeHtml(label)}</span></button>`).join("")}
       </div>
       <input class="classic-toolbar-input" aria-label="Crosstab quick filter" />
       <label class="crosstab-item-label">Item</label>
       <select class="crosstab-item-select" data-stock-report-select="crosstabItem">
         ${itemOptions.map((item) => `<option value="${escapeHtml(item)}" ${selectedItem === item ? "selected" : ""}>${escapeHtml(item)}</option>`).join("")}
       </select>
+      ${stockReportOptions.reportDateOpen ? stockReportDatePopup() : ""}
     </div>
   `;
 }
@@ -10831,6 +11614,10 @@ function crosstabRows() {
       }
     };
   });
+}
+
+function stockReportDateIncludesMovement(date = "13/07/2026") {
+  return isDateWithinPeriod(date, stockReportOptions.reportFrom, stockReportOptions.reportTo);
 }
 
 function movementPair(weight, nos) {
@@ -10936,7 +11723,7 @@ function crosstabDetailCells(row, key) {
 }
 
 function exportReconciliationCrosstabCsv() {
-  const allRows = crosstabRows();
+  const allRows = stockReportDateIncludesMovement() ? crosstabRows() : [];
   const rows = stockReportOptions.crosstabItem === "All" ? allRows : allRows.filter((row) => row.itemName === stockReportOptions.crosstabItem);
   const lines = [
     ["MT GOLD LAND"],
@@ -11059,7 +11846,7 @@ function reconciliationRows() {
 }
 
 function filteredReconciliationRows(reportKey, columns) {
-  let rows = reconciliationRows();
+  let rows = stockReportDateIncludesMovement() ? reconciliationRows() : [];
   if (stockReportOptions.reconciliationType && stockReportOptions.reconciliationType !== "All") {
     rows = rows.filter((row) => row.itemType === stockReportOptions.reconciliationType);
   }
@@ -11084,7 +11871,7 @@ function reconciliationNetReport() {
 
 function reconciliationDiamondBarcodeReport() {
   const columns = reconciliationDiamondBarcodeColumns();
-  let rows = reconciliationDiamondBarcodeRows();
+  let rows = stockReportDateIncludesMovement() ? reconciliationDiamondBarcodeRows() : [];
   if (stockReportOptions.reconciliationIgnoreZero) {
     rows = rows.filter((row) => row.nos !== 0 || row.gross !== 0 || row.stone !== 0 || row.net !== 0);
   }
@@ -11095,7 +11882,7 @@ function reconciliationDiamondBarcodeReport() {
 
 function reconciliationDiamondItemReport() {
   const columns = reconciliationDiamondItemColumns();
-  let rows = reconciliationDiamondItemRows();
+  let rows = stockReportDateIncludesMovement() ? reconciliationDiamondItemRows() : [];
   if (stockReportOptions.reconciliationIgnoreZero) {
     rows = rows.filter((row) => row.opNos !== 0 || row.transNos !== 0 || row.clNos !== 0);
   }
@@ -11294,7 +12081,7 @@ function reconciliationDiamondItemColumns() {
 
 function reconciliationStockTypeWiseReport() {
   const columns = reconciliationStockTypeWiseColumns();
-  let rows = reconciliationStockTypeWiseRows();
+  let rows = stockReportDateIncludesMovement() ? reconciliationStockTypeWiseRows() : [];
   if (stockReportOptions.reconciliationIgnoreZero) rows = rows.filter((row) => row.summary || row.opGross !== 0 || row.clGross !== 0 || row.clDmdCar !== 0);
   rows = applyClassicColumnFilters("reconciliationStockTypeWise", rows, columns);
   rows = applyClassicColumnSort("reconciliationStockTypeWise", rows, columns);
@@ -11331,7 +12118,7 @@ function reconciliationStockTypeWiseColumns() {
 
 function reconciliationStockTypeItemWiseReport() {
   const columns = reconciliationStockTypeItemWiseColumns();
-  let rows = reconciliationStockTypeItemWiseRows();
+  let rows = stockReportDateIncludesMovement() ? reconciliationStockTypeItemWiseRows() : [];
   if (stockReportOptions.reconciliationIgnoreZero) rows = rows.filter((row) => row.summary || row.opGross !== 0 || row.clGross !== 0 || row.clDmdCar !== 0);
   rows = applyClassicColumnFilters("reconciliationStockTypeItemWise", rows, columns);
   rows = applyClassicColumnSort("reconciliationStockTypeItemWise", rows, columns);
@@ -11622,7 +12409,7 @@ function classicStockToolbar(activeReport = "") {
   return `
     <div class="classic-report-toolbar">
       <div class="classic-tool-buttons">
-        ${tools.map(([label, icon]) => `<button class="classic-tool" data-action="${label === "PRINT" ? "print-now" : label === "EXCEL" ? "export-report" : "noop"}"><strong>${icon}</strong><span>${label}</span></button>`).join("")}
+        ${tools.map(([label, icon]) => `<button class="classic-tool" data-action="${label === "PRINT" ? "print-now" : label === "EXCEL" ? "export-report" : label === "DATE" ? "stock-report-date" : "noop"}"><strong>${icon}</strong><span>${label}</span></button>`).join("")}
       </div>
       <label class="classic-a4"><input type="checkbox" checked />${escapeHtml(stockReportOptions.pageSize)}</label>
       <input class="classic-toolbar-input" value="" aria-label="Report parameter" />
@@ -11631,6 +12418,17 @@ function classicStockToolbar(activeReport = "") {
       ${["Barcode Wise", "Category Wise", "Diamond Stock", "Type Wise"].includes(activeReport) ? stockReportTypeSelect(activeReport === "Category Wise" ? "categoryType" : activeReport === "Diamond Stock" ? "diamondType" : activeReport === "Type Wise" ? "typeType" : "barcodeType") : stockReportCheckbox("groupByType", "Group By Type")}
       ${stockReportCheckbox("groupByItem", "Group By Item")}
       ${stockReportCheckbox("noFirmName", "No FirmName")}
+      ${stockReportOptions.reportDateOpen ? stockReportDatePopup() : ""}
+    </div>
+  `;
+}
+
+function stockReportDatePopup() {
+  return `
+    <div class="sales-date-popup stock-date-popup">
+      <label><span>From</span><input data-stock-date-field="reportFrom" value="${escapeHtml(displaySalesDate(stockReportOptions.reportFrom))}" /><button data-action="stock-date-prev">◄</button></label>
+      <label><span>To</span><input data-stock-date-field="reportTo" value="${escapeHtml(displaySalesDate(stockReportOptions.reportTo))}" /><button data-action="stock-date-today">▲</button></label>
+      <button class="sales-date-set" data-action="stock-date-set">SET</button>
     </div>
   `;
 }
@@ -11662,6 +12460,7 @@ function classicStockTitle(activeReport) {
     <header class="classic-report-title">
       ${stockReportOptions.noFirmName ? "" : `<h3>MT GOLD LAND</h3>`}
       <h2>${escapeHtml(subtitle)}</h2>
+      <span>As of ${escapeHtml(displaySalesDate(stockReportOptions.reportTo))}</span>
     </header>
   `;
 }
@@ -14302,6 +15101,31 @@ function bindEvents() {
     select.addEventListener("change", () => {
       const option = select.dataset.stockReportSelect;
       stockReportOptions = { ...stockReportOptions, [option]: select.value };
+      render();
+    });
+  });
+
+  document.querySelector("[data-sales-report-option]")?.addEventListener("change", (event) => {
+    salesReportOptions = { ...salesReportOptions, option: event.currentTarget.value, shown: false };
+    render();
+  });
+
+  document.querySelectorAll("[data-sales-date-field]").forEach((field) => {
+    field.addEventListener("input", () => {
+      salesReportOptions = { ...salesReportOptions, [field.dataset.salesDateField]: field.value, shown: false };
+    });
+    field.addEventListener("change", () => {
+      salesReportOptions = { ...salesReportOptions, [field.dataset.salesDateField]: normalizeSalesDateInput(field.value), shown: false };
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-stock-date-field]").forEach((field) => {
+    field.addEventListener("input", () => {
+      stockReportOptions = { ...stockReportOptions, [field.dataset.stockDateField]: field.value };
+    });
+    field.addEventListener("change", () => {
+      stockReportOptions = { ...stockReportOptions, [field.dataset.stockDateField]: normalizeSalesDateInput(field.value) };
       render();
     });
   });
@@ -19531,6 +20355,53 @@ function handleAction(action, source) {
     toast("Report export queued and recorded in audit trail.");
     state.audit.unshift(audit("Exported report"));
     saveState();
+  }
+  if (action === "sales-report-show") {
+    salesReportOptions = { ...salesReportOptions, shown: true, dateOpen: false, from: normalizeSalesDateInput(salesReportOptions.from), to: normalizeSalesDateInput(salesReportOptions.to) };
+    render();
+  }
+  if (action === "sales-report-date") {
+    salesReportOptions = { ...salesReportOptions, dateOpen: !salesReportOptions.dateOpen };
+    render();
+  }
+  if (action === "sales-date-set") {
+    salesReportOptions = { ...salesReportOptions, dateOpen: false, shown: false, from: normalizeSalesDateInput(salesReportOptions.from), to: normalizeSalesDateInput(salesReportOptions.to) };
+    toast("Sales report date range set. Click SHOW to load data.");
+    render();
+  }
+  if (action === "sales-date-today") {
+    const today = "16/07/2026";
+    salesReportOptions = { ...salesReportOptions, from: today, to: today, shown: false };
+    render();
+  }
+  if (action === "sales-date-prev") {
+    salesReportOptions = { ...salesReportOptions, from: "01/01/2025", shown: false };
+    render();
+  }
+  if (action === "sales-report-close") {
+    selectedReport = "";
+    render();
+  }
+  if (action === "stock-report-date") {
+    stockReportOptions = { ...stockReportOptions, reportDateOpen: !stockReportOptions.reportDateOpen };
+    render();
+  }
+  if (action === "stock-date-set") {
+    const reportFrom = normalizeSalesDateInput(stockReportOptions.reportFrom);
+    const reportTo = normalizeSalesDateInput(stockReportOptions.reportTo);
+    stockReportOptions = { ...stockReportOptions, reportDateOpen: false, reportFrom, reportTo, stockLedgerFrom: reportFrom, stockLedgerTo: reportTo };
+    toast("Stock report date range applied.");
+    render();
+  }
+  if (action === "stock-date-today") {
+    stockReportOptions = { ...stockReportOptions, reportFrom: "13/07/2026", reportTo: "13/07/2026", stockLedgerFrom: "13/07/2026", stockLedgerTo: "13/07/2026" };
+    render();
+  }
+  if (action === "stock-date-prev") {
+    const from = financialYearOpeningDate();
+    const reportFrom = formatDisplayDate(from);
+    stockReportOptions = { ...stockReportOptions, reportFrom, stockLedgerFrom: reportFrom };
+    render();
   }
   if (action === "stock-ledger-fin-year") {
     const from = financialYearOpeningDate();
