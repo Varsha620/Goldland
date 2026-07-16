@@ -1,21 +1,31 @@
 # Goldland Jewellery
 
-A local-first jewellery ERP/POS prototype for Goldland. It implements the approved architecture as a working browser app with no external dependencies, so it can run in the shop even without internet.
+Local-first jewellery ERP/POS prototype for Goldland. The app runs in a browser from a small Node server and is built to model the workflows discussed during client demos: billing, sales orders, purchase entries, stock/work orders, accounts, masters, and reports.
 
-## What is included
+## Current Scope
 
-- Premium desktop-style UI with seven clear areas: Dashboard, Billing, Stock, Customers, Schemes, Accounts, Reports.
-- Owner dashboard for sales, purchases, cash, stock, scheme dues, alerts, and rate timeline.
-- Multiple intraday rate updates for gold, silver, diamond, and stones.
-- Invoice rate snapshots so old bills never change after a rate update.
-- Single password access for authorized shop staff.
-- Add-new windows for bills, stock items, parties, scheme collections, account entries, and rate updates.
-- Billing now includes the operational columns visible in the current software screenshots: entry/reference, customer fields, barcode, item, weight, wastage, stone charge, rate, VA, making charge, tax, amount, and balance.
-- Customer bill preview with a browser print flow for giving the buyer a printed copy.
-- Scheme, stock, and ledger tables include the detailed columns from the screenshots, while the final 3-schema split can be added once confirmed.
-- Audit trail for rate updates, exports, stock drafts, scheme collections, and bill creation.
-- Manual stock register with HUID/BIS-ready fields.
-- Financial-year database schema in `src/schema.sql`.
+- Dashboard with sales, purchase, cash, stock, scheme, audit, and rate timeline summaries.
+- Sales billing with Sales, Exchange, Return, DMD Return/DMD OP, DMD Sales Wholesale, Sales Order, Additional Order Advance, and Order Advance Refund screens.
+- Purchase screens for Purchase Invoice, Purchase Return, Diamond Purchase/Return, Direct Purchase/Return, and DMD Stone Purchase.
+- Stock and work-order screens for barcode/opening stock, adjustments, gold deposit/withdrawal, smith, jeweller, refining, melting, sample, polishing, service, and complimentary items.
+- Account screens for cash/bank vouchers, journal/direct/expense entries, PDC, billwise collection/payment, credit/debit note discounts, and custom vouchers.
+- Master-data windows for parties, employees, items, accounts, categories, and miscellaneous dropdown values.
+- Local persistence through browser storage, plus schema reference in `src/schema.sql`.
+
+## Important Business Logic
+
+- Bill row entry supports keyboard-only operation: `Enter` moves to the next field and adds the row from the last editable field.
+- Bill `Edit` opens an existing-record picker so staff can search by customer, phone, bill number, entry number, or party and load the record back into the screen.
+- Saved bill/detail rows can be double-clicked to load the row into the entry line for correction.
+- Making Charge for Sales, Sales Order, and Return rows is calculated as:
+
+```text
+MC = Net WT * VA% * Current Rate
+```
+
+- Sales Order is treated as a quotation/customer deposit flow. It does not affect stock. Additional Order Advance adds money to the customer deposit, and Order Advance Refund subtracts money from available advance.
+- DMD Return/DMD OP treats returned diamond/ornament value as return-side acquisition value. `Total` includes purchase MC, while `Sales Amt` stays zero until the item is sold later.
+- DMD Return/DMD OP stone selling price defaults to zero.
 
 ## Run
 
@@ -23,7 +33,11 @@ A local-first jewellery ERP/POS prototype for Goldland. It implements the approv
 npm.cmd start
 ```
 
-Open `http://localhost:4173`.
+Open:
+
+```text
+http://localhost:4173
+```
 
 Prototype password:
 
@@ -31,21 +45,39 @@ Prototype password:
 goldland2026
 ```
 
-The app can also be opened directly from `index.html` for a quick offline preview.
-
 ## Test
 
 ```powershell
 npm.cmd test
 ```
 
-## Suggested production path
+The test suite includes smoke checks plus runtime checks for billing calculations, DMD return logic, sales-order advance/refund behavior, and demo-data initialization.
 
-This prototype is intentionally dependency-free. For production, keep this product shape and migrate the implementation to:
+## GitHub
+
+Repository remote:
+
+```text
+https://github.com/Varsha620/Goldland.git
+```
+
+Typical update flow:
+
+```powershell
+git status
+git add .
+git commit -m "Describe the change"
+git push
+```
+
+The `.gitignore` excludes local databases, logs, dependency folders, build output, and editor scratch files.
+
+## Production Direction
+
+This is still a local-first prototype. A production build should keep the validated workflows but move toward:
 
 - React + TypeScript frontend
-- Tauri Windows shell
-- Local .NET 8 or NestJS API
-- PostgreSQL local database
-- Encrypted local/cloud backups
-- Optional owner web/mobile dashboard sync
+- Windows desktop shell such as Tauri
+- Local API layer
+- PostgreSQL or another durable local database
+- Backup/sync strategy for owner access and disaster recovery

@@ -71,6 +71,9 @@ assert(app.includes("data-bill-calc"), "Bill modal should show live calculated n
 assert(app.includes("appendEntryLine"), "Enter key should add the completed entry row to bill items");
 assert(app.includes("moveToNextBillField"), "Enter key should move to the next bill field before adding rows");
 assert(app.includes("setupBillEnterNavigation"), "Bill headers and transaction fields should support keyboard-only Enter navigation");
+assert(app.includes("setupBillCustomerLookup"), "Bill headers should support customer lookup by phone/customer ID");
+assert(app.includes("data-customer-lookup"), "Customer lookup fields should expose browser dropdown suggestions");
+assert(app.includes("quickCustomer"), "Missing quick customer creation flow from bill headers");
 assert(app.includes("deleteLineButton"), "Bill rows need a small delete option");
 assert(app.includes("openCardTransactionsModal"), "Card transaction split window is missing");
 assert(app.includes("data-card-transactions"), "Card (F8) should open transactions on double-click");
@@ -123,6 +126,10 @@ for (const dmdFeature of ["dmdReturnFinancials", "dmdWholesaleFinancials", "dmdR
 for (const dmdField of ["Precious Wght", "Diamond Wt/Cent", "Colour Stone Wt", "Pure Wght", "Rate RTGS", "Crt/Cent Rate", "DmdWgt", "Stn S.price", "Pur. MC", "Sales MC"]) {
   assert(app.includes(dmdField), `Missing DMD field ${dmdField}`);
 }
+for (const dmdReturnType of ["Sales Return", "Opening Stock", "Local Purchase"]) {
+  assert(app.includes(dmdReturnType), `Missing DMD Return type ${dmdReturnType}`);
+}
+assert(app.includes("data-dmd-return-field=\"returnType\""), "DMD Return screen should expose return type dropdown");
 assert(app.includes("transactionGroup"), "Structured transaction launcher is missing");
 for (const billField of ["Prepare eINVOICE", "Cust ID", "MudLess", "Touch Less", "RateLess%", "CessPerc", "HUID"]) {
   assert(app.includes(billField), `Missing bill field ${billField}`);

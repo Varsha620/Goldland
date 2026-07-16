@@ -104,12 +104,44 @@ const dmdReturnMcCheck = vm.runInContext(`
     stnSPrice: 500,
     purMc: 50,
     salesMc: 80
-  }, { returnMode: true })
+  }, { returnMode: true, returnType: "Local Purchase" })
 `, context);
 assert.equal(dmdReturnMcCheck.purchaseMaking, 450, "DMD Return purchase MC should be net weight * purchase MC");
 assert.equal(dmdReturnMcCheck.total, 11450, "DMD Return total should include purchase MC");
 assert.equal(dmdReturnMcCheck.amount, 11450, "DMD Return amount should carry the purchase-side total");
 assert.equal(dmdReturnMcCheck.salesAmt, 0, "DMD Return sales amount must stay zero until sold");
+
+const dmdSalesReturnCheck = vm.runInContext(`
+  normalizeDmdWholesaleLine({
+    gross: 10,
+    stone: 1,
+    stonePrice: 100,
+    va: 10,
+    goldRate: 1000,
+    dmdWgt: 2,
+    stnSPrice: 500,
+    purMc: 50,
+    salesMc: 80
+  }, { returnMode: true, returnType: "Sales Return" })
+`, context);
+assert.equal(dmdSalesReturnCheck.total, 11720, "DMD Sales Return total should include sales MC");
+assert.equal(dmdSalesReturnCheck.salesAmt, 0, "DMD Sales Return should not create sales amount until sold again");
+
+const dmdOpeningStockCheck = vm.runInContext(`
+  normalizeDmdWholesaleLine({
+    gross: 10,
+    stone: 1,
+    stonePrice: 100,
+    va: 10,
+    goldRate: 1000,
+    dmdWgt: 2,
+    stnSPrice: 500,
+    purMc: 50,
+    salesMc: 80
+  }, { returnMode: true, returnType: "Opening Stock" })
+`, context);
+assert.equal(dmdOpeningStockCheck.total, 11450, "DMD Opening Stock should use cost-side purchase MC");
+assert.equal(dmdOpeningStockCheck.salesAmt, 0, "DMD Opening Stock should not create sales amount");
 
 const dmdWholesaleMcCheck = vm.runInContext(`
   normalizeDmdWholesaleLine({
@@ -129,6 +161,15 @@ assert.equal(dmdWholesaleMcCheck.salesAmt, 11720, "DMD wholesale sales amount sh
 
 const blankDmdLine = vm.runInContext(`defaultDmdWholesaleLine()`, context);
 assert.equal(blankDmdLine.stnSPrice, 0, "Default DMD stone selling price should be zero");
+
+const customerLookupCheck = vm.runInContext(`
+  const customer = findCustomerLookupMatch("8281900323");
+  applyCustomerToCurrentBill(customer, null);
+  ({ id: state.bills[0].customerId, name: state.bills[0].customer, phone: state.bills[0].phone });
+`, context);
+assert.equal(customerLookupCheck.name, "Rahul U M", "Customer lookup by phone should find existing customer");
+assert.equal(customerLookupCheck.phone, "8281900323", "Customer lookup should fill phone into current bill");
+assert(customerLookupCheck.id, "Customer lookup should fill customer ID into current bill");
 
 const normalizedAdvance = vm.runInContext(`
   normalizeOrderAdvanceRecord({

@@ -4,11 +4,152 @@ const PURCHASE_ITEMS = ["Purchase Invoice", "Purchase Return", "Diamond Purchase
 const WORK_ORDER_ITEMS = ["Smith", "Jeweller", "Refining", "Sample", "Polishing", "Service / Job", "Complimentary Item"];
 const ACCOUNT_ITEMS = ["Account Ledger", "Cash Receipt", "Cash Payment", "Bank Deposit", "Bank Withdrawal", "Journal Voucher", "PDC Transactions", "Direct Entry", "Expense Entry", "Bill Wise Collection", "Bill Wise Payment", "Discount in Credit Note", "Discount in Debit Note", "Custom Voucher"];
 const MANAGEMENT_ITEMS = ["Customers", "Suppliers", "Smiths", "Refiners", "Employees", "Item Category", "Miscellaneous", "Item Creation", "Account Creation"];
-const EXPANDABLE_NAVS = new Set(["Sales", "Purchase", "Stock", "Work Orders", "Accounts", "Management"]);
+const EXPANDABLE_NAVS = new Set(["Sales", "Purchase", "Stock", "Work Orders", "Accounts", "Management", "Reports"]);
 const OPENING_STOCK_VIEW = "Opening Stock Account Entry";
 const STOCK_ITEMS = ["Stock Register", "Barcode Entry", OPENING_STOCK_VIEW, "Stock Adjustments", "Item Transfer", "Gold Deposit", "Gold Withdrawal"];
+const STOCK_CURRENT_REPORTS = ["Item Wise", "Barcode Wise", "Category Wise", "Product Wise", "Diamond Stock", "Type Wise", "Stock Compare", "Other Location Stock"];
+const STOCK_REPORT_MENU = [
+  { title: "Stock", items: ["CurrentStock", "Opening Stock", "Stock Reconciliation", "Reconciliation Crosstab", "Stock Ledger", "Smith/Jeweller Stock"] },
+  { title: "CurrentStock", items: STOCK_CURRENT_REPORTS }
+];
+const REPORT_ROOT_MENU_ITEMS = [
+  { label: "Stock", target: "CurrentStock", hasSubmenu: true },
+  { label: "Sales" },
+  { label: "Sales Profit" },
+  { label: "Sales Return" },
+  { label: "Exchange" },
+  { label: "Purchase" },
+  { label: "Purchase Return" },
+  { label: "Direct Gold Purchase" },
+  { label: "Direct Gold Purchase Return" },
+  { label: "Diamond", hasSubmenu: true },
+  { label: "Stock Adjustment" },
+  { label: "Transfers", hasSubmenu: true },
+  { label: "Sample Issue/Return" },
+  { label: "Sales Order", hasSubmenu: true },
+  { label: "Gold Deposit", hasSubmenu: true },
+  { label: "Today's Dues", hasSubmenu: true },
+  { label: "Barcode Entry" },
+  { label: "Day end Report", hasSubmenu: true },
+  { label: "Tax Reports" },
+  { label: "Service / Job" },
+  { label: "Bills Reports" },
+  { label: "Bills Payables" },
+  { label: "Cash Point" },
+  { label: "Discount Voucher" }
+];
+const ITEM_WISE_CLOSING_STOCK = [
+  { itemType: "Gold", subGroup: "", itemId: "AG", name: "ANKLET", nos: 122, grossWeight: 485.960, stoneWeight: -0.330, netWeight: 486.293 },
+  { itemType: "Gold", subGroup: "", itemId: "BR", name: "BABY RING", nos: 40, grossWeight: 8.674, stoneWeight: 0.000, netWeight: 8.674 },
+  { itemType: "Gold", subGroup: "", itemId: "B", name: "BANGLE", nos: 340, grossWeight: 2308.922, stoneWeight: 0.160, netWeight: 2308.764 },
+  { itemType: "Gold", subGroup: "", itemId: "BB", name: "BANGLE SMALL", nos: 26, grossWeight: 12.680, stoneWeight: -0.240, netWeight: 12.920 },
+  { itemType: "Diamond", subGroup: "", itemId: "BRSL", name: "BIRTH STONE PENTANT", nos: 1, grossWeight: 2.250, stoneWeight: 0.000, netWeight: 2.250 },
+  { itemType: "Diamond", subGroup: "", itemId: "BSR", name: "BIRTH STONE RING", nos: 9, grossWeight: 40.210, stoneWeight: 0.000, netWeight: 40.210 },
+  { itemType: "Gold", subGroup: "", itemId: "BL", name: "BRACELET", nos: 102, grossWeight: 435.201, stoneWeight: -3.062, netWeight: 438.254 },
+  { itemType: "Gold", subGroup: "", itemId: "C", name: "CHAIN", nos: 113, grossWeight: 1572.023, stoneWeight: 0.000, netWeight: 1572.005 },
+  { itemType: "Gold", subGroup: "", itemId: "CM", name: "CHUTY MATTY", nos: 0, grossWeight: 1.570, stoneWeight: 0.000, netWeight: 1.570 },
+  { itemType: "Pure Gold", subGroup: "", itemId: "CN", name: "COIN", nos: -1, grossWeight: 6.954, stoneWeight: 29.588, netWeight: -22.634 },
+  { itemType: "Other", subGroup: "", itemId: "CP", name: "COPPER", nos: 0, grossWeight: 15.350, stoneWeight: 0.000, netWeight: 15.350 },
+  { itemType: "Gold", subGroup: "", itemId: "CT", name: "CUTPIECE", nos: 0, grossWeight: 106.260, stoneWeight: 0.690, netWeight: 105.570 },
+  { itemType: "Diamond", subGroup: "", itemId: "DBR", name: "DIAMOND BRACELET", nos: 20, grossWeight: 61.880, stoneWeight: 0.100, netWeight: 61.780 },
+  { itemType: "Diamond", subGroup: "", itemId: "DC", name: "DIAMOND CHAIN", nos: 6, grossWeight: 19.760, stoneWeight: 0.000, netWeight: 19.760 },
+  { itemType: "Diamond", subGroup: "", itemId: "DDD", name: "DIAMOND DROPS", nos: 217, grossWeight: 114.750, stoneWeight: -0.140, netWeight: 114.890 },
+  { itemType: "Diamond", subGroup: "", itemId: "DL", name: "DIAMOND LOCKET", nos: 33, grossWeight: 33.710, stoneWeight: 0.146, netWeight: 33.564 },
+  { itemType: "Diamond", subGroup: "", itemId: "DN", name: "DIAMOND NECKLACE", nos: 12, grossWeight: 43.340, stoneWeight: 0.790, netWeight: 42.550 },
+  { itemType: "Diamond", subGroup: "", itemId: "DD", name: "DIAMOND RING", nos: 128, grossWeight: 128.420, stoneWeight: 0.678, netWeight: 127.742 },
+  { itemType: "Gold", subGroup: "", itemId: "D", name: "DROPS", nos: 2435, grossWeight: 1817.401, stoneWeight: -9.738, netWeight: 1827.139 },
+  { itemType: "Gold", subGroup: "", itemId: "ST", name: "DROPS STUD", nos: 827, grossWeight: 237.100, stoneWeight: -0.880, netWeight: 237.980 },
+  { itemType: "Gold", subGroup: "", itemId: "L", name: "LOCKET", nos: 355, grossWeight: 500.250, stoneWeight: -0.750, netWeight: 501.000 }
+];
+const BARCODE_WISE_CLOSING_STOCK = [
+  { iid: "BRSL", name: "BIRTH STONE PENTANT", itemCategory: "Diamond", description: "Emerald 916", barcode: "BRSL000001", nos: 1, gross: 2.250, stone: 0.280, net: 1.970, stnChr: 0.00, mc: 1478.00, vaPerc: 0.00, pmc: 0.000, salesPrice: 0.00, smithName: "Old Stock", transDate: "28/07/2023", type: "Diamond", model: "", size: "" },
+  { iid: "BSR", name: "BIRTH STONE RING", itemCategory: "Diamond", description: "PEARL", barcode: "BSR000001", nos: 1, gross: 5.220, stone: 0.570, net: 4.650, stnChr: 0.00, mc: 3487.00, vaPerc: 0.00, pmc: 0.000, salesPrice: 0.00, smithName: "Old Stock", transDate: "28/07/2023", type: "Diamond", model: "", size: "" },
+  { iid: "BSR", name: "BIRTH STONE RING", itemCategory: "Diamond", description: "GOMEDA", barcode: "BSR000002", nos: 1, gross: 5.480, stone: 0.530, net: 4.950, stnChr: 0.00, mc: 3713.00, vaPerc: 0.00, pmc: 0.000, salesPrice: 0.00, smithName: "Old Stock", transDate: "28/07/2023", type: "Diamond", model: "", size: "" },
+  { iid: "BSR", name: "BIRTH STONE RING", itemCategory: "Diamond", description: "JADE 916", barcode: "BSR000003", nos: 1, gross: 2.620, stone: 0.120, net: 2.500, stnChr: 0.00, mc: 1875.00, vaPerc: 0.00, pmc: 0.000, salesPrice: 0.00, smithName: "Old Stock", transDate: "28/07/2023", type: "Diamond", model: "", size: "" },
+  { iid: "BSR", name: "BIRTH STONE RING", itemCategory: "Diamond", description: "GARNET", barcode: "BSR000004", nos: 1, gross: 4.950, stone: 0.320, net: 4.630, stnChr: 0.00, mc: 3473.00, vaPerc: 0.00, pmc: 0.000, salesPrice: 0.00, smithName: "Old Stock", transDate: "28/07/2023", type: "Diamond", model: "", size: "" },
+  { iid: "BSR", name: "BIRTH STONE RING", itemCategory: "Diamond", description: "SYNTHETIC", barcode: "BSR000005", nos: 1, gross: 5.210, stone: 0.360, net: 4.850, stnChr: 0.00, mc: 3638.00, vaPerc: 0.00, pmc: 0.000, salesPrice: 0.00, smithName: "Old Stock", transDate: "28/07/2023", type: "Diamond", model: "", size: "" },
+  { iid: "BSR", name: "BIRTH STONE RING", itemCategory: "Diamond", description: "EMERALD", barcode: "BSR000006", nos: 1, gross: 5.930, stone: 0.500, net: 5.430, stnChr: 0.00, mc: 4073.00, vaPerc: 0.00, pmc: 0.000, salesPrice: 0.00, smithName: "Old Stock", transDate: "28/07/2023", type: "Diamond", model: "", size: "" },
+  { iid: "BSR", name: "BIRTH STONE RING", itemCategory: "Diamond", description: "YELLOW SAPPHIRE", barcode: "BSR000007", nos: 1, gross: 2.570, stone: 0.440, net: 2.130, stnChr: 0.00, mc: 1598.00, vaPerc: 0.00, pmc: 0.000, salesPrice: 0.00, smithName: "Old Stock", transDate: "28/07/2023", type: "Diamond", model: "", size: "" },
+  { iid: "BSR", name: "BIRTH STONE RING", itemCategory: "Diamond", description: "ONYX 916", barcode: "BSR000008", nos: 1, gross: 2.920, stone: 0.300, net: 2.620, stnChr: 0.00, mc: 1965.00, vaPerc: 0.00, pmc: 0.000, salesPrice: 0.00, smithName: "Old Stock", transDate: "28/07/2023", type: "Diamond", model: "", size: "" },
+  { iid: "BSR", name: "BIRTH STONE RING", itemCategory: "Diamond", description: "GOMEDA", barcode: "BSR000009", nos: 1, gross: 5.460, stone: 0.530, net: 4.930, stnChr: 0.00, mc: 3698.00, vaPerc: 0.00, pmc: 0.000, salesPrice: 0.00, smithName: "Old Stock", transDate: "28/07/2023", type: "Diamond", model: "", size: "" },
+  { iid: "BSR", name: "BIRTH STONE RING", itemCategory: "Diamond", description: "PEARL", barcode: "BSR000010", nos: 1, gross: 5.070, stone: 0.410, net: 4.660, stnChr: 0.00, mc: 3495.00, vaPerc: 0.00, pmc: 0.000, salesPrice: 0.00, smithName: "Old Stock", transDate: "28/07/2023", type: "Diamond", model: "", size: "" },
+  { iid: "BSR", name: "BIRTH STONE RING", itemCategory: "Diamond", description: "", barcode: "BSR000011", nos: 1, gross: 4.490, stone: 0.400, net: 4.090, stnChr: 4200.00, mc: 0.00, vaPerc: 20.00, pmc: 0.000, salesPrice: 0.00, smithName: "", transDate: "11/10/2024", type: "Diamond", model: "", size: "" },
+  { iid: "BSR", name: "BIRTH STONE RING", itemCategory: "Diamond", description: "", barcode: "BSR000012", nos: 1, gross: 3.980, stone: 0.300, net: 3.680, stnChr: 5250.00, mc: 0.00, vaPerc: 20.00, pmc: 0.000, salesPrice: 0.00, smithName: "", transDate: "15/11/2024", type: "Diamond", model: "", size: "" },
+  { iid: "DBR", name: "DIAMOND BRACELET", itemCategory: "Diamond", description: "18K 9 PCS", barcode: "DBR000030", nos: 1, gross: 1.850, stone: 0.000, net: 1.850, stnChr: 0.00, mc: 2035.00, vaPerc: 0.00, pmc: 0.000, salesPrice: 0.00, smithName: "B G C Gold", transDate: "29/01/2025", type: "Diamond", model: "", size: "" },
+  { iid: "DBR", name: "DIAMOND BRACELET", itemCategory: "Diamond", description: "18K 6 PCS", barcode: "DBR000032", nos: 1, gross: 2.160, stone: 0.000, net: 2.160, stnChr: 0.00, mc: 2376.00, vaPerc: 0.00, pmc: 0.000, salesPrice: 0.00, smithName: "B G C Gold", transDate: "29/01/2025", type: "Diamond", model: "", size: "" },
+  { iid: "DBR", name: "DIAMOND BRACELET", itemCategory: "Diamond", description: "18k 10 pcs", barcode: "DBR000027", nos: 1, gross: 4.040, stone: 0.000, net: 4.040, stnChr: 0.00, mc: 4848.00, vaPerc: 0.00, pmc: 0.000, salesPrice: 0.00, smithName: "SABNA ARTS", transDate: "07/10/2024", type: "Diamond", model: "", size: "" },
+  { iid: "DBR", name: "DIAMOND BRACELET", itemCategory: "Diamond", description: "18K5Pcs", barcode: "DBR000012", nos: 1, gross: 1.860, stone: 0.000, net: 1.860, stnChr: 0.00, mc: 2232.00, vaPerc: 0.00, pmc: 0.000, salesPrice: 0.00, smithName: "MIO DIAMOND", transDate: "19/01/2024", type: "Diamond", model: "", size: "" },
+  { iid: "DBR", name: "DIAMOND BRACELET", itemCategory: "Diamond", description: "18k 10pcs", barcode: "DBR000014", nos: 1, gross: 4.040, stone: 0.000, net: 4.040, stnChr: 0.00, mc: 4848.00, vaPerc: 0.00, pmc: 0.000, salesPrice: 0.00, smithName: "ORIEL DIAMOND", transDate: "19/01/2024", type: "Diamond", model: "", size: "" },
+  { iid: "DBR", name: "DIAMOND BRACELET", itemCategory: "Diamond", description: "18k 16pcs", barcode: "DBR000015", nos: 1, gross: 3.540, stone: 0.000, net: 3.540, stnChr: 0.00, mc: 4248.00, vaPerc: 0.00, pmc: 0.000, salesPrice: 0.00, smithName: "ORIEL DIAMOND", transDate: "19/01/2024", type: "Diamond", model: "", size: "" },
+  { iid: "DBR", name: "DIAMOND BRACELET", itemCategory: "Diamond", description: "18k 12pcs", barcode: "DBR000016", nos: 1, gross: 3.760, stone: 0.000, net: 3.760, stnChr: 0.00, mc: 4512.00, vaPerc: 0.00, pmc: 0.000, salesPrice: 0.00, smithName: "ORIEL DIAMOND", transDate: "19/01/2024", type: "Diamond", model: "", size: "" },
+  { iid: "DBR", name: "DIAMOND BRACELET", itemCategory: "Diamond", description: "18k 12pcs", barcode: "DBR000017", nos: 1, gross: 3.660, stone: 0.000, net: 3.660, stnChr: 0.00, mc: 4392.00, vaPerc: 0.00, pmc: 0.000, salesPrice: 0.00, smithName: "ORIEL DIAMOND", transDate: "19/01/2024", type: "Diamond", model: "", size: "" }
+];
+const CATEGORY_WISE_CLOSING_STOCK = [
+  { name: "Pure Gold", nos: -1, grossWeight: 112.703, stoneWeight: 29.588, netWeight: 83.115 },
+  { name: "Other", nos: -1, grossWeight: -30.760, stoneWeight: 0.300, netWeight: -31.060 },
+  { name: "Gold", nos: 4902, grossWeight: 10251.869, stoneWeight: -23.570, netWeight: 10275.400 },
+  { name: "Diamond", nos: 480, grossWeight: 542.700, stoneWeight: 1.774, netWeight: 540.926 },
+  { name: "Silver", nos: 422, grossWeight: 7804.950, stoneWeight: 0.000, netWeight: 7804.950 }
+];
+const TYPE_WISE_CLOSING_STOCK = [
+  { name: "24ct", nos: -1, grossWeight: 112.703, stoneWeight: 29.588, netWeight: 83.115 },
+  { name: "Other", nos: -1, grossWeight: 0.000, stoneWeight: 0.000, netWeight: 0.000 },
+  { name: "Old Gold", nos: 0, grossWeight: 773.720, stoneWeight: 1.110, netWeight: 772.610 },
+  { name: "Old Silver", nos: 0, grossWeight: 601.200, stoneWeight: 0.000, netWeight: 601.200 },
+  { name: "22ct", nos: 5030, grossWeight: 10023.329, stoneWeight: -24.180, netWeight: 10047.470 },
+  { name: "Silver", nos: 310, grossWeight: 6718.280, stoneWeight: 0.000, netWeight: 6718.280 },
+  { name: "18ct", nos: 464, grossWeight: 452.230, stoneWeight: 1.574, netWeight: 450.656 }
+];
+const PRODUCT_WISE_CLOSING_STOCK = [
+  { name: "GOLD", itemName: "CHAIN", nos: 113, grossWeight: 1572.023, stoneWeight: 0.000, netWeight: 1572.005 },
+  { name: "DIAMOND", itemName: "DIAMOND LOCKET", nos: 33, grossWeight: 33.710, stoneWeight: 0.146, netWeight: 33.564 }
+];
+const DIAMOND_CLOSING_STOCK = [
+  { name: "DIAMOND NECKLACE", barcode: "DN000001", smithName: "Old Stock", nos: 1.00, gross: 7.840, stone: 0.000, net: 7.840, salesAmt: 0, dmdCarat: 0.540, dmdCaratType: "Cnt", purchaseRate: 0, crtPuRate: 0, sellingRate: 54000, purchaseMC: 0, salesMC: 0, goldRate: 0 },
+  { name: "DIAMOND NECKLACE", barcode: "DN000002", smithName: "Old Stock", nos: 1.00, gross: 6.300, stone: 0.000, net: 6.300, salesAmt: 0, dmdCarat: 0.200, dmdCaratType: "Cnt", purchaseRate: 0, crtPuRate: 0, sellingRate: 20000, purchaseMC: 0, salesMC: 0, goldRate: 0 },
+  { name: "DIAMOND NECKLACE", barcode: "DN000004", smithName: "ORIEL DIAMOND", nos: 1.00, gross: 3.600, stone: 0.000, net: 3.600, salesAmt: 0, dmdCarat: 0.080, dmdCaratType: "Cnt", purchaseRate: 0, crtPuRate: 4640, sellingRate: 8000, purchaseMC: 0, salesMC: 0, goldRate: 0 },
+  { name: "DIAMOND NECKLACE", barcode: "DN000006", smithName: "ORIEL DIAMOND", nos: 1.00, gross: 2.810, stone: 0.000, net: 2.810, salesAmt: 0, dmdCarat: 0.090, dmdCaratType: "Cnt", purchaseRate: 0, crtPuRate: 5220, sellingRate: 9000, purchaseMC: 0, salesMC: 0, goldRate: 0 },
+  { name: "DIAMOND NECKLACE", barcode: "DN000008", smithName: "MIO DIAMOND", nos: 1.00, gross: 2.980, stone: 0.000, net: 2.980, salesAmt: 4560, dmdCarat: 0.080, dmdCaratType: "Cnt", purchaseRate: 5747.65, crtPuRate: 4560, sellingRate: 8800, purchaseMC: 0, salesMC: 0, goldRate: 0 },
+  { name: "DIAMOND NECKLACE", barcode: "DN000011", smithName: "B G C Gold", nos: 1.00, gross: 3.320, stone: 0.000, net: 3.320, salesAmt: 3480, dmdCarat: 0.060, dmdCaratType: "Cnt", purchaseRate: 6098.79, crtPuRate: 3480, sellingRate: 6600, purchaseMC: 0, salesMC: 0, goldRate: 0 },
+  { name: "DIAMOND NECKLACE", barcode: "DN000015", smithName: "MAKEIDA GOLD", nos: 1.00, gross: 3.010, stone: 0.000, net: 3.010, salesAmt: 5319.99, dmdCarat: 0.090, dmdCaratType: "Cnt", purchaseRate: 6552.49, crtPuRate: 5319.99, sellingRate: 9900, purchaseMC: 0, salesMC: 0, goldRate: 0 },
+  { name: "DIAMOND NECKLACE", barcode: "DN000017", smithName: "MAKEIDA GOLD", nos: 1.00, gross: 1.740, stone: 0.000, net: 1.740, salesAmt: 7200, dmdCarat: 0.120, dmdCaratType: "Cnt", purchaseRate: 6634.48, crtPuRate: 7200, sellingRate: 13200, purchaseMC: 0, salesMC: 0, goldRate: 0 },
+  { name: "DIAMOND NECKLACE", barcode: "DN000021", smithName: "NASEERA GOLD", nos: 1.00, gross: 2.660, stone: 0.000, net: 2.660, salesAmt: 0, dmdCarat: 0.050, dmdCaratType: "Cnt", purchaseRate: 0, crtPuRate: 0, sellingRate: 5500, purchaseMC: 0, salesMC: 0, goldRate: 0 },
+  { name: "DIAMOND NECKLACE", barcode: "DN000022", smithName: "MIO DIAMOND", nos: 1.00, gross: 2.940, stone: 0.000, net: 2.940, salesAmt: 1140, dmdCarat: 0.020, dmdCaratType: "Cnt", purchaseRate: 10699.31, crtPuRate: 1140, sellingRate: 2200, purchaseMC: 0, salesMC: 0, goldRate: 0 },
+  { name: "DIAMOND NECKLACE", barcode: "DN000024", smithName: "MAKEIDA GOLD", nos: 1.00, gross: 3.750, stone: 0.790, net: 2.960, salesAmt: 9380, dmdCarat: 0.160, dmdCaratType: "Cnt", purchaseRate: 13855.13, crtPuRate: 9380, sellingRate: 17600, purchaseMC: 0, salesMC: 0, goldRate: 0 },
+  { name: "DIAMOND NECKLACE", barcode: "DN000025", smithName: "AJAYA KUMAR", nos: 1.00, gross: 2.770, stone: 0.000, net: 2.770, salesAmt: 0, dmdCarat: 0.050, dmdCaratType: "Cnt", purchaseRate: 0, crtPuRate: 3960, sellingRate: 5500, purchaseMC: 0, salesMC: 4570, goldRate: 11508.75 },
+  { name: "DIAMOND NECKLACE", barcode: "DN000026", smithName: "LEENA KAKKAD", nos: 1.00, gross: 6.300, stone: 0.000, net: 6.300, salesAmt: 14400, dmdCarat: 0.200, dmdCaratType: "Cnt", purchaseRate: 11924.55, crtPuRate: 14400, sellingRate: 44000, purchaseMC: 0, salesMC: 10395, goldRate: 11924.55 },
+  { name: "DIAMOND NECKLACE", barcode: "DN000027", smithName: "B G C GOLD", nos: 1.00, gross: 3.210, stone: 0.000, net: 3.210, salesAmt: 1740, dmdCarat: 0.030, dmdCaratType: "Cnt", purchaseRate: 11822.86, crtPuRate: 1740, sellingRate: 3300, purchaseMC: 2723, salesMC: 5297, goldRate: 11822.86 },
+  { name: "DIAMOND NECKLACE", barcode: "DN000028", smithName: "B G C GOLD", nos: 1.00, gross: 2.820, stone: 0.000, net: 2.820, salesAmt: 1740, dmdCarat: 0.030, dmdCaratType: "Cnt", purchaseRate: 11879.78, crtPuRate: 1740, sellingRate: 3300, purchaseMC: 2392, salesMC: 4653, goldRate: 11879.78 },
+  { name: "BIRTH STONE RING", barcode: "BSR000001", smithName: "Old Stock", nos: 1.00, gross: 5.220, stone: 0.570, net: 4.650, salesAmt: 0, dmdCarat: 2.850, dmdCaratType: "Cnt", purchaseRate: 0, crtPuRate: 0, sellingRate: 2280, purchaseMC: 0, salesMC: 0, goldRate: 0 },
+  { name: "BIRTH STONE RING", barcode: "BSR000002", smithName: "Old Stock", nos: 1.00, gross: 5.480, stone: 0.530, net: 4.950, salesAmt: 0, dmdCarat: 2.650, dmdCaratType: "Cnt", purchaseRate: 0, crtPuRate: 0, sellingRate: 2120, purchaseMC: 0, salesMC: 0, goldRate: 0 },
+  { name: "BIRTH STONE RING", barcode: "BSR000003", smithName: "Old Stock", nos: 1.00, gross: 2.620, stone: 0.120, net: 2.500, salesAmt: 0, dmdCarat: 0.600, dmdCaratType: "Cnt", purchaseRate: 0, crtPuRate: 0, sellingRate: 480, purchaseMC: 0, salesMC: 0, goldRate: 0 },
+  { name: "BIRTH STONE RING", barcode: "BSR000004", smithName: "Old Stock", nos: 1.00, gross: 4.950, stone: 0.320, net: 4.630, salesAmt: 0, dmdCarat: 1.600, dmdCaratType: "Cnt", purchaseRate: 0, crtPuRate: 0, sellingRate: 1280, purchaseMC: 0, salesMC: 0, goldRate: 0 },
+  { name: "BIRTH STONE RING", barcode: "BSR000005", smithName: "Old Stock", nos: 1.00, gross: 5.210, stone: 0.360, net: 4.850, salesAmt: 0, dmdCarat: 1.800, dmdCaratType: "Cnt", purchaseRate: 0, crtPuRate: 0, sellingRate: 1440, purchaseMC: 0, salesMC: 0, goldRate: 0 }
+];
+const STOCK_COMPARE_ROWS = [
+  stockCompareRow("Diamond", "BRSL", "BIRTH STONE PENTANT", 1, 2.250, 0.000, 2.250, 1, 2.250, 0.280, 1.970),
+  stockCompareRow("Diamond", "BSR", "BIRTH STONE RING", 9, 40.210, 0.000, 40.210, 12, 53.900, 4.780, 49.120),
+  stockCompareRow("Diamond", "DBR", "DIAMOND BRACELET", 20, 61.880, 0.100, 61.780, 32, 107.700, 0.100, 107.600),
+  stockCompareRow("Diamond", "DC", "DIAMOND CHAIN", 6, 19.760, 0.000, 19.760, 9, 31.530, 0.000, 31.530),
+  stockCompareRow("Diamond", "DD", "DIAMOND RING", 128, 128.420, 0.678, 127.742, 162, 162.350, 0.678, 161.638),
+  stockCompareRow("Diamond", "DDD", "DIAMOND DROPS", 217, 114.750, -0.140, 114.890, 327, 163.460, 0.080, 163.376),
+  stockCompareRow("Diamond", "DL", "DIAMOND LOCKET", 33, 33.710, 0.146, 33.564, 41, 41.230, 0.146, 41.084),
+  stockCompareRow("Diamond", "DN", "DIAMOND NECKLACE", 12, 43.340, 0.790, 42.550, 15, 56.050, 0.790, 55.260),
+  stockCompareRow("Diamond", "DNR", "NAVARATNA RNG", 6, 48.010, 0.200, 47.810, 7, 59.300, 0.000, 59.300),
+  stockCompareRow("Diamond", "TDB", "TALIA DIAMOND BANGLE", 0, 0.000, 0.000, 0.000, 0, 0.000, 0.000, 0.000),
+  stockCompareRow("Diamond", "TDBR", "TALIA DIAMOND BRACELET", 2, 3.430, 0.000, 3.430, 2, 3.430, 0.000, 3.430),
+  stockCompareRow("Diamond", "TDC", "TALIA DIAMOND CHAIN", 0, 0.000, 0.000, 0.000, 0, 0.000, 0.000, 0.000),
+  stockCompareRow("Diamond", "TDD", "TALIA DIAMOND RING", 15, 12.950, 0.000, 12.950, 15, 12.950, 0.000, 12.950),
+  stockCompareRow("Diamond", "TDDD", "TALIA DIAMOND DROPS", 19, 13.920, 0.000, 13.920, 19, 13.920, 0.000, 13.920),
+  stockCompareRow("Diamond", "TDL", "TALIA DIAMOND LOCKET", 8, 4.870, 0.000, 4.870, 8, 4.870, 0.000, 4.870),
+  stockCompareRow("Diamond", "TDN", "TALIA DIAMOND NECKLACE", 4, 15.200, 0.000, 15.200, 4, 15.200, 0.000, 15.200),
+  stockCompareRow("Gold", "AG", "ANKLET", 120, 473.240, -0.330, 473.573, 598, 4209.512, 3.190, 4206.331),
+  stockCompareRow("Gold", "B", "BANGLE", 340, 2308.922, 0.160, 2308.764, 1439, 11706.459, 5.190, 11710.409),
+  stockCompareRow("Gold", "BB", "BANGLE SMALL", 26, 12.680, -0.240, 12.920, 0, 0.000, 0.000, 0.000),
+  stockCompareRow("Gold", "BL", "BRACELET", 102, 435.201, -3.062, 438.254, 656, 3986.572, 37.910, 3948.663)
+];
 const REPORT_MENU_GROUPS = [
-  { title: "Stock", items: ["Stock", "Stock Ledger", "Stock Register", "Stock Adjustment", "Sample Issue/Return"] },
+  { title: "Stock", items: ["CurrentStock", ...STOCK_CURRENT_REPORTS, "Opening Stock", "Stock Reconciliation", "Reconciliation Crosstab", "Stock Ledger", "Smith/Jeweller Stock"] },
   { title: "Sales", items: ["Sales", "Sales Profit", "Sales Return", "Exchange", "Sales Order"] },
   { title: "Purchase", items: ["Purchase", "Purchase Return", "Direct Gold Purchase", "Direct Gold Purchase Return"] },
   { title: "Diamond", items: ["Diamond"] },
@@ -385,10 +526,14 @@ let existingRecordPickerItems = [];
 let customVoucherDraft = null;
 let customVoucherEntryDraft = null;
 let customVoucherConfirmDelete = true;
-let selectedReport = "Day Summary";
+let selectedReport = "";
 let reportSearch = "";
 let globalMenuSearch = "";
 let recentReportItems = [];
+let stockReportOptions = { includeZero: false, groupByType: false, groupByItem: false, noFirmName: false, pageSize: "A4", barcodeType: "", categoryType: "", diamondType: "", typeType: "", summary: false, reconciliationType: "All", reconciliationOption: "", reconciliationIgnoreZero: true, crosstabMode: "Summary", crosstabItem: "All", crosstabPrintSummarized: false, stockLedgerFrom: "13/07/2026", stockLedgerTo: "13/07/2026", stockLedgerItem: "ANKLET", stockLedgerBarcodeWise: false };
+let classicColumnMenu = null;
+let classicColumnFilters = {};
+let classicColumnSorts = {};
 let authenticated = sessionStorage.getItem("goldland-authenticated") === "true";
 
 function rate(type, grade, price, time, reason) {
@@ -397,6 +542,28 @@ function rate(type, grade, price, time, reason) {
 
 function audit(action, time = nowTime()) {
   return { id: crypto.randomUUID(), user: "Goldland", action, time, date: "2026-05-16" };
+}
+
+function stockCompareRow(category, itemId, name, itemNos, itemGross, itemStone, itemNet, barNos, barGross, barStone, barNet) {
+  return {
+    category,
+    itemId,
+    name,
+    itemNos,
+    itemGross,
+    itemStone,
+    itemNet,
+    separatorA: "...",
+    barNos,
+    barGross,
+    barStone,
+    barNet,
+    separatorB: "...",
+    diffNos: itemNos - barNos,
+    diffGross: itemGross - barGross,
+    diffStone: itemStone - barStone,
+    diffNet: itemNet - barNet
+  };
 }
 
 function nextCustomerId() {
@@ -3644,7 +3811,7 @@ function appShell() {
 }
 
 function sidebar() {
-  const nav = ["Dashboard", "Schemes", "Reports"];
+  const nav = ["Dashboard", "Schemes"];
   const stockItems = STOCK_ITEMS;
   const workItems = WORK_ORDER_ITEMS;
   const isGroupOpen = (name) => expandedNavGroups.has(name);
@@ -3695,6 +3862,18 @@ function sidebar() {
             ${MANAGEMENT_ITEMS.map((item) => `<button class="subnav-item ${active === "Management" && managementView === item ? "active" : ""}" data-management="${item}">${item}</button>`).join("")}
           </div>
         </div>
+        <div class="nav-group ${isGroupOpen("Reports") || active === "Reports" ? "open" : ""}">
+          <button class="nav ${active === "Reports" ? "active" : ""}" data-nav="Reports">${icon("Reports")}<span>Reports</span><span class="chevron">v</span></button>
+          <div class="subnav reports-subnav">
+            ${REPORT_ROOT_MENU_ITEMS.map((item) => `
+              <button class="subnav-item report-root-item ${selectedReport === (item.target || item.label) ? "active" : ""}" data-report-item="${escapeHtml(item.target || item.label)}">
+                <span class="classic-menu-chevron">»</span>
+                <span>${escapeHtml(item.label)}</span>
+                ${item.hasSubmenu ? `<span class="report-root-arrow">›</span>` : ""}
+              </button>
+            `).join("")}
+          </div>
+        </div>
         ${nav.slice(1).map((item) => `<button class="nav ${active === item ? "active" : ""}" data-nav="${item}">${icon(item)}<span>${item}</span></button>`).join("")}
       </nav>
       <div class="security-card">
@@ -3730,6 +3909,23 @@ function topbar() {
         <button class="rate-update-button" data-action="open-rate">Rate Update</button>
       </div>
     </header>
+  `;
+}
+
+function reportsTopDropdown() {
+  return `
+    <div class="top-report-menu">
+      <button class="top-report-trigger" type="button">Reports</button>
+      <div class="top-report-dropdown">
+        ${REPORT_ROOT_MENU_ITEMS.map((item) => `
+          <button class="${selectedReport === (item.target || item.label) ? "active" : ""}" data-report-item="${escapeHtml(item.target || item.label)}">
+            <span class="classic-menu-chevron">»</span>
+            <span>${escapeHtml(item.label)}</span>
+            ${item.hasSubmenu ? `<span class="top-report-arrow">›</span>` : ""}
+          </button>
+        `).join("")}
+      </div>
+    </div>
   `;
 }
 
@@ -10302,6 +10498,16 @@ function customVoucherRegisterPanel() {
 }
 
 function reports() {
+  if (!selectedReport) {
+    return reportsHomePlaceholder();
+  }
+  if (isStockReport(selectedReport)) {
+    return `
+      <section class="panel report-preview-panel focused-report-panel">
+        ${reportPreview(selectedReport)}
+      </section>
+    `;
+  }
   const matches = filteredMenuItems(reportSearch, 200).filter((item) => item.module === "Reports");
   const pinned = PINNED_REPORTS.map((name) => reportQuickButton(name, "pin")).join("");
   const recent = recentReportItems.length
@@ -10353,6 +10559,20 @@ function reports() {
   `;
 }
 
+function reportsHomePlaceholder() {
+  return `
+    <section class="panel reports-home-placeholder">
+      <p class="eyebrow">Reports</p>
+      <h2>Select a report from the menu</h2>
+      <p>Use the Reports dropdown in the left menu to open Stock, Sales, Purchase, Tax, Bills, Day End, and other report screens.</p>
+    </section>
+  `;
+}
+
+function isStockReport(name) {
+  return name === "CurrentStock" || STOCK_CURRENT_REPORTS.includes(name) || STOCK_REPORT_MENU[0].items.includes(name);
+}
+
 function reportQuickButton(name, kind) {
   const label = kind === "pin" ? "Pinned" : "Recent";
   return `<button class="report-pill ${selectedReport === name ? "active" : ""}" data-report-item="${escapeHtml(name)}"><span>${escapeHtml(name)}</span><small>${label}</small></button>`;
@@ -10393,6 +10613,12 @@ function reportPreview(name) {
   if (name === "Rate History") {
     return rateTimeline();
   }
+  if (name === "CurrentStock" || STOCK_CURRENT_REPORTS.includes(name)) {
+    return currentStockReportScreen(name);
+  }
+  if (STOCK_REPORT_MENU[0].items.includes(name)) {
+    return stockReportSubmenuScreen(name);
+  }
   const group = REPORT_MENU_GROUPS.find((item) => item.items.includes(name))?.title || "Reports";
   return `
     <div class="report-placeholder">
@@ -10405,6 +10631,1758 @@ function reportPreview(name) {
       </div>
     </div>
   `;
+}
+
+function currentStockReportScreen(name) {
+  const activeReport = name === "CurrentStock" ? "Item Wise" : name;
+  return `
+    <div class="classic-report-layout focused-classic-report">
+      ${stockReportSubmenus(activeReport)}
+      <section class="classic-stock-report">
+        ${classicStockToolbar(activeReport)}
+        ${classicStockTitle(activeReport)}
+        ${stockReportBody(activeReport)}
+      </section>
+    </div>
+  `;
+}
+
+function stockReportSubmenuScreen(name) {
+  if (name === "Opening Stock") {
+    return openingStockReportPlaceholder();
+  }
+  if (name === "Stock Reconciliation") {
+    return stockReconciliationScreen();
+  }
+  if (name === "Reconciliation Crosstab") {
+    return stockReconciliationCrosstabScreen();
+  }
+  if (name === "Stock Ledger") {
+    return stockLedgerReportScreen();
+  }
+  return `
+    <div class="classic-report-layout focused-classic-report">
+      ${stockReportSubmenus(name)}
+      <section class="classic-stock-report">
+        ${classicStockToolbar(name)}
+        <div class="classic-report-empty">
+          <h3>${escapeHtml(name)}</h3>
+          <p>Select CurrentStock and choose Item Wise, Barcode Wise, Category Wise, Product Wise, Diamond Stock, Type Wise, Stock Compare or Other Location Stock.</p>
+        </div>
+      </section>
+    </div>
+  `;
+}
+
+function stockReconciliationScreen() {
+  return `
+    <div class="classic-report-layout focused-classic-report">
+      ${stockReportSubmenus("Stock Reconciliation")}
+      <section class="classic-stock-report reconciliation-report">
+        ${stockReconciliationToolbar()}
+        <header class="classic-report-title reconciliation-title">
+          <h3>MT GOLD LAND</h3>
+          <h2>${stockReportOptions.reconciliationOption ? `Stock Reconciliation Report for the Period From 13-07-2026 TO 13-07-2026` : "Reconciliation"}</h2>
+        </header>
+        ${stockReconciliationBody()}
+      </section>
+    </div>
+  `;
+}
+
+function stockReconciliationBody() {
+  if (stockReportOptions.reconciliationOption === "All Items - Gross") return reconciliationGrossReport();
+  if (stockReportOptions.reconciliationOption === "All Items - Net") return reconciliationNetReport();
+  if (stockReportOptions.reconciliationOption === "Diamond - Barcode Summary") return reconciliationDiamondBarcodeReport();
+  if (stockReportOptions.reconciliationOption === "Diamond - Item Summary") return reconciliationDiamondItemReport();
+  if (stockReportOptions.reconciliationOption === "Stock TypeWise") return reconciliationStockTypeWiseReport();
+  if (stockReportOptions.reconciliationOption === "Stock Type-ItemWise") return reconciliationStockTypeItemWiseReport();
+  return `
+    <div class="reconciliation-canvas">
+      <p>Choose a reconciliation option from the green dropdown to preview and print the stock report.</p>
+    </div>
+  `;
+}
+
+function stockReconciliationToolbar() {
+  const tools = [
+    ["SHOW", "SHOW"], ["PRINT", "PRINT"], ["DIRECT PRINT", "DIRECT PRINT"], ["EXCEL", "EXCEL"], ["DATE", "DATE"],
+    ["FIRST", "FIRST"], ["PREV", "PREV"], ["NEXT", "NEXT"], ["LAST", "LAST"], ["VIEW/HIDE", "VIEW/HIDE"],
+    ["ZOOM IN", "ZOOM IN"], ["DEFAULT", "DEFAULT"], ["ZOOM OUT", "ZOOM OUT"], ["CLOSE", "CLOSE"]
+  ];
+  const options = [
+    "",
+    "All Items - Gross",
+    "All Items - Net",
+    "Diamond - Barcode Summary",
+    "Diamond - Item Summary",
+    "Stock TypeWise",
+    "Stock Type-ItemWise"
+  ];
+  return `
+    <div class="classic-report-toolbar reconciliation-toolbar">
+      <div class="classic-tool-buttons">
+        ${tools.map(([label, action]) => `<button class="classic-tool" data-action="${action === "PRINT" ? "print-now" : action === "EXCEL" ? "export-report" : "noop"}"><strong>${toolbarGlyph(label)}</strong><span>${escapeHtml(label)}</span></button>`).join("")}
+      </div>
+      <label class="reconciliation-type-label">Type</label>
+      <select class="reconciliation-type-select" data-stock-report-select="reconciliationType">
+        ${["All", "Gold", "Diamond", "Silver", "Pure Gold", "Other"].map((item) => `<option value="${escapeHtml(item)}" ${stockReportOptions.reconciliationType === item ? "selected" : ""}>${escapeHtml(item)}</option>`).join("")}
+      </select>
+      <select class="reconciliation-filter-select" aria-label="Reconciliation filter"><option></option></select>
+      <select class="reconciliation-option-select" data-stock-report-select="reconciliationOption">
+        ${options.map((item) => `<option value="${escapeHtml(item)}" ${stockReportOptions.reconciliationOption === item ? "selected" : ""}>${escapeHtml(item || "Select Report")}</option>`).join("")}
+      </select>
+      <label class="reconciliation-ignore-zero"><input type="checkbox" checked data-stock-report-option="reconciliationIgnoreZero" /> Ignore Zero</label>
+    </div>
+  `;
+}
+
+function stockReconciliationCrosstabScreen() {
+  const rows = crosstabRows();
+  const itemOptions = ["All", ...rows.map((row) => row.itemName)];
+  const selectedItem = itemOptions.includes(stockReportOptions.crosstabItem) ? stockReportOptions.crosstabItem : "All";
+  const visibleRows = selectedItem === "All" ? rows : rows.filter((row) => row.itemName === selectedItem);
+  return `
+    <div class="classic-report-layout focused-classic-report">
+      ${stockReportSubmenus("Reconciliation Crosstab")}
+      <section class="classic-stock-report crosstab-report">
+        ${stockReconciliationCrosstabToolbar(itemOptions, selectedItem)}
+        <header class="crosstab-title">
+          <h3>MT GOLD LAND</h3>
+          <div>
+            <strong>13-07-2026 To 13-07-2026</strong>
+            <h2>STOCK RECONCILIATION</h2>
+          </div>
+          <label><input type="checkbox" data-stock-report-option="crosstabPrintSummarized" ${stockReportOptions.crosstabPrintSummarized ? "checked" : ""} /> Print Summarized Row</label>
+        </header>
+        ${crosstabSummaryTable(visibleRows)}
+        <div class="crosstab-splitter">
+          <button class="crosstab-nav">|&lt;</button>
+          <button class="crosstab-nav">&lt;</button>
+          <button class="crosstab-nav">&gt;</button>
+          <button class="crosstab-nav">&gt;|</button>
+          <span></span>
+          <span></span>
+          <button class="crosstab-filter-button">▼</button>
+          <button class="crosstab-filter-button">▲</button>
+          <button class="crosstab-excel-button" data-action="export-report">Excel</button>
+        </div>
+        ${crosstabDetailTable(visibleRows)}
+      </section>
+    </div>
+  `;
+}
+
+function stockReconciliationCrosstabToolbar(itemOptions, selectedItem) {
+  const tools = [
+    ["SHOW", "SHOW"], ["PRINT", "PRINT"], ["DIRECT PRINT", "DIRECT PRINT"], ["EXCEL", "EXCEL"], ["DATE", "DATE"],
+    ["FIRST", "FIRST"], ["PREV", "PREV"], ["NEXT", "NEXT"], ["LAST", "LAST"], ["VIEW/HIDE", "VIEW/HIDE"],
+    ["ZOOM IN", "ZOOM IN"], ["DEFAULT", "DEFAULT"], ["ZOOM OUT", "ZOOM OUT"], ["CLOSE", "CLOSE"]
+  ];
+  return `
+    <div class="classic-report-toolbar crosstab-toolbar">
+      <div class="classic-tool-buttons">
+        ${tools.slice(0, 4).map(([label, action]) => `<button class="classic-tool" data-action="${action === "PRINT" ? "print-now" : action === "EXCEL" ? "export-report" : "noop"}"><strong>${toolbarGlyph(label)}</strong><span>${escapeHtml(label)}</span></button>`).join("")}
+      </div>
+      <select class="crosstab-mode-select" data-stock-report-select="crosstabMode">
+        ${["Summary", "Detailed"].map((item) => `<option value="${escapeHtml(item)}" ${stockReportOptions.crosstabMode === item ? "selected" : ""}>${escapeHtml(item)}</option>`).join("")}
+      </select>
+      <div class="classic-tool-buttons">
+        ${tools.slice(4).map(([label, action]) => `<button class="classic-tool" data-action="${action === "PRINT" ? "print-now" : action === "EXCEL" ? "export-report" : "noop"}"><strong>${toolbarGlyph(label)}</strong><span>${escapeHtml(label)}</span></button>`).join("")}
+      </div>
+      <input class="classic-toolbar-input" aria-label="Crosstab quick filter" />
+      <label class="crosstab-item-label">Item</label>
+      <select class="crosstab-item-select" data-stock-report-select="crosstabItem">
+        ${itemOptions.map((item) => `<option value="${escapeHtml(item)}" ${selectedItem === item ? "selected" : ""}>${escapeHtml(item)}</option>`).join("")}
+      </select>
+    </div>
+  `;
+}
+
+function crosstabRows() {
+  return reconciliationRows().map((row, index) => {
+    const purchase = movementPair(row.addGross > 0 ? row.addGross : 0, row.adNos > 0 ? row.adNos : 0);
+    const sales = movementPair(row.dedGross < 0 ? Math.abs(row.dedGross) : 0, row.deNos < 0 ? Math.abs(row.deNos) : 0);
+    const itemTransferOut = movementPair(row.dedGross > 0 ? row.dedGross : 0, row.deNos > 0 ? row.deNos : 0);
+    const addition = addMovementPairs([purchase]);
+    const deduction = addMovementPairs([sales, itemTransferOut]);
+    return {
+      sl: index + 1,
+      id: row.id,
+      itemName: row.itemName,
+      opening: row.opGross,
+      openingNos: row.opNos,
+      addition: addition.weight,
+      additionNos: addition.nos,
+      deduction: deduction.weight,
+      deductionNos: deduction.nos,
+      closing: row.clGross,
+      closingNos: row.clNos,
+      movements: {
+        opening: movementPair(row.opGross, row.opNos),
+        exchangeInSales: movementPair(0, 0),
+        itemTransferIn: movementPair(0, 0),
+        purchase,
+        addition,
+        sales,
+        itemTransferOut,
+        deduction,
+        closing: movementPair(row.clGross, row.clNos)
+      }
+    };
+  });
+}
+
+function movementPair(weight, nos) {
+  return { weight: Number(weight || 0), nos: Number(nos || 0) };
+}
+
+function addMovementPairs(pairs) {
+  return pairs.reduce((total, pair) => ({
+    weight: Number((total.weight + Number(pair.weight || 0)).toFixed(3)),
+    nos: Number((total.nos + Number(pair.nos || 0)).toFixed(3))
+  }), movementPair(0, 0));
+}
+
+function crosstabSummaryTable(rows) {
+  const columns = [
+    ["sl", "SL", 0],
+    ["itemName", "Name"],
+    ["opening", "Opening", 3],
+    ["openingNos", "Nos", 0],
+    ["addition", "Addition", 3],
+    ["additionNos", "Nos", 0],
+    ["deduction", "Deduction", 3],
+    ["deductionNos", "Nos", 0],
+    ["closing", "Closing", 3],
+    ["closingNos", "Nos", 3]
+  ];
+  return `
+    <div class="crosstab-summary-wrap">
+      <table class="crosstab-summary-table">
+        <thead><tr>${columns.map(([, label]) => `<th>${escapeHtml(label)}</th>`).join("")}</tr></thead>
+        <tbody>
+          ${rows.map((row, index) => `
+            <tr class="${index === 0 ? "selected" : ""}">
+              ${columns.map(([key, , digits]) => `<td class="${typeof digits === "number" ? "num" : ""}">${typeof digits === "number" ? numberValue(row[key], digits) : escapeHtml(row[key])}</td>`).join("")}
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function crosstabDetailTable(rows) {
+  const particulars = crosstabParticularRows();
+  return `
+    <div class="crosstab-detail-wrap">
+      <table class="crosstab-detail-table">
+        <thead>
+          <tr>
+            <th>Particular</th>
+            ${rows.map((row) => `<th>${escapeHtml(row.itemName)}</th><th>Nos</th>`).join("")}
+          </tr>
+        </thead>
+        <tbody>
+          ${particulars.map((particular, rowIndex) => `
+            <tr class="${rowIndex === 0 ? "selected" : ""}">
+              <td>${escapeHtml(particular.label)}</td>
+              ${rows.map((row) => crosstabDetailCells(row, particular.key)).join("")}
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function crosstabParticularRows() {
+  return [
+    { key: "opening", label: "OPENING" },
+    { key: "exchangeInSales", label: "Exchange in Sales" },
+    { key: "blank1", label: "" },
+    { key: "blank2", label: "" },
+    { key: "itemTransferIn", label: "Item Transfer IN" },
+    { key: "blank3", label: "" },
+    { key: "blank4", label: "" },
+    { key: "purchase", label: "Purchase" },
+    { key: "blank5", label: "" },
+    { key: "blank6", label: "" },
+    { key: "addition", label: "ADDITION" },
+    { key: "sales", label: "Sales" },
+    { key: "blank7", label: "" },
+    { key: "blank8", label: "" },
+    { key: "blank9", label: "" },
+    { key: "blank10", label: "" },
+    { key: "blank11", label: "" },
+    { key: "blank12", label: "" },
+    { key: "blank13", label: "" },
+    { key: "itemTransferOut", label: "Item Transfer OUT" },
+    { key: "blank14", label: "" },
+    { key: "blank15", label: "" },
+    { key: "deduction", label: "DEDUCTION" },
+    { key: "closing", label: "CLOSING" }
+  ];
+}
+
+function crosstabDetailCells(row, key) {
+  const movement = row.movements?.[key];
+  if (!movement) return `<td class="num"></td><td class="num"></td>`;
+  const hideZero = !["opening", "addition", "deduction", "closing"].includes(key) && !movement.weight && !movement.nos;
+  const weightText = hideZero ? "" : numberValue(movement.weight, 3);
+  const nosText = hideZero ? "" : numberValue(movement.nos, key === "opening" || key === "closing" ? 3 : 0);
+  return `<td class="num">${weightText}</td><td class="num">${nosText}</td>`;
+}
+
+function exportReconciliationCrosstabCsv() {
+  const allRows = crosstabRows();
+  const rows = stockReportOptions.crosstabItem === "All" ? allRows : allRows.filter((row) => row.itemName === stockReportOptions.crosstabItem);
+  const lines = [
+    ["MT GOLD LAND"],
+    ["STOCK RECONCILIATION"],
+    ["13-07-2026 To 13-07-2026"],
+    [],
+    ["SL", "Name", "Opening", "Nos", "Addition", "Nos", "Deduction", "Nos", "Closing", "Nos"],
+    ...rows.map((row) => [row.sl, row.itemName, numberValue(row.opening, 3), numberValue(row.openingNos, 0), numberValue(row.addition, 3), numberValue(row.additionNos, 0), numberValue(row.deduction, 3), numberValue(row.deductionNos, 0), numberValue(row.closing, 3), numberValue(row.closingNos, 3)]),
+    [],
+    ["Particular", ...rows.flatMap((row) => [row.itemName, "Nos"])],
+    ...crosstabParticularRows().map((particular) => [
+      particular.label,
+      ...rows.flatMap((row) => {
+        const movement = row.movements?.[particular.key];
+        if (!movement) return ["", ""];
+        const hideZero = !["opening", "addition", "deduction", "closing"].includes(particular.key) && !movement.weight && !movement.nos;
+        return [
+          hideZero ? "" : numberValue(movement.weight, 3),
+          hideZero ? "" : numberValue(movement.nos, particular.key === "opening" || particular.key === "closing" ? 3 : 0)
+        ];
+      })
+    ])
+  ];
+  downloadCsv("stock-reconciliation-crosstab.csv", lines);
+}
+
+function downloadCsv(filename, rows) {
+  const csv = rows.map((row) => row.map((cell) => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(",")).join("\r\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function toolbarGlyph(label) {
+  const glyphs = {
+    SHOW: "▦",
+    PRINT: "▰",
+    "DIRECT PRINT": "▤",
+    EXCEL: "X",
+    DATE: "▥",
+    FIRST: "↤",
+    PREV: "←",
+    NEXT: "→",
+    LAST: "↦",
+    "VIEW/HIDE": "◉",
+    "ZOOM IN": "+",
+    DEFAULT: "100%",
+    "ZOOM OUT": "-",
+    CLOSE: "×"
+  };
+  return glyphs[label] || label;
+}
+
+function reconciliationRows() {
+  const adjustmentMap = {
+    AG: { opNos: 118, adNos: 0, addGross: 0, addStone: 0, deNos: 0, dedGross: 0, dedStone: 0 },
+    BR: { opNos: 38, adNos: 0, addGross: 0, addStone: 0, deNos: -1, dedGross: -0.150, dedStone: 0 },
+    B: { opNos: 337, adNos: 0, addGross: 0, addStone: 0, deNos: 0, dedGross: 0, dedStone: 0 },
+    BB: { opNos: 25, adNos: 0, addGross: 0, addStone: 0, deNos: 0, dedGross: 0, dedStone: 0 },
+    C: { opNos: 109, adNos: 0, addGross: 0.280, addStone: 0, deNos: -2, dedGross: -35.820, dedStone: 0 },
+    CT: { opNos: 0, adNos: 0, addGross: 2.630, addStone: 0, deNos: 0, dedGross: -0.280, dedStone: 0 },
+    DC: { opNos: 6, adNos: 0, addGross: 0, addStone: 0, deNos: -1, dedGross: -3.460, dedStone: 0 },
+    DDD: { opNos: 217, adNos: 0, addGross: 0, addStone: 0, deNos: -2, dedGross: -1.470, dedStone: 0 },
+    L: { opNos: 354, adNos: 0, addGross: 0, addStone: 0, deNos: -1, dedGross: -0.580, dedStone: 0 }
+  };
+  const extraRows = [
+    { itemId: "M", name: "MOOSA", itemType: "Gold", subGroup: "", nos: 0, grossWeight: 62.258, stoneWeight: 0, netWeight: 62.258 }
+  ];
+  return [...ITEM_WISE_CLOSING_STOCK, ...extraRows].map((row) => {
+    const adjustment = adjustmentMap[row.itemId] || {};
+    const opNos = Number(adjustment.opNos ?? row.nos);
+    const adNos = Number(adjustment.adNos || 0);
+    const deNos = Number(adjustment.deNos || 0);
+    const clNos = opNos + adNos + deNos;
+    const addGross = Number(adjustment.addGross || 0);
+    const addStone = Number(adjustment.addStone || 0);
+    const addNet = addGross - addStone;
+    const dedGross = Number(adjustment.dedGross || 0);
+    const dedStone = Number(adjustment.dedStone || 0);
+    const dedNet = dedGross - dedStone;
+    const opGross = Number((row.grossWeight - addGross - dedGross).toFixed(3));
+    const opStone = Number((row.stoneWeight - addStone - dedStone).toFixed(3));
+    const opNet = Number((opGross - opStone).toFixed(3));
+    const clGross = Number((opGross + addGross + dedGross).toFixed(3));
+    const clStone = Number((opStone + addStone + dedStone).toFixed(3));
+    const clNet = Number((opNet + addNet + dedNet).toFixed(3));
+    return {
+      id: row.itemId,
+      itemName: row.name,
+      subGroup: row.subGroup || "",
+      itemType: row.itemType,
+      opNos,
+      opening: opGross,
+      adNos,
+      addition: addGross,
+      deNos,
+      deduction: dedGross,
+      clNos,
+      closing: clGross,
+      opGross,
+      opStone,
+      opNet,
+      addGross,
+      addStone,
+      addNet,
+      dedGross,
+      dedStone,
+      dedNet,
+      clGross,
+      clStone,
+      clNet
+    };
+  });
+}
+
+function filteredReconciliationRows(reportKey, columns) {
+  let rows = reconciliationRows();
+  if (stockReportOptions.reconciliationType && stockReportOptions.reconciliationType !== "All") {
+    rows = rows.filter((row) => row.itemType === stockReportOptions.reconciliationType);
+  }
+  if (stockReportOptions.reconciliationIgnoreZero) {
+    rows = rows.filter((row) => row.opNos !== 0 || row.clNos !== 0 || row.opening !== 0 || row.clGross !== 0 || row.clNet !== 0);
+  }
+  rows = applyClassicColumnFilters(reportKey, rows, columns);
+  return applyClassicColumnSort(reportKey, rows, columns);
+}
+
+function reconciliationGrossReport() {
+  const columns = reconciliationGrossColumns();
+  const rows = filteredReconciliationRows("reconciliationGross", columns);
+  return reconciliationTable("reconciliationGross", rows, columns, reconciliationRows(), "reconciliation-gross-grid");
+}
+
+function reconciliationNetReport() {
+  const columns = reconciliationNetColumns();
+  const rows = filteredReconciliationRows("reconciliationNet", columns);
+  return reconciliationTable("reconciliationNet", rows, columns, reconciliationRows(), "reconciliation-net-grid");
+}
+
+function reconciliationDiamondBarcodeReport() {
+  const columns = reconciliationDiamondBarcodeColumns();
+  let rows = reconciliationDiamondBarcodeRows();
+  if (stockReportOptions.reconciliationIgnoreZero) {
+    rows = rows.filter((row) => row.nos !== 0 || row.gross !== 0 || row.stone !== 0 || row.net !== 0);
+  }
+  rows = applyClassicColumnFilters("reconciliationDiamondBarcode", rows, columns);
+  rows = applyClassicColumnSort("reconciliationDiamondBarcode", rows, columns);
+  return reconciliationTable("reconciliationDiamondBarcode", rows, columns, reconciliationDiamondBarcodeRows(), "reconciliation-diamond-barcode-grid");
+}
+
+function reconciliationDiamondItemReport() {
+  const columns = reconciliationDiamondItemColumns();
+  let rows = reconciliationDiamondItemRows();
+  if (stockReportOptions.reconciliationIgnoreZero) {
+    rows = rows.filter((row) => row.opNos !== 0 || row.transNos !== 0 || row.clNos !== 0);
+  }
+  rows = applyClassicColumnFilters("reconciliationDiamondItem", rows, columns);
+  rows = applyClassicColumnSort("reconciliationDiamondItem", rows, columns);
+  return reconciliationTable("reconciliationDiamondItem", rows, columns, reconciliationDiamondItemRows(), "reconciliation-diamond-item-grid", reconciliationDiamondItemTotals(rows, columns));
+}
+
+function reconciliationTable(reportKey, rows, columns, sourceRows, gridClass, totals = null) {
+  return `
+    <div class="classic-report-grid-wrap reconciliation-grid-wrap">
+      <table class="classic-report-grid ${gridClass}">
+        <thead>
+          <tr>
+            <th></th>
+            ${columns.map((column) => classicGridHeader(reportKey, column, sourceRows)).join("")}
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map((row, index) => `
+            <tr class="${index === 0 ? "selected" : ""} ${row.summary ? "summary-row" : ""}">
+              <td>${index === 0 ? ">" : index + 1}</td>
+              ${columns.map((column) => `<td class="${column.numeric ? "num" : ""}">${classicCellValue(row, column)}</td>`).join("")}
+            </tr>
+          `).join("")}
+        </tbody>
+        ${totals ? `
+          <tfoot>
+            <tr>
+              <td>*</td>
+              ${columns.map((column) => `<td class="${column.numeric ? "num" : ""}">${column.total ? classicCellValue(totals, column) : ""}</td>`).join("")}
+            </tr>
+          </tfoot>
+        ` : ""}
+      </table>
+    </div>
+  `;
+}
+
+function reconciliationGrossColumns() {
+  return [
+    { key: "id", label: "Id" },
+    { key: "itemName", label: "Item_Name" },
+    { key: "subGroup", label: "SuGroup" },
+    { key: "opNos", label: "OpNos", numeric: true, format: (value) => numberValue(value, 0) },
+    { key: "opening", label: "Opening", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "adNos", label: "AdNos", numeric: true, format: (value) => numberValue(value, 0) },
+    { key: "addition", label: "Addition", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "deNos", label: "DeNos", numeric: true, format: (value) => numberValue(value, 0) },
+    { key: "deduction", label: "Deduction", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "clNos", label: "ClNos", numeric: true, format: (value) => numberValue(value, 0) },
+    { key: "closing", label: "Closing", numeric: true, format: (value) => numberValue(value, 3) }
+  ];
+}
+
+function reconciliationNetColumns() {
+  return [
+    { key: "id", label: "Id" },
+    { key: "itemName", label: "Item_Name" },
+    { key: "subGroup", label: "SuGroup" },
+    { key: "opNos", label: "Opnos", numeric: true, format: (value) => numberValue(value, 0) },
+    { key: "opGross", label: "OpGross", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "opStone", label: "OpStone", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "opNet", label: "OpNet", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "adNos", label: "AdNos", numeric: true, format: (value) => numberValue(value, 0) },
+    { key: "addGross", label: "AddGross", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "addStone", label: "AddStone", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "addNet", label: "Addnet", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "deNos", label: "DeNos", numeric: true, format: (value) => numberValue(value, 0) },
+    { key: "dedGross", label: "DedGross", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "dedStone", label: "DedStone", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "dedNet", label: "Dednet", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "clNos", label: "ClNos", numeric: true, format: (value) => numberValue(value, 0) },
+    { key: "clGross", label: "ClGross", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "clStone", label: "ClStone", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "clNet", label: "ClNet", numeric: true, format: (value) => numberValue(value, 3) }
+  ];
+}
+
+function reconciliationDiamondBarcodeRows() {
+  return DIAMOND_CLOSING_STOCK.map((row) => ({
+    id: row.barcode.replace(/\d+$/, "") || row.name.slice(0, 3),
+    itemName: row.name,
+    barcode: row.barcode,
+    purchaseRate: row.purchaseRate,
+    sellingRate: row.sellingRate,
+    amount: row.salesAmt,
+    dmdPcRate: row.crtPuRate,
+    salesPcRate: row.salesAmt ? row.sellingRate : 0,
+    nos: row.nos,
+    gross: row.gross,
+    stone: row.stone,
+    net: row.net
+  }));
+}
+
+function reconciliationDiamondBarcodeColumns() {
+  return [
+    { key: "id", label: "ID" },
+    { key: "itemName", label: "item_Name" },
+    { key: "barcode", label: "Barcode" },
+    { key: "purchaseRate", label: "Purchase_", numeric: true, format: (value) => trimMoney(value) },
+    { key: "sellingRate", label: "SellingRate", numeric: true, format: (value) => trimMoney(value) },
+    { key: "amount", label: "Amount", numeric: true, format: (value) => trimMoney(value) },
+    { key: "dmdPcRate", label: "DmdPcRat", numeric: true, format: (value) => trimMoney(value) },
+    { key: "salesPcRate", label: "SalesPcRat", numeric: true, format: (value) => trimMoney(value) },
+    { key: "nos", label: "Nos", numeric: true, format: (value) => numberValue(value, 0) },
+    { key: "gross", label: "Gross", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "stone", label: "Stone", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "net", label: "Net", numeric: true, format: (value) => numberValue(value, 3) }
+  ];
+}
+
+function reconciliationDiamondItemRows() {
+  const diamondRows = STOCK_COMPARE_ROWS.filter((row) => row.category === "Diamond");
+  const transactionMap = {
+    DC: { transNos: -1, transGross: -3.460, transStone: 0.000 },
+    DDD: { transNos: -2, transGross: -1.470, transStone: 0.000 }
+  };
+  const caratMap = {
+    BRSL: [1.400, 1.000],
+    BSR: [19.700, 10.000],
+    DBR: [3.910, 924.000],
+    DC: [0.000, 0.000],
+    DD: [8.659, 1765.000],
+    DDD: [26.233, 4700.000],
+    DL: [3.740, 612.000],
+    DN: [2.510, 448.000],
+    DNR: [0.860, 12.000],
+    TDBR: [0.530, 0.000],
+    TDD: [1.110, 2.000],
+    TDDD: [2.170, 0.000],
+    TDL: [0.800, 0.000],
+    TDN: [1.340, 0.000]
+  };
+  return diamondRows
+    .filter((row) => row.barNos !== 0 || row.itemNos !== 0)
+    .map((row) => {
+      const trans = transactionMap[row.itemId] || { transNos: 0, transGross: 0, transStone: 0 };
+      const opNet = Number((row.barGross - row.barStone).toFixed(3));
+      const transNet = Number((trans.transGross - trans.transStone).toFixed(3));
+      const clNos = row.barNos + trans.transNos;
+      const clGross = Number((row.barGross + trans.transGross).toFixed(3));
+      const clStone = Number((row.barStone + trans.transStone).toFixed(3));
+      const clNet = Number((opNet + transNet).toFixed(3));
+      const [opCarat, opDmdPcs] = caratMap[row.itemId] || [0, 0];
+      return {
+        id: row.itemId,
+        itemName: row.name,
+        opNos: row.barNos,
+        opGross: row.barGross,
+        opStone: row.barStone,
+        opNet,
+        opCarat,
+        opDmdPcs,
+        transNos: trans.transNos,
+        transGross: trans.transGross,
+        transStone: trans.transStone,
+        transNet,
+        clNos,
+        clGross,
+        clStone,
+        clNet
+      };
+    });
+}
+
+function reconciliationDiamondItemTotals(rows) {
+  const totals = { id: "", itemName: "" };
+  reconciliationDiamondItemColumns().forEach((column) => {
+    if (column.total) totals[column.key] = rows.reduce((sum, row) => sum + Number(row[column.key] || 0), 0);
+  });
+  return totals;
+}
+
+function reconciliationDiamondItemColumns() {
+  return [
+    { key: "id", label: "ID" },
+    { key: "itemName", label: "item_Name" },
+    { key: "opNos", label: "OP_Nos", numeric: true, total: true, format: (value) => numberValue(value, 0) },
+    { key: "opGross", label: "OP_Gross", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "opStone", label: "OP_Stone", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "opNet", label: "OP_Net", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "opCarat", label: "OP_Carat", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "opDmdPcs", label: "OP_DmdP", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "transNos", label: "Trans_Nos", numeric: true, total: true, format: (value) => numberValue(value, 0) },
+    { key: "transGross", label: "Trans_Gro", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "transStone", label: "Trans_Sto", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "transNet", label: "Trans_Net", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "clNos", label: "Cl_Nos", numeric: true, total: true, format: (value) => numberValue(value, 0) },
+    { key: "clGross", label: "Cl_Gross", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "clStone", label: "Cl_Stone", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "clNet", label: "Cl_Net", numeric: true, total: true, format: (value) => numberValue(value, 3) }
+  ];
+}
+
+function reconciliationStockTypeWiseReport() {
+  const columns = reconciliationStockTypeWiseColumns();
+  let rows = reconciliationStockTypeWiseRows();
+  if (stockReportOptions.reconciliationIgnoreZero) rows = rows.filter((row) => row.summary || row.opGross !== 0 || row.clGross !== 0 || row.clDmdCar !== 0);
+  rows = applyClassicColumnFilters("reconciliationStockTypeWise", rows, columns);
+  rows = applyClassicColumnSort("reconciliationStockTypeWise", rows, columns);
+  return reconciliationTable("reconciliationStockTypeWise", rows, columns, reconciliationStockTypeWiseRows(), "reconciliation-stock-type-grid");
+}
+
+function reconciliationStockTypeWiseRows() {
+  return [
+    { category: "Diamond", goldType: "18ct", opGross: 611.080, opStone: 1.794, opNet: 609.248, clGross: 606.150, clStone: 1.794, clNet: 604.318, clDmdCar: 51.352 },
+    { category: "Diamond", goldType: "22ct", opGross: 115.450, opStone: 5.060, opNet: 110.390, clGross: 115.450, clStone: 5.060, clNet: 110.390, clDmdCar: 21.960 },
+    { category: "Diamond", goldType: "** Sub Total-->", opGross: 726.530, opStone: 6.854, opNet: 719.638, clGross: 721.600, clStone: 6.854, clNet: 714.708, clDmdCar: 73.312, summary: true },
+    { category: "Gold", goldType: "22ct", opGross: 45641.606, opStone: 431.210, opNet: 45222.892, clGross: 45724.936, clStone: 431.800, clNet: 45302.632, clDmdCar: 0.000 },
+    { category: "Gold", goldType: "** Sub Total-->", opGross: 45644.606, opStone: 431.210, opNet: 45222.892, clGross: 45724.936, clStone: 431.800, clNet: 45302.632, clDmdCar: 0.000, summary: true },
+    { category: "Silver", goldType: "22ct", opGross: 671.570, opStone: 0.000, opNet: 671.570, clGross: 671.570, clStone: 0.000, clNet: 671.570, clDmdCar: 0.000 },
+    { category: "Silver", goldType: "Silver", opGross: 3704.630, opStone: 0.000, opNet: 3704.630, clGross: 3704.630, clStone: 0.000, clNet: 3704.630, clDmdCar: 0.000 },
+    { category: "Silver", goldType: "** Sub Total-->", opGross: 4376.200, opStone: 0.000, opNet: 4376.200, clGross: 4376.200, clStone: 0.000, clNet: 4376.200, clDmdCar: 0.000, summary: true },
+    { category: "*** Tota...", goldType: "** Sub Total-->", opGross: 50747.336, opStone: 438.064, opNet: 50318.730, clGross: 50822.736, clStone: 438.654, clNet: 50393.540, clDmdCar: 73.312, summary: true }
+  ];
+}
+
+function reconciliationStockTypeWiseColumns() {
+  return [
+    { key: "category", label: "Category" },
+    { key: "goldType", label: "GoldType" },
+    { key: "opGross", label: "OpGross", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "opStone", label: "OpStone", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "opNet", label: "OpNet", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "clGross", label: "ClGross", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "clStone", label: "ClStone", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "clNet", label: "ClNet", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "clDmdCar", label: "ClDmdCar", numeric: true, format: (value) => numberValue(value, 3) }
+  ];
+}
+
+function reconciliationStockTypeItemWiseReport() {
+  const columns = reconciliationStockTypeItemWiseColumns();
+  let rows = reconciliationStockTypeItemWiseRows();
+  if (stockReportOptions.reconciliationIgnoreZero) rows = rows.filter((row) => row.summary || row.opGross !== 0 || row.clGross !== 0 || row.clDmdCar !== 0);
+  rows = applyClassicColumnFilters("reconciliationStockTypeItemWise", rows, columns);
+  rows = applyClassicColumnSort("reconciliationStockTypeItemWise", rows, columns);
+  return reconciliationTable("reconciliationStockTypeItemWise", rows, columns, reconciliationStockTypeItemWiseRows(), "reconciliation-stock-type-item-grid");
+}
+
+function reconciliationStockTypeItemWiseRows() {
+  const baseRows = [
+    ["BIRTH STONE PENTANT", "22ct", 2.250, 0.280, 1.970, 2.250, 0.280, 1.970, 1.400],
+    ["BIRTH STONE RING", "22ct", 53.900, 4.780, 49.120, 53.900, 4.780, 49.120, 19.700],
+    ["DIAMOND BRACELET", "18ct", 107.700, 0.100, 107.600, 107.700, 0.100, 107.600, 3.910],
+    ["DIAMOND CHAIN", "18ct", 31.530, 0.000, 31.530, 28.070, 0.000, 28.070, 0.000],
+    ["DIAMOND DROPS", "18ct", 163.460, 0.080, 163.376, 161.990, 0.080, 161.906, 26.153],
+    ["DIAMOND LOCKET", "18ct", 41.230, 0.146, 41.084, 41.230, 0.146, 41.084, 3.740],
+    ["DIAMOND NECKLACE", "18ct", 56.050, 0.790, 55.260, 56.050, 0.790, 55.260, 2.510],
+    ["DIAMOND RING", "18ct", 160.740, 0.678, 160.028, 160.740, 0.678, 160.028, 8.659],
+    ["NAVARATNA RNG", "22ct", 59.300, 0.000, 59.300, 59.300, 0.000, 59.300, 0.860],
+    ["TALIA DIAMOND BANGLE", "18ct", 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.430],
+    ["TALIA DIAMOND BRACELET", "18ct", 3.430, 0.000, 3.430, 3.430, 0.000, 3.430, 0.530],
+    ["TALIA DIAMOND RING", "18ct", 12.950, 0.000, 12.950, 12.950, 0.000, 12.950, 1.110],
+    ["TALIA DIAMOND DROPS", "18ct", 13.920, 0.000, 13.920, 13.920, 0.000, 13.920, 2.170],
+    ["TALIA DIAMOND LOCKET", "18ct", 4.870, 0.000, 4.870, 4.870, 0.000, 4.870, 0.800],
+    ["TALIA DIAMOND NECKLACE", "18ct", 15.200, 0.000, 15.200, 15.200, 0.000, 15.200, 1.340]
+  ];
+  return baseRows.flatMap(([itemName, goldType, opGross, opStone, opNet, clGross, clStone, clNet, clDmdCar]) => {
+    const row = { category: "Diamond", itemName, goldType, opGross, opStone, opNet, clGross, clStone, clNet, clDmdCar };
+    const subtotal = { ...row, goldType: "** Sub Total-->", summary: true };
+    return [row, subtotal];
+  });
+}
+
+function reconciliationStockTypeItemWiseColumns() {
+  return [
+    { key: "category", label: "Category" },
+    { key: "itemName", label: "Item_Name" },
+    { key: "goldType", label: "GoldType" },
+    { key: "opGross", label: "OpGross", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "opStone", label: "OpStone", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "opNet", label: "OpNet", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "clGross", label: "ClGross", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "clStone", label: "ClStone", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "clNet", label: "ClNet", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "clDmdCar", label: "ClDmdCar", numeric: true, format: (value) => numberValue(value, 3) }
+  ];
+}
+
+function openingStockReportPlaceholder() {
+  return `
+    <div class="classic-report-layout focused-classic-report">
+      ${stockReportSubmenus("Opening Stock")}
+      <section class="classic-stock-report">
+        ${classicStockToolbar("Opening Stock")}
+        <header class="classic-report-title">
+          ${stockReportOptions.noFirmName ? "" : `<h3>MT GOLD LAND</h3>`}
+          <h2>OPENING STOCK</h2>
+        </header>
+        <div class="classic-report-empty opening-stock-report-placeholder">
+          <h3>Opening Stock Report</h3>
+          <p>Opening Stock report screen placeholder. This will show branch opening stock entries once the opening-stock report columns are finalized.</p>
+        </div>
+      </section>
+    </div>
+  `;
+}
+
+function stockLedgerReportScreen() {
+  const items = stockLedgerItemRows();
+  const selected = stockLedgerSelectedItem(items);
+  const ledgerRows = selected ? stockLedgerRowsForItem(selected) : [];
+  return `
+    <div class="classic-report-layout focused-classic-report">
+      ${stockReportSubmenus("Stock Ledger")}
+      <section class="stock-ledger-stage">
+        <div class="stock-ledger-window">
+          <header class="stock-ledger-titlebar">
+            <span class="stock-ledger-app-icon"></span>
+            <span>Item Pick</span>
+            <button data-action="stock-ledger-close" aria-label="Close">×</button>
+          </header>
+          <div class="stock-ledger-form">
+            <label><span>From Date</span><input data-stock-ledger-field="stockLedgerFrom" value="${escapeHtml(stockReportOptions.stockLedgerFrom)}" /></label>
+            <button class="stock-ledger-date-button" data-action="stock-ledger-fin-year">Fin Year</button>
+            <label><span>To Date</span><input data-stock-ledger-field="stockLedgerTo" value="${escapeHtml(stockReportOptions.stockLedgerTo)}" /></label>
+            <button class="stock-ledger-date-button" data-action="stock-ledger-today">Today</button>
+            <label class="stock-ledger-item-field"><span>Item Name</span><input data-stock-ledger-field="stockLedgerItem" value="${escapeHtml(stockReportOptions.stockLedgerItem)}" /></label>
+          </div>
+          <div class="stock-ledger-pick-wrap">
+            <table class="stock-ledger-pick-table">
+              <thead><tr><th>SL</th><th>ItemID</th><th>ItemName</th></tr></thead>
+              <tbody>
+                ${items.map((item, index) => `
+                  <tr class="${selected?.itemId === item.itemId ? "selected" : ""}" data-stock-ledger-item="${escapeHtml(item.name)}">
+                    <td>${index + 1}</td>
+                    <td>${escapeHtml(item.itemId)}</td>
+                    <td>${escapeHtml(item.name)}</td>
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table>
+          </div>
+          <footer class="stock-ledger-footer">
+            <label><input type="checkbox" data-stock-ledger-check="stockLedgerBarcodeWise" ${stockReportOptions.stockLedgerBarcodeWise ? "checked" : ""} /> Barcode Wise</label>
+            <span></span>
+            <button data-action="stock-ledger-ok">OK</button>
+            <button data-action="stock-ledger-close">Close</button>
+          </footer>
+        </div>
+        ${selected ? stockLedgerResult(selected, ledgerRows) : `<div class="stock-ledger-result-empty">Search and select an item to view its stock ledger.</div>`}
+      </section>
+    </div>
+  `;
+}
+
+function stockLedgerItemRows() {
+  return ITEM_WISE_CLOSING_STOCK.map((row) => ({ itemId: row.itemId, name: row.name, itemType: row.itemType }));
+}
+
+function stockLedgerSelectedItem(items = stockLedgerItemRows()) {
+  const query = String(stockReportOptions.stockLedgerItem || "").trim().toLowerCase();
+  if (!query) return items[0];
+  return items.find((item) => item.name.toLowerCase() === query || item.itemId.toLowerCase() === query)
+    || items.find((item) => item.name.toLowerCase().includes(query) || item.itemId.toLowerCase().includes(query));
+}
+
+function stockLedgerRowsForItem(item) {
+  const reconciliation = reconciliationRows().find((row) => row.id === item.itemId || row.itemName === item.name);
+  if (!reconciliation) return [];
+  const movementDate = "13/07/2026";
+  const openingDate = stockReportOptions.stockLedgerFrom || movementDate;
+  const rows = [
+    {
+      date: openingDate,
+      voucher: "OP",
+      particular: "Opening Stock",
+      inGross: reconciliation.opGross,
+      inNos: reconciliation.opNos,
+      outGross: 0,
+      outNos: 0
+    }
+  ];
+  if (isDateWithinPeriod(movementDate, stockReportOptions.stockLedgerFrom, stockReportOptions.stockLedgerTo)) {
+    if (reconciliation.addGross > 0 || reconciliation.adNos > 0) {
+      rows.push({ date: movementDate, voucher: "PUR", particular: "Purchase / Addition", inGross: reconciliation.addGross, inNos: reconciliation.adNos, outGross: 0, outNos: 0 });
+    }
+    if (reconciliation.dedGross < 0 || reconciliation.deNos < 0) {
+      rows.push({ date: movementDate, voucher: "SAL", particular: "Sales / Deduction", inGross: 0, inNos: 0, outGross: Math.abs(reconciliation.dedGross), outNos: Math.abs(reconciliation.deNos) });
+    }
+    if (reconciliation.dedGross > 0 || reconciliation.deNos > 0) {
+      rows.push({ date: movementDate, voucher: "TRF", particular: "Item Transfer OUT", inGross: 0, inNos: 0, outGross: reconciliation.dedGross, outNos: reconciliation.deNos });
+    }
+  }
+  let balanceGross = 0;
+  let balanceNos = 0;
+  return rows.map((row) => {
+    balanceGross = Number((balanceGross + row.inGross - row.outGross).toFixed(3));
+    balanceNos = Number((balanceNos + row.inNos - row.outNos).toFixed(3));
+    return { ...row, balanceGross, balanceNos };
+  });
+}
+
+function stockLedgerResult(item, ledgerRows) {
+  const last = ledgerRows.at(-1) || {};
+  return `
+    <div class="stock-ledger-result">
+      <header>
+        <div>
+          <strong>${escapeHtml(item.name)}</strong>
+          <span>${escapeHtml(item.itemId)} · ${escapeHtml(formatDisplayDate(stockReportOptions.stockLedgerFrom))} to ${escapeHtml(formatDisplayDate(stockReportOptions.stockLedgerTo))}</span>
+        </div>
+        <div class="stock-ledger-balance">
+          <span>Closing Gross</span><strong>${numberValue(last.balanceGross, 3)}</strong>
+          <span>Nos</span><strong>${numberValue(last.balanceNos, 3)}</strong>
+        </div>
+      </header>
+      <div class="stock-ledger-result-wrap">
+        <table class="stock-ledger-result-table">
+          <thead><tr><th>Date</th><th>Voucher</th><th>Particular</th><th>In Gross</th><th>In Nos</th><th>Out Gross</th><th>Out Nos</th><th>Balance Gross</th><th>Balance Nos</th></tr></thead>
+          <tbody>
+            ${ledgerRows.map((row, index) => `
+              <tr class="${index === 0 ? "selected" : ""}">
+                <td>${escapeHtml(row.date)}</td>
+                <td>${escapeHtml(row.voucher)}</td>
+                <td>${escapeHtml(row.particular)}</td>
+                <td class="num">${numberValue(row.inGross, 3)}</td>
+                <td class="num">${numberValue(row.inNos, 3)}</td>
+                <td class="num">${numberValue(row.outGross, 3)}</td>
+                <td class="num">${numberValue(row.outNos, 3)}</td>
+                <td class="num">${numberValue(row.balanceGross, 3)}</td>
+                <td class="num">${numberValue(row.balanceNos, 3)}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      </div>
+      ${stockReportOptions.stockLedgerBarcodeWise ? stockLedgerBarcodeResult(item) : ""}
+    </div>
+  `;
+}
+
+function stockLedgerBarcodeResult(item) {
+  const barcodes = BARCODE_WISE_CLOSING_STOCK.filter((row) => row.iid === item.itemId || row.name === item.name);
+  return `
+    <div class="stock-ledger-barcode-wrap">
+      <table class="stock-ledger-barcode-table">
+        <thead><tr><th>Barcode</th><th>Description</th><th>Nos</th><th>Gross</th><th>Stone</th><th>Net</th><th>Date</th></tr></thead>
+        <tbody>
+          ${barcodes.length ? barcodes.map((row) => `
+            <tr>
+              <td>${escapeHtml(row.barcode)}</td>
+              <td>${escapeHtml(row.description || row.name)}</td>
+              <td class="num">${numberValue(row.nos, 0)}</td>
+              <td class="num">${numberValue(row.gross, 3)}</td>
+              <td class="num">${numberValue(row.stone, 3)}</td>
+              <td class="num">${numberValue(row.net, 3)}</td>
+              <td>${escapeHtml(row.transDate || "")}</td>
+            </tr>
+          `).join("") : `<tr><td colspan="7">No barcode rows for this item.</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function stockReportSubmenus(activeReport) {
+  return `
+    <div class="report-submenu-stack">
+      <div class="report-submenu-row">
+        <strong>Stock</strong>
+        ${STOCK_REPORT_MENU[0].items.map((item) => `
+          <button class="${activeReport === item || (item === "CurrentStock" && STOCK_CURRENT_REPORTS.includes(activeReport)) ? "active" : ""}" data-report-item="${escapeHtml(item)}">
+            ${escapeHtml(item)}
+          </button>
+        `).join("")}
+      </div>
+      <div class="report-submenu-row current-stock-row">
+        <strong>CurrentStock</strong>
+        ${STOCK_CURRENT_REPORTS.map((item) => `
+          <button class="${activeReport === item ? "active" : ""}" data-report-item="${escapeHtml(item)}">
+            ${escapeHtml(item)}${item === "Item Wise" ? `<small>Ctrl+I</small>` : ""}
+          </button>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function stockReportMenu(activeReport) {
+  const rootItems = [
+    "Stock", "Sales", "Sales Profit", "Sales Return", "Exchange", "Purchase", "Purchase Return",
+    "Direct Gold Purchase", "Direct Gold Purchase Return", "Diamond", "Stock Adjustment", "Transfers",
+    "Sample Issue/Return", "Sales Order", "Gold Deposit", "Today's Dues", "Barcode Entry", "Day end Report",
+    "Tax Reports", "Service / Job", "Bills Reports", "Bills Payables", "Cash Point", "Discount Voucher"
+  ];
+  return `
+    <aside class="classic-report-menu" aria-label="Reports menu">
+      <div class="classic-menu-column">
+        ${rootItems.map((item) => classicMenuItem(item, item === "Stock", ["Diamond", "Transfers", "Sales Order", "Gold Deposit", "Today's Dues", "Day end Report"].includes(item))).join("")}
+      </div>
+      <div class="classic-menu-column">
+        ${STOCK_REPORT_MENU[0].items.map((item) => classicMenuItem(item, item === "CurrentStock" || activeReport === item, item === "CurrentStock")).join("")}
+      </div>
+      <div class="classic-menu-column">
+        ${STOCK_CURRENT_REPORTS.map((item) => classicMenuItem(item, activeReport === item, false, item === "Item Wise" ? "Ctrl+I" : "")).join("")}
+      </div>
+    </aside>
+  `;
+}
+
+function classicMenuItem(label, activeItem = false, hasChildren = false, shortcut = "") {
+  const clickable = STOCK_CURRENT_REPORTS.includes(label) || STOCK_REPORT_MENU[0].items.includes(label);
+  const attrs = clickable ? `data-report-item="${escapeHtml(label)}"` : "";
+  return `
+    <button class="classic-menu-item ${activeItem ? "active" : ""}" ${attrs}>
+      <span class="classic-menu-chevron">»</span>
+      <span>${escapeHtml(label)}</span>
+      ${shortcut ? `<kbd>${escapeHtml(shortcut)}</kbd>` : ""}
+      ${hasChildren ? `<span class="classic-menu-arrow">›</span>` : ""}
+    </button>
+  `;
+}
+
+function classicStockToolbar(activeReport = "") {
+  const tools = [
+    ["SHOW", "▦"], ["PRINT", "▰"], ["DIRECT PRINT", "▤"], ["EXCEL", "X"], ["SAVE AS", "▣"], ["DATE", "▥"],
+    ["FIRST", "↤"], ["PREV", "←"], ["NEXT", "→"], ["LAST", "↦"], ["VIEW/HIDE", "◉"], ["ZOOM IN", "+"],
+    ["DEFAULT", "100%"], ["ZOOM OUT", "-"], ["CLOSE", "×"]
+  ];
+  return `
+    <div class="classic-report-toolbar">
+      <div class="classic-tool-buttons">
+        ${tools.map(([label, icon]) => `<button class="classic-tool" data-action="${label === "PRINT" ? "print-now" : label === "EXCEL" ? "export-report" : "noop"}"><strong>${icon}</strong><span>${label}</span></button>`).join("")}
+      </div>
+      <label class="classic-a4"><input type="checkbox" checked />${escapeHtml(stockReportOptions.pageSize)}</label>
+      <input class="classic-toolbar-input" value="" aria-label="Report parameter" />
+      ${stockReportCheckbox("includeZero", "Include 0")}
+      ${activeReport === "Product Wise" ? stockReportCheckbox("summary", "Summary") : ""}
+      ${["Barcode Wise", "Category Wise", "Diamond Stock", "Type Wise"].includes(activeReport) ? stockReportTypeSelect(activeReport === "Category Wise" ? "categoryType" : activeReport === "Diamond Stock" ? "diamondType" : activeReport === "Type Wise" ? "typeType" : "barcodeType") : stockReportCheckbox("groupByType", "Group By Type")}
+      ${stockReportCheckbox("groupByItem", "Group By Item")}
+      ${stockReportCheckbox("noFirmName", "No FirmName")}
+    </div>
+  `;
+}
+
+function stockReportCheckbox(key, label) {
+  return `<label class="classic-report-check"><input type="checkbox" data-stock-report-option="${key}" ${stockReportOptions[key] ? "checked" : ""} /> ${escapeHtml(label)}</label>`;
+}
+
+function stockReportTypeSelect(optionKey = "barcodeType") {
+  const selected = stockReportOptions[optionKey] || "";
+  const options = optionKey === "diamondType"
+    ? ["", "DIAMOND NECKLACE", "BIRTH STONE RING"]
+    : optionKey === "typeType"
+      ? ["", "24ct", "Other", "Old Gold", "Old Silver", "22ct", "Silver", "18ct"]
+      : ["", "Diamond", "Gold", "Pure Gold", "Other", "Silver"];
+  return `
+    <label class="classic-report-type">
+      <span>type</span>
+      <select data-stock-report-select="${escapeHtml(optionKey)}">
+        ${options.map((item) => `<option value="${escapeHtml(item)}" ${selected === item ? "selected" : ""}>${escapeHtml(item || "type")}</option>`).join("")}
+      </select>
+    </label>
+  `;
+}
+
+function classicStockTitle(activeReport) {
+  const subtitle = activeReport === "Item Wise" ? "ITEM WISE CLOSING STOCK" : `${activeReport.toUpperCase()} CLOSING STOCK`;
+  return `
+    <header class="classic-report-title">
+      ${stockReportOptions.noFirmName ? "" : `<h3>MT GOLD LAND</h3>`}
+      <h2>${escapeHtml(subtitle)}</h2>
+    </header>
+  `;
+}
+
+function stockReportBody(activeReport) {
+  if (activeReport === "Barcode Wise") return barcodeWiseStockReport();
+  if (activeReport === "Category Wise") return categoryWiseStockReport();
+  if (activeReport === "Product Wise") return productWiseStockReport();
+  if (activeReport === "Type Wise") return typeWiseStockReport();
+  if (activeReport === "Diamond Stock") return diamondStockReport();
+  if (activeReport === "Stock Compare") return stockCompareReport();
+  if (activeReport === "Other Location Stock") return otherLocationStockReport();
+  return itemWiseClosingStockTable(itemWiseClosingRows());
+}
+
+function itemWiseClosingRows() {
+  let rows = ITEM_WISE_CLOSING_STOCK.filter((row) => stockReportOptions.includeZero || Number(row.nos) !== 0);
+  const columns = itemWiseColumns();
+  rows = applyClassicColumnFilters("itemWise", rows, columns);
+  if (stockReportOptions.groupByType) rows = [...rows].sort((a, b) => a.itemType.localeCompare(b.itemType) || a.name.localeCompare(b.name));
+  if (stockReportOptions.groupByItem) rows = [...rows].sort((a, b) => a.name.localeCompare(b.name) || a.itemType.localeCompare(b.itemType));
+  return applyClassicColumnSort("itemWise", rows, columns);
+}
+
+function itemWiseClosingStockTable(rows) {
+  const columns = itemWiseColumns();
+  const totals = rows.reduce((acc, row) => ({
+    nos: acc.nos + Number(row.nos || 0),
+    grossWeight: acc.grossWeight + Number(row.grossWeight || 0),
+    stoneWeight: acc.stoneWeight + Number(row.stoneWeight || 0),
+    netWeight: acc.netWeight + Number(row.netWeight || 0)
+  }), { nos: 0, grossWeight: 0, stoneWeight: 0, netWeight: 0 });
+  return `
+    <div class="classic-report-grid-wrap">
+      <table class="classic-report-grid">
+        <thead>
+          <tr>
+            <th></th>
+            ${columns.map((column) => classicGridHeader("itemWise", column, ITEM_WISE_CLOSING_STOCK)).join("")}
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map((row, index) => `
+            <tr class="${index === 0 ? "selected" : ""}">
+              <td>${index === 0 ? "›" : index + 1}</td>
+              <td>${escapeHtml(row.itemType)}</td>
+              <td>${escapeHtml(row.subGroup)}</td>
+              <td>${escapeHtml(row.itemId)}</td>
+              <td>${escapeHtml(row.name)}</td>
+              <td class="num">${numberValue(row.nos, 0)}</td>
+              <td class="num">${numberValue(row.grossWeight, 3)}</td>
+              <td class="num">${numberValue(row.stoneWeight, 3)}</td>
+              <td class="num">${numberValue(row.netWeight, 3)}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="5">Total</td>
+            <td class="num">${numberValue(totals.nos, 0)}</td>
+            <td class="num">${numberValue(totals.grossWeight, 3)}</td>
+            <td class="num">${numberValue(totals.stoneWeight, 3)}</td>
+            <td class="num">${numberValue(totals.netWeight, 3)}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  `;
+}
+
+function itemWiseColumns() {
+  return [
+    { key: "itemType", label: "ItemType" },
+    { key: "subGroup", label: "SubGroup" },
+    { key: "itemId", label: "ItemID" },
+    { key: "name", label: "Name" },
+    { key: "nos", label: "Nos", numeric: true, format: (value) => numberValue(value, 0) },
+    { key: "grossWeight", label: "GrossWeig", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "stoneWeight", label: "StoneWeig", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "netWeight", label: "NetWeight", numeric: true, format: (value) => numberValue(value, 3) }
+  ];
+}
+
+function stockSummaryReport(activeReport) {
+  const rows = Object.values(ITEM_WISE_CLOSING_STOCK.reduce((acc, row) => {
+    const key = activeReport === "Product Wise" ? row.itemType : activeReport === "Category Wise" ? `${row.itemType} Closing` : row.itemType;
+    acc[key] ||= { label: key, itemCount: 0, nos: 0, grossWeight: 0, stoneWeight: 0, netWeight: 0 };
+    acc[key].itemCount += 1;
+    acc[key].nos += row.nos;
+    acc[key].grossWeight += row.grossWeight;
+    acc[key].stoneWeight += row.stoneWeight;
+    acc[key].netWeight += row.netWeight;
+    return acc;
+  }, {}));
+  return table(["Group", "Items", "Nos", "GrossWeight", "StoneWeight", "NetWeight"], rows.map((row) => [
+    row.label,
+    row.itemCount,
+    numberValue(row.nos, 0),
+    numberValue(row.grossWeight, 3),
+    numberValue(row.stoneWeight, 3),
+    numberValue(row.netWeight, 3)
+  ]));
+}
+
+function categoryWiseStockReport() {
+  const rows = categoryWiseRows();
+  const columns = categoryWiseColumns();
+  const totals = rows.reduce((acc, row) => ({
+    nos: acc.nos + Number(row.nos || 0),
+    grossWeight: acc.grossWeight + Number(row.grossWeight || 0),
+    stoneWeight: acc.stoneWeight + Number(row.stoneWeight || 0),
+    netWeight: acc.netWeight + Number(row.netWeight || 0)
+  }), { nos: 0, grossWeight: 0, stoneWeight: 0, netWeight: 0 });
+  return `
+    <div class="classic-report-grid-wrap category-report-grid-wrap">
+      <table class="classic-report-grid category-report-grid">
+        <thead>
+          <tr>
+            <th></th>
+            ${columns.map((column) => classicGridHeader("categoryWise", column, CATEGORY_WISE_CLOSING_STOCK)).join("")}
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map((row, index) => `
+            <tr class="${index === 0 ? "selected" : ""}">
+              <td>${index === 0 ? ">" : index + 1}</td>
+              ${columns.map((column) => `<td class="${column.numeric ? "num" : ""}">${classicCellValue(row, column)}</td>`).join("")}
+            </tr>
+          `).join("")}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td>6</td>
+            <td></td>
+            <td class="num">${numberValue(totals.nos, 0)}</td>
+            <td class="num">${numberValue(totals.grossWeight, 3)}</td>
+            <td class="num">${numberValue(totals.stoneWeight, 3)}</td>
+            <td class="num">${numberValue(totals.netWeight, 3)}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  `;
+}
+
+function categoryWiseRows() {
+  let rows = CATEGORY_WISE_CLOSING_STOCK.filter((row) => stockReportOptions.includeZero || Number(row.nos) !== 0);
+  const columns = categoryWiseColumns();
+  rows = applyClassicColumnFilters("categoryWise", rows, columns);
+  if (stockReportOptions.categoryType) rows = rows.filter((row) => row.name === stockReportOptions.categoryType);
+  if (stockReportOptions.groupByItem) rows = [...rows].sort((a, b) => a.name.localeCompare(b.name));
+  return applyClassicColumnSort("categoryWise", rows, columns);
+}
+
+function categoryWiseColumns() {
+  return [
+    { key: "name", label: "Name" },
+    { key: "nos", label: "Nos", numeric: true, format: (value) => numberValue(value, 0) },
+    { key: "grossWeight", label: "GrossWeig", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "stoneWeight", label: "StoneWeig", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "netWeight", label: "NetWeight", numeric: true, format: (value) => numberValue(value, 3) }
+  ];
+}
+
+function typeWiseStockReport() {
+  const rows = typeWiseRows();
+  const columns = typeWiseColumns();
+  const totals = rows.reduce((acc, row) => ({
+    nos: acc.nos + Number(row.nos || 0),
+    grossWeight: acc.grossWeight + Number(row.grossWeight || 0),
+    stoneWeight: acc.stoneWeight + Number(row.stoneWeight || 0),
+    netWeight: acc.netWeight + Number(row.netWeight || 0)
+  }), { nos: 0, grossWeight: 0, stoneWeight: 0, netWeight: 0 });
+  return `
+    <div class="classic-report-grid-wrap type-report-grid-wrap">
+      <table class="classic-report-grid type-report-grid">
+        <thead>
+          <tr>
+            <th></th>
+            ${columns.map((column) => classicGridHeader("typeWise", column, TYPE_WISE_CLOSING_STOCK)).join("")}
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map((row, index) => `
+            <tr class="${index === 0 ? "selected" : ""}">
+              <td>${index === 0 ? ">" : index + 1}</td>
+              ${columns.map((column) => `<td class="${column.numeric ? "num" : ""}">${classicCellValue(row, column)}</td>`).join("")}
+            </tr>
+          `).join("")}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td>8</td>
+            <td></td>
+            <td class="num">${numberValue(totals.nos, 0)}</td>
+            <td class="num">${numberValue(totals.grossWeight, 3)}</td>
+            <td class="num">${numberValue(totals.stoneWeight, 3)}</td>
+            <td class="num">${numberValue(totals.netWeight, 3)}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  `;
+}
+
+function typeWiseRows() {
+  let rows = TYPE_WISE_CLOSING_STOCK.filter((row) => stockReportOptions.includeZero || Number(row.nos) !== 0);
+  const columns = typeWiseColumns();
+  rows = applyClassicColumnFilters("typeWise", rows, columns);
+  if (stockReportOptions.typeType) rows = rows.filter((row) => row.name === stockReportOptions.typeType);
+  if (stockReportOptions.groupByItem) rows = [...rows].sort((a, b) => a.name.localeCompare(b.name));
+  return applyClassicColumnSort("typeWise", rows, columns);
+}
+
+function typeWiseColumns() {
+  return [
+    { key: "name", label: "Name" },
+    { key: "nos", label: "Nos", numeric: true, format: (value) => numberValue(value, 0) },
+    { key: "grossWeight", label: "GrossWeig", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "stoneWeight", label: "StoneWeig", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "netWeight", label: "NetWeight", numeric: true, format: (value) => numberValue(value, 3) }
+  ];
+}
+
+function productWiseStockReport() {
+  const rows = productWiseRows();
+  const columns = productWiseColumns();
+  const totals = rows.reduce((acc, row) => ({
+    nos: acc.nos + Number(row.nos || 0),
+    grossWeight: acc.grossWeight + Number(row.grossWeight || 0),
+    stoneWeight: acc.stoneWeight + Number(row.stoneWeight || 0),
+    netWeight: acc.netWeight + Number(row.netWeight || 0)
+  }), { nos: 0, grossWeight: 0, stoneWeight: 0, netWeight: 0 });
+  return `
+    <div class="classic-report-grid-wrap product-report-grid-wrap">
+      <table class="classic-report-grid product-report-grid">
+        <thead>
+          <tr>
+            <th></th>
+            ${columns.map((column) => classicGridHeader("productWise", column, PRODUCT_WISE_CLOSING_STOCK)).join("")}
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map((row, index) => `
+            <tr class="${index === 0 ? "selected" : ""}">
+              <td>${index === 0 ? ">" : index + 1}</td>
+              ${columns.map((column) => `<td class="${column.numeric ? "num" : ""}">${classicCellValue(row, column)}</td>`).join("")}
+            </tr>
+          `).join("")}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td>3</td>
+            <td colspan="2"></td>
+            <td class="num">${numberValue(totals.nos, 0)}</td>
+            <td class="num">${numberValue(totals.grossWeight, 3)}</td>
+            <td class="num">${numberValue(totals.stoneWeight, 3)}</td>
+            <td class="num">${numberValue(totals.netWeight, 3)}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  `;
+}
+
+function productWiseRows() {
+  let rows = PRODUCT_WISE_CLOSING_STOCK.filter((row) => stockReportOptions.includeZero || Number(row.nos) !== 0);
+  const columns = productWiseColumns();
+  rows = applyClassicColumnFilters("productWise", rows, columns);
+  if (stockReportOptions.summary) rows = summarizeProductWiseRows(rows);
+  if (stockReportOptions.groupByItem) rows = [...rows].sort((a, b) => a.itemName.localeCompare(b.itemName) || a.name.localeCompare(b.name));
+  return applyClassicColumnSort("productWise", rows, columns);
+}
+
+function summarizeProductWiseRows(rows) {
+  return Object.values(rows.reduce((acc, row) => {
+    acc[row.name] ||= { name: row.name, itemName: "Summary", nos: 0, grossWeight: 0, stoneWeight: 0, netWeight: 0 };
+    acc[row.name].nos += row.nos;
+    acc[row.name].grossWeight += row.grossWeight;
+    acc[row.name].stoneWeight += row.stoneWeight;
+    acc[row.name].netWeight += row.netWeight;
+    return acc;
+  }, {}));
+}
+
+function productWiseColumns() {
+  return [
+    { key: "name", label: "Name" },
+    { key: "itemName", label: "item_Nam" },
+    { key: "nos", label: "Nos", numeric: true, format: (value) => numberValue(value, 0) },
+    { key: "grossWeight", label: "GrossWeig", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "stoneWeight", label: "StoneWeig", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "netWeight", label: "NetWeight", numeric: true, format: (value) => numberValue(value, 3) }
+  ];
+}
+
+function diamondStockReport() {
+  const rows = diamondStockRows();
+  const columns = diamondStockColumns();
+  const totals = rows.reduce((acc, row) => ({
+    nos: acc.nos + Number(row.nos || 0),
+    gross: acc.gross + Number(row.gross || 0),
+    stone: acc.stone + Number(row.stone || 0),
+    net: acc.net + Number(row.net || 0),
+    salesAmt: acc.salesAmt + Number(row.salesAmt || 0),
+    dmdCarat: acc.dmdCarat + Number(row.dmdCarat || 0),
+    purchaseRate: acc.purchaseRate + Number(row.purchaseRate || 0),
+    crtPuRate: acc.crtPuRate + Number(row.crtPuRate || 0),
+    sellingRate: acc.sellingRate + Number(row.sellingRate || 0),
+    purchaseMC: acc.purchaseMC + Number(row.purchaseMC || 0),
+    salesMC: acc.salesMC + Number(row.salesMC || 0),
+    goldRate: acc.goldRate + Number(row.goldRate || 0)
+  }), { nos: 0, gross: 0, stone: 0, net: 0, salesAmt: 0, dmdCarat: 0, purchaseRate: 0, crtPuRate: 0, sellingRate: 0, purchaseMC: 0, salesMC: 0, goldRate: 0 });
+  return `
+    <div class="classic-report-grid-wrap diamond-report-grid-wrap">
+      <table class="classic-report-grid diamond-report-grid">
+        <thead>
+          <tr>
+            <th></th>
+            ${columns.map((column) => classicGridHeader("diamondStock", column, DIAMOND_CLOSING_STOCK)).join("")}
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map((row, index) => `
+            <tr class="${index === 0 ? "selected" : ""}">
+              <td>${index === 0 ? ">" : index + 1}</td>
+              ${columns.map((column) => `<td class="${column.numeric ? "num" : ""}">${classicCellValue(row, column)}</td>`).join("")}
+            </tr>
+          `).join("")}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="4">Total</td>
+            <td class="num">${numberValue(totals.nos, 2)}</td>
+            <td class="num">${numberValue(totals.gross, 3)}</td>
+            <td class="num">${numberValue(totals.stone, 3)}</td>
+            <td class="num">${numberValue(totals.net, 3)}</td>
+            <td class="num">${numberValue(totals.salesAmt, 2)}</td>
+            <td class="num">${numberValue(totals.dmdCarat, 3)}</td>
+            <td></td>
+            <td class="num">${numberValue(totals.purchaseRate, 2)}</td>
+            <td class="num">${numberValue(totals.crtPuRate, 2)}</td>
+            <td class="num">${numberValue(totals.sellingRate, 2)}</td>
+            <td class="num">${numberValue(totals.purchaseMC, 2)}</td>
+            <td class="num">${numberValue(totals.salesMC, 2)}</td>
+            <td class="num">${numberValue(totals.goldRate, 2)}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  `;
+}
+
+function diamondStockRows() {
+  let rows = DIAMOND_CLOSING_STOCK.filter((row) => stockReportOptions.includeZero || Number(row.nos) !== 0);
+  const columns = diamondStockColumns();
+  rows = applyClassicColumnFilters("diamondStock", rows, columns);
+  if (stockReportOptions.diamondType) rows = rows.filter((row) => row.name.toLowerCase().includes(stockReportOptions.diamondType.toLowerCase()));
+  if (stockReportOptions.groupByItem) rows = [...rows].sort((a, b) => a.name.localeCompare(b.name) || a.barcode.localeCompare(b.barcode));
+  return applyClassicColumnSort("diamondStock", rows, columns);
+}
+
+function diamondStockColumns() {
+  return [
+    { key: "name", label: "Name" },
+    { key: "barcode", label: "Barcode" },
+    { key: "smithName", label: "SmithNam" },
+    { key: "nos", label: "Nos", numeric: true, format: (value) => numberValue(value, 2) },
+    { key: "gross", label: "Gross", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "stone", label: "Stone", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "net", label: "Net", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "salesAmt", label: "SalesAmt", numeric: true, format: (value) => trimMoney(value) },
+    { key: "dmdCarat", label: "dmdCarat", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "dmdCaratType", label: "dmdCarat" },
+    { key: "purchaseRate", label: "PurchaseR", numeric: true, format: (value) => trimMoney(value) },
+    { key: "crtPuRate", label: "CrtPuRate", numeric: true, format: (value) => trimMoney(value) },
+    { key: "sellingRate", label: "SellingRate", numeric: true, format: (value) => trimMoney(value) },
+    { key: "purchaseMC", label: "purchaseMC", numeric: true, format: (value) => trimMoney(value) },
+    { key: "salesMC", label: "salesMC", numeric: true, format: (value) => trimMoney(value) },
+    { key: "goldRate", label: "GoldRate", numeric: true, format: (value) => trimMoney(value) }
+  ];
+}
+
+function classicGridHeader(reportKey, column, sourceRows = []) {
+  const menuOpen = classicColumnMenu?.reportKey === reportKey && classicColumnMenu?.columnKey === column.key;
+  const filterKey = classicFilterKey(reportKey, column.key);
+  const hasFilter = Object.prototype.hasOwnProperty.call(classicColumnFilters, filterKey);
+  return `
+    <th class="${hasFilter ? "filtered" : ""}">
+      <span>${escapeHtml(column.label)}</span>
+      <button class="grid-filter" data-classic-filter-button data-report-key="${escapeHtml(reportKey)}" data-column-key="${escapeHtml(column.key)}">v</button>
+      ${menuOpen ? classicColumnMenuMarkup(reportKey, column, sourceRows) : ""}
+    </th>
+  `;
+}
+
+function classicColumnMenuMarkup(reportKey, column, sourceRows) {
+  const filterKey = classicFilterKey(reportKey, column.key);
+  const selected = classicColumnFilters[filterKey];
+  const values = classicColumnValues(sourceRows, column);
+  const selectedSet = Array.isArray(selected) ? new Set(selected) : new Set(values.map((item) => item.value));
+  return `
+    <div class="classic-filter-menu" data-classic-filter-menu>
+      <button type="button" data-classic-sort="asc" data-report-key="${escapeHtml(reportKey)}" data-column-key="${escapeHtml(column.key)}"><span class="sort-icon">1↓</span> Sort smallest to largest</button>
+      <button type="button" data-classic-sort="desc" data-report-key="${escapeHtml(reportKey)}" data-column-key="${escapeHtml(column.key)}"><span class="sort-icon">1↑</span> Sort largest to smallest</button>
+      <button type="button" class="muted" data-classic-clear-sort data-report-key="${escapeHtml(reportKey)}" data-column-key="${escapeHtml(column.key)}">Cancel sort</button>
+      <hr />
+      <button type="button" class="muted" data-classic-filter-clear data-report-key="${escapeHtml(reportKey)}" data-column-key="${escapeHtml(column.key)}">Clear filter</button>
+      <div class="classic-filter-subtitle">Number filter <span>&rsaquo;</span></div>
+      <div class="classic-filter-values">
+        <label><input type="checkbox" data-classic-filter-all data-report-key="${escapeHtml(reportKey)}" data-column-key="${escapeHtml(column.key)}" ${selected ? "" : "checked"} /> <strong>(Select All)</strong></label>
+        ${values.map((item) => `
+          <label><input type="checkbox" data-classic-filter-value data-report-key="${escapeHtml(reportKey)}" data-column-key="${escapeHtml(column.key)}" value="${escapeHtml(item.value)}" ${selectedSet.has(item.value) ? "checked" : ""} /> ${escapeHtml(item.label)}</label>
+        `).join("")}
+      </div>
+      <div class="classic-filter-actions">
+        <button type="button" data-classic-filter-close>OK</button>
+        <button type="button" data-classic-filter-close>Cancel</button>
+      </div>
+    </div>
+  `;
+}
+
+function classicColumnValues(rows, column) {
+  const seen = new Map();
+  rows.forEach((row) => {
+    const rawValue = classicRawValue(row, column);
+    const value = String(rawValue ?? "");
+    if (!seen.has(value)) seen.set(value, classicValueLabel(row, column));
+  });
+  return [...seen.entries()]
+    .map(([value, label]) => ({ value, label: label || "(Blanks)" }))
+    .sort((a, b) => column.numeric ? Number(a.value || 0) - Number(b.value || 0) : a.label.localeCompare(b.label));
+}
+
+function classicColumnValuesForFilter(reportKey, columnKey) {
+  const config = classicReportColumnConfig(reportKey);
+  const column = config.columns.find((item) => item.key === columnKey);
+  if (!column) return [];
+  return classicColumnValues(config.rows, column).map((item) => item.value);
+}
+
+function classicReportColumnConfig(reportKey) {
+  if (reportKey === "reconciliationGross") return { rows: reconciliationRows(), columns: reconciliationGrossColumns() };
+  if (reportKey === "reconciliationNet") return { rows: reconciliationRows(), columns: reconciliationNetColumns() };
+  if (reportKey === "reconciliationDiamondBarcode") return { rows: reconciliationDiamondBarcodeRows(), columns: reconciliationDiamondBarcodeColumns() };
+  if (reportKey === "reconciliationDiamondItem") return { rows: reconciliationDiamondItemRows(), columns: reconciliationDiamondItemColumns() };
+  if (reportKey === "reconciliationStockTypeWise") return { rows: reconciliationStockTypeWiseRows(), columns: reconciliationStockTypeWiseColumns() };
+  if (reportKey === "reconciliationStockTypeItemWise") return { rows: reconciliationStockTypeItemWiseRows(), columns: reconciliationStockTypeItemWiseColumns() };
+  if (reportKey === "barcodeWise") return { rows: BARCODE_WISE_CLOSING_STOCK, columns: barcodeWiseColumns() };
+  if (reportKey === "categoryWise") return { rows: CATEGORY_WISE_CLOSING_STOCK, columns: categoryWiseColumns() };
+  if (reportKey === "typeWise") return { rows: TYPE_WISE_CLOSING_STOCK, columns: typeWiseColumns() };
+  if (reportKey === "productWise") return { rows: PRODUCT_WISE_CLOSING_STOCK, columns: productWiseColumns() };
+  if (reportKey === "diamondStock") return { rows: DIAMOND_CLOSING_STOCK, columns: diamondStockColumns() };
+  if (reportKey === "stockCompare") return { rows: STOCK_COMPARE_ROWS, columns: stockCompareColumns().filter((column) => !column.separator) };
+  if (reportKey === "otherLocation") return { rows: otherLocationSourceRows(), columns: otherLocationColumns() };
+  return { rows: ITEM_WISE_CLOSING_STOCK, columns: itemWiseColumns() };
+}
+
+function applyClassicColumnFilters(reportKey, rows, columns) {
+  return rows.filter((row) => columns.every((column) => {
+    const filter = classicColumnFilters[classicFilterKey(reportKey, column.key)];
+    if (!Array.isArray(filter)) return true;
+    return filter.includes(String(classicRawValue(row, column) ?? ""));
+  }));
+}
+
+function applyClassicColumnSort(reportKey, rows, columns) {
+  const sort = classicColumnSorts[reportKey];
+  if (!sort) return rows;
+  const column = columns.find((item) => item.key === sort.columnKey);
+  if (!column) return rows;
+  return [...rows].sort((a, b) => {
+    const left = classicRawValue(a, column);
+    const right = classicRawValue(b, column);
+    const result = column.numeric
+      ? Number(left || 0) - Number(right || 0)
+      : String(left ?? "").localeCompare(String(right ?? ""));
+    return sort.direction === "desc" ? -result : result;
+  });
+}
+
+function classicCellValue(row, column) {
+  return escapeHtml(classicValueLabel(row, column));
+}
+
+function classicValueLabel(row, column) {
+  const value = classicRawValue(row, column);
+  return column.format ? column.format(value, row) : String(value ?? "");
+}
+
+function classicRawValue(row, column) {
+  return typeof column.value === "function" ? column.value(row) : row[column.key];
+}
+
+function classicFilterKey(reportKey, columnKey) {
+  return `${reportKey}:${columnKey}`;
+}
+
+function barcodeWiseStockReport() {
+  const rows = barcodeWiseRows();
+  const totals = rows.reduce((acc, row) => ({
+    nos: acc.nos + Number(row.nos || 0),
+    gross: acc.gross + Number(row.gross || 0),
+    stone: acc.stone + Number(row.stone || 0),
+    net: acc.net + Number(row.net || 0),
+    stnChr: acc.stnChr + Number(row.stnChr || 0),
+    mc: acc.mc + Number(row.mc || 0),
+    pmc: acc.pmc + Number(row.pmc || 0),
+    salesPrice: acc.salesPrice + Number(row.salesPrice || 0)
+  }), { nos: 0, gross: 0, stone: 0, net: 0, stnChr: 0, mc: 0, pmc: 0, salesPrice: 0 });
+  const columns = barcodeWiseColumns();
+  return `
+    <div class="classic-report-grid-wrap barcode-report-grid-wrap">
+      <table class="classic-report-grid barcode-report-grid">
+        <thead>
+          <tr>
+            <th></th>
+            ${columns.map((column) => classicGridHeader("barcodeWise", column, BARCODE_WISE_CLOSING_STOCK)).join("")}
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map((row, index) => `
+            <tr class="${index === 0 ? "selected" : ""}">
+              <td>${index === 0 ? ">" : index + 1}</td>
+              ${columns.map((column) => `<td class="${column.numeric ? "num" : ""}">${classicCellValue(row, column)}</td>`).join("")}
+            </tr>
+          `).join("")}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="6">Total</td>
+            <td class="num">${numberValue(totals.nos, 0)}</td>
+            <td class="num">${numberValue(totals.gross, 3)}</td>
+            <td class="num">${numberValue(totals.stone, 3)}</td>
+            <td class="num">${numberValue(totals.net, 3)}</td>
+            <td class="num">${numberValue(totals.stnChr, 2)}</td>
+            <td class="num">${numberValue(totals.mc, 2)}</td>
+            <td></td>
+            <td class="num">${numberValue(totals.pmc, 3)}</td>
+            <td class="num">${numberValue(totals.salesPrice, 2)}</td>
+            <td colspan="5"></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  `;
+}
+
+function barcodeWiseRows() {
+  let rows = BARCODE_WISE_CLOSING_STOCK.filter((row) => stockReportOptions.includeZero || Number(row.nos) !== 0);
+  const columns = barcodeWiseColumns();
+  rows = applyClassicColumnFilters("barcodeWise", rows, columns);
+  if (stockReportOptions.barcodeType) rows = rows.filter((row) => row.type === stockReportOptions.barcodeType);
+  if (stockReportOptions.groupByItem) rows = [...rows].sort((a, b) => a.name.localeCompare(b.name) || a.barcode.localeCompare(b.barcode));
+  return applyClassicColumnSort("barcodeWise", rows, columns);
+}
+
+function barcodeWiseColumns() {
+  return [
+    { key: "iid", label: "iid" },
+    { key: "name", label: "Name" },
+    { key: "itemCategory", label: "item_Cate" },
+    { key: "description", label: "IDescriptio" },
+    { key: "barcode", label: "barcode" },
+    { key: "nos", label: "Nos", numeric: true, format: (value) => numberValue(value, 0) },
+    { key: "gross", label: "Gross", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "stone", label: "Stone", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "net", label: "Net", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "stnChr", label: "StnChr", numeric: true, format: (value) => numberValue(value, 2) },
+    { key: "mc", label: "MC", numeric: true, format: (value) => numberValue(value, 2) },
+    { key: "vaPerc", label: "VAperc", numeric: true, format: (value) => numberValue(value, 2) },
+    { key: "pmc", label: "PMC", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "salesPrice", label: "SalesPrice", numeric: true, format: (value) => numberValue(value, 2) },
+    { key: "smithName", label: "SmithNam" },
+    { key: "transDate", label: "TransDate" },
+    { key: "type", label: "Type" },
+    { key: "model", label: "Model" },
+    { key: "size", label: "Size" }
+  ];
+}
+
+function stockCompareReport() {
+  const rows = stockCompareRows();
+  const columns = stockCompareColumns();
+  return `
+    <div class="classic-report-grid-wrap stock-compare-grid-wrap">
+      <table class="classic-report-grid stock-compare-grid">
+        <thead>
+          <tr>
+            <th></th>
+            ${columns.map((column) => column.separator ? `<th class="compare-separator-head"></th>` : classicGridHeader("stockCompare", column, STOCK_COMPARE_ROWS)).join("")}
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map((row, index) => `
+            <tr class="${index === 9 ? "selected" : ""}">
+              <td>${index + 1}</td>
+              ${columns.map((column) => column.separator
+                ? `<td class="compare-separator">...</td>`
+                : `<td class="${column.numeric ? "num" : ""}">${classicCellValue(row, column)}</td>`).join("")}
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function stockCompareRows() {
+  let rows = STOCK_COMPARE_ROWS.filter((row) => stockReportOptions.includeZero || Number(row.itemNos) !== 0 || Number(row.barNos) !== 0);
+  const columns = stockCompareColumns().filter((column) => !column.separator);
+  rows = applyClassicColumnFilters("stockCompare", rows, columns);
+  if (stockReportOptions.groupByItem) rows = [...rows].sort((a, b) => a.name.localeCompare(b.name) || a.itemId.localeCompare(b.itemId));
+  return applyClassicColumnSort("stockCompare", rows, columns);
+}
+
+function stockCompareColumns() {
+  return [
+    { key: "category", label: "Category" },
+    { key: "itemId", label: "itemID" },
+    { key: "name", label: "Name" },
+    { key: "itemNos", label: "Item_Nos", numeric: true, format: (value) => numberValue(value, 0) },
+    { key: "itemGross", label: "Item_Gros", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "itemStone", label: "Item_Ston", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "itemNet", label: "Item_Net", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "separatorA", label: "", separator: true },
+    { key: "barNos", label: "Bar_Nos", numeric: true, format: (value) => numberValue(value, 0) },
+    { key: "barGross", label: "Bar_Gross", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "barStone", label: "Bar_Stone", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "barNet", label: "Bar_Net", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "separatorB", label: "", separator: true },
+    { key: "diffNos", label: "Diff_Nos", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "diffGross", label: "Diff_Gross", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "diffStone", label: "Diff_Stone", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "diffNet", label: "Diff_Net", numeric: true, format: (value) => numberValue(value, 3) }
+  ];
+}
+
+function otherLocationStockReport() {
+  const rows = otherLocationRows();
+  const columns = otherLocationColumns();
+  const totals = rows.reduce((acc, row) => ({
+    nos: acc.nos + Number(row.nos || 0),
+    grossWeight: acc.grossWeight + Number(row.grossWeight || 0),
+    stoneWeight: acc.stoneWeight + Number(row.stoneWeight || 0),
+    netWeight: acc.netWeight + Number(row.netWeight || 0)
+  }), { nos: 0, grossWeight: 0, stoneWeight: 0, netWeight: 0 });
+  return `
+    <div class="single-location-note">Only one branch/location is configured, so this report shows the current branch stock.</div>
+    <div class="classic-report-grid-wrap other-location-grid-wrap">
+      <table class="classic-report-grid other-location-grid">
+        <thead>
+          <tr>
+            <th></th>
+            ${columns.map((column) => classicGridHeader("otherLocation", column, otherLocationSourceRows())).join("")}
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map((row, index) => `
+            <tr class="${index === 0 ? "selected" : ""}">
+              <td>${index === 0 ? ">" : index + 1}</td>
+              ${columns.map((column) => `<td class="${column.numeric ? "num" : ""}">${classicCellValue(row, column)}</td>`).join("")}
+            </tr>
+          `).join("")}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="5">Total</td>
+            <td class="num">${numberValue(totals.nos, 0)}</td>
+            <td class="num">${numberValue(totals.grossWeight, 3)}</td>
+            <td class="num">${numberValue(totals.stoneWeight, 3)}</td>
+            <td class="num">${numberValue(totals.netWeight, 3)}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  `;
+}
+
+function otherLocationSourceRows() {
+  return ITEM_WISE_CLOSING_STOCK.map((row) => ({
+    location: "Main Branch",
+    itemType: row.itemType,
+    itemId: row.itemId,
+    name: row.name,
+    nos: row.nos,
+    grossWeight: row.grossWeight,
+    stoneWeight: row.stoneWeight,
+    netWeight: row.netWeight
+  }));
+}
+
+function otherLocationRows() {
+  let rows = otherLocationSourceRows().filter((row) => stockReportOptions.includeZero || Number(row.nos) !== 0);
+  const columns = otherLocationColumns();
+  rows = applyClassicColumnFilters("otherLocation", rows, columns);
+  if (stockReportOptions.groupByItem) rows = [...rows].sort((a, b) => a.name.localeCompare(b.name) || a.itemId.localeCompare(b.itemId));
+  return applyClassicColumnSort("otherLocation", rows, columns);
+}
+
+function otherLocationColumns() {
+  return [
+    { key: "location", label: "Location" },
+    { key: "itemType", label: "ItemType" },
+    { key: "itemId", label: "ItemID" },
+    { key: "name", label: "Name" },
+    { key: "nos", label: "Nos", numeric: true, format: (value) => numberValue(value, 0) },
+    { key: "grossWeight", label: "GrossWeig", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "stoneWeight", label: "StoneWeig", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "netWeight", label: "NetWeight", numeric: true, format: (value) => numberValue(value, 3) }
+  ];
+}
+
+function numberValue(value, digits = 2) {
+  return Number(value || 0).toFixed(digits);
+}
+
+function trimMoney(value) {
+  const numeric = Number(value || 0);
+  return Number.isInteger(numeric) ? String(numeric) : numeric.toFixed(2);
 }
 
 function billHeader(bill) {
@@ -12312,6 +14290,122 @@ function bindEvents() {
     });
   });
 
+  document.querySelectorAll("[data-stock-report-option]").forEach((input) => {
+    input.addEventListener("change", () => {
+      const option = input.dataset.stockReportOption;
+      stockReportOptions = { ...stockReportOptions, [option]: input.checked };
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-stock-report-select]").forEach((select) => {
+    select.addEventListener("change", () => {
+      const option = select.dataset.stockReportSelect;
+      stockReportOptions = { ...stockReportOptions, [option]: select.value };
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-stock-ledger-field]").forEach((field) => {
+    const update = () => {
+      stockReportOptions = { ...stockReportOptions, [field.dataset.stockLedgerField]: field.value };
+      renderAndFocus(`[data-stock-ledger-field="${field.dataset.stockLedgerField}"]`);
+    };
+    field.addEventListener("change", update);
+    if (field.dataset.stockLedgerField === "stockLedgerItem") field.addEventListener("input", update);
+  });
+
+  document.querySelectorAll("[data-stock-ledger-check]").forEach((field) => {
+    field.addEventListener("change", () => {
+      stockReportOptions = { ...stockReportOptions, [field.dataset.stockLedgerCheck]: field.checked };
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-stock-ledger-item]").forEach((row) => {
+    row.addEventListener("click", () => {
+      stockReportOptions = { ...stockReportOptions, stockLedgerItem: row.dataset.stockLedgerItem || "" };
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-classic-filter-button]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const nextMenu = { reportKey: button.dataset.reportKey, columnKey: button.dataset.columnKey };
+      const isSame = classicColumnMenu?.reportKey === nextMenu.reportKey && classicColumnMenu?.columnKey === nextMenu.columnKey;
+      classicColumnMenu = isSame ? null : nextMenu;
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-classic-filter-menu]").forEach((menu) => {
+    menu.addEventListener("click", (event) => event.stopPropagation());
+  });
+
+  document.querySelectorAll("[data-classic-sort]").forEach((button) => {
+    button.addEventListener("click", () => {
+      classicColumnSorts = { ...classicColumnSorts, [button.dataset.reportKey]: { columnKey: button.dataset.columnKey, direction: button.dataset.classicSort } };
+      classicColumnMenu = null;
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-classic-clear-sort]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const nextSorts = { ...classicColumnSorts };
+      delete nextSorts[button.dataset.reportKey];
+      classicColumnSorts = nextSorts;
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-classic-filter-clear]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const nextFilters = { ...classicColumnFilters };
+      delete nextFilters[classicFilterKey(button.dataset.reportKey, button.dataset.columnKey)];
+      classicColumnFilters = nextFilters;
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-classic-filter-all]").forEach((input) => {
+    input.addEventListener("change", () => {
+      const key = classicFilterKey(input.dataset.reportKey, input.dataset.columnKey);
+      const nextFilters = { ...classicColumnFilters };
+      if (input.checked) {
+        delete nextFilters[key];
+      } else {
+        nextFilters[key] = [];
+      }
+      classicColumnFilters = nextFilters;
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-classic-filter-value]").forEach((input) => {
+    input.addEventListener("change", () => {
+      const key = classicFilterKey(input.dataset.reportKey, input.dataset.columnKey);
+      const nextFilters = { ...classicColumnFilters };
+      const current = new Set(Array.isArray(nextFilters[key]) ? nextFilters[key] : classicColumnValuesForFilter(input.dataset.reportKey, input.dataset.columnKey));
+      if (input.checked) {
+        current.add(input.value);
+      } else {
+        current.delete(input.value);
+      }
+      nextFilters[key] = [...current];
+      classicColumnFilters = nextFilters;
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-classic-filter-close]").forEach((button) => {
+    button.addEventListener("click", () => {
+      classicColumnMenu = null;
+      render();
+    });
+  });
+
   document.querySelectorAll("[data-nav]").forEach((button) => {
     button.addEventListener("click", () => {
       const clicked = button.dataset.nav;
@@ -12321,6 +14415,10 @@ function bindEvents() {
         } else {
           expandedNavGroups.add(clicked);
         }
+      }
+      if (clicked === "Reports") {
+        selectedReport = "";
+        reportSearch = "";
       }
       active = clicked;
       render();
@@ -17423,9 +19521,35 @@ function handleAction(action, source) {
     saveState();
   }
   if (action === "export-report") {
+    if (selectedReport === "Reconciliation Crosstab") {
+      exportReconciliationCrosstabCsv();
+      toast("Reconciliation Crosstab exported for Excel.");
+      state.audit.unshift(audit("Exported Reconciliation Crosstab"));
+      saveState();
+      return;
+    }
     toast("Report export queued and recorded in audit trail.");
     state.audit.unshift(audit("Exported report"));
     saveState();
+  }
+  if (action === "stock-ledger-fin-year") {
+    const from = financialYearOpeningDate();
+    stockReportOptions = { ...stockReportOptions, stockLedgerFrom: formatDisplayDate(from), stockLedgerTo: "13/07/2026" };
+    render();
+  }
+  if (action === "stock-ledger-today") {
+    stockReportOptions = { ...stockReportOptions, stockLedgerFrom: "13/07/2026", stockLedgerTo: "13/07/2026" };
+    render();
+  }
+  if (action === "stock-ledger-ok") {
+    const item = stockLedgerSelectedItem();
+    stockReportOptions = { ...stockReportOptions, stockLedgerItem: item?.name || stockReportOptions.stockLedgerItem };
+    toast(`Stock ledger loaded for ${item?.name || "selected item"}.`);
+    render();
+  }
+  if (action === "stock-ledger-close") {
+    selectedReport = "CurrentStock";
+    render();
   }
 }
 
