@@ -24,13 +24,14 @@ const SALES_REPORT_OPTIONS = [
   "Salesman Summary",
   "Salesman Weight Summary",
   "Salesman Category Summary",
-  "Salesman Category Summary - Net",
+  "Salesman Category Summary - Net Wt/Amount",
   "Agent Wise",
   "Agent Summary",
   "Brand Wise",
   "Brand Summary",
   "Day Report",
   "Sold and Pending",
+  "Top Moving",
   "DMD WH Sales Summary",
   "DMD WH Sales Details",
   "CASHPOINT Pending",
@@ -10531,63 +10532,10 @@ function customVoucherRegisterPanel() {
 }
 
 function reports() {
-  if (!selectedReport) {
-    return reportsHomePlaceholder();
-  }
-  if (isStockReport(selectedReport)) {
-    return `
-      <section class="panel report-preview-panel focused-report-panel">
-        ${reportPreview(selectedReport)}
-      </section>
-    `;
-  }
-  const matches = filteredMenuItems(reportSearch, 200).filter((item) => item.module === "Reports");
-  const pinned = PINNED_REPORTS.map((name) => reportQuickButton(name, "pin")).join("");
-  const recent = recentReportItems.length
-    ? recentReportItems.map((name) => reportQuickButton(name, "recent")).join("")
-    : `<p class="soft-note">Opened reports will appear here during the session.</p>`;
+  const activeReport = selectedReport || "Sales";
   return `
-    <section class="panel report-center-hero">
-      <div>
-        <p class="eyebrow">Reports</p>
-        <h2>Searchable report center</h2>
-        <p>Old report names are preserved, but grouped so the full menu does not crowd the main sidebar.</p>
-      </div>
-      <label class="report-search">
-        <span>Find report</span>
-        <input data-report-search value="${escapeHtml(reportSearch)}" placeholder="sales profit, barcode, day end..." autocomplete="off" />
-      </label>
-    </section>
-    <section class="report-quick-grid">
-      <article class="panel report-quick-panel">
-        <div class="panel-head"><h2>Pinned</h2></div>
-        <div class="report-pill-row">${pinned}</div>
-      </article>
-      <article class="panel report-quick-panel">
-        <div class="panel-head"><h2>Recent</h2></div>
-        <div class="report-pill-row">${recent}</div>
-      </article>
-    </section>
-    ${reportSearch.trim() ? `
-      <section class="panel report-search-results-panel">
-        <div class="panel-head"><h2>Search Results</h2></div>
-        <div class="report-result-list">
-          ${matches.length ? matches.map((item) => reportResultButton(item)).join("") : `<p class="soft-note">No matching reports found.</p>`}
-        </div>
-      </section>
-    ` : ""}
-    <section class="report-module-grid">
-      ${REPORT_MENU_GROUPS.map(reportGroupCard).join("")}
-    </section>
-    <section class="panel report-preview-panel">
-      <div class="panel-head">
-        <h2>${escapeHtml(selectedReport)}</h2>
-        <div class="panel-actions">
-          <button class="secondary" data-action="export-report">Export</button>
-          <button class="primary" data-action="print-now">Print</button>
-        </div>
-      </div>
-      ${reportPreview(selectedReport)}
+    <section class="panel report-preview-panel focused-report-panel">
+      ${reportPreview(activeReport)}
     </section>
   `;
 }
@@ -10682,7 +10630,7 @@ function salesReportScreen(name) {
         <header class="classic-report-title sales-report-title">
           <h3>MT GOLD LAND</h3>
           <h4>M.T.PLAZA,OOTY ROAD EDAKKARA</h4>
-          <h2>${escapeHtml(salesReportOptions.option)}&nbsp; From ${escapeHtml(displaySalesDate(salesReportOptions.from))}&nbsp; To ${escapeHtml(displaySalesDate(salesReportOptions.to))}</h2>
+          <h2>${escapeHtml(salesReportDisplayTitle(salesReportOptions.option))}&nbsp; From ${escapeHtml(displaySalesDate(salesReportOptions.from))}&nbsp; To ${escapeHtml(displaySalesDate(salesReportOptions.to))}</h2>
         </header>
         ${salesReportOptions.shown ? salesReportBody(name) : salesReportBlankState()}
       </section>
@@ -10733,6 +10681,11 @@ function salesDatePopup() {
   `;
 }
 
+function salesReportDisplayTitle(option) {
+  if (isSalesmanCategoryNetOption(option)) return "Salesman Category Summary - Net Weight/Amount";
+  return option;
+}
+
 function salesReportBlankState() {
   return `
     <div class="sales-report-empty">
@@ -10758,7 +10711,7 @@ function salesReportTable(columns, rows, gridClass = "", totals = null) {
         </thead>
         <tbody>
           ${rows.length ? rows.map((row, index) => `
-            <tr class="${[index === 0 ? "selected" : "", row.rowClass || ""].filter(Boolean).join(" ")}">
+            <tr class="${[index === 0 ? "selected" : "", row.rowClass || ""].filter(Boolean).join(" ")}" ${salesReportDrillAttrs(row)}>
               <td>${index + 1}</td>
               ${columns.map((column) => `<td class="${column.numeric ? "num" : ""}">${escapeHtml(column.format ? column.format(row[column.key], row) : row[column.key] ?? "")}</td>`).join("")}
             </tr>
@@ -10777,13 +10730,51 @@ function salesReportTable(columns, rows, gridClass = "", totals = null) {
   `;
 }
 
+function salesReportDrillAttrs(row = {}) {
+  const bill = row.bill || {};
+  const billId = row.sourceBillId || bill.id || "";
+  const entryNo = row.sourceEntryNo || row.entryNo || bill.entryNo || "";
+  const billNo = row.sourceBillNo || row.billNo || bill.billNo || "";
+  if (!billId && !entryNo && !billNo) return "";
+  const section = row.sourceSection || "";
+  return [
+    billId ? `data-report-bill-id="${escapeHtml(billId)}"` : "",
+    entryNo ? `data-report-entry-no="${escapeHtml(entryNo)}"` : "",
+    billNo ? `data-report-bill-no="${escapeHtml(billNo)}"` : "",
+    section ? `data-report-section="${escapeHtml(section)}"` : ""
+  ].filter(Boolean).join(" ");
+}
+
+function carryReportBillSource(target, row) {
+  if (!target || !row || target.sourceBillId || target.sourceEntryNo || target.sourceBillNo) return target;
+  const bill = row.bill || {};
+  target.sourceBillId = row.sourceBillId || bill.id || "";
+  target.sourceEntryNo = row.sourceEntryNo || bill.entryNo || "";
+  target.sourceBillNo = row.sourceBillNo || bill.billNo || "";
+  target.sourceSection = row.sourceSection || "";
+  return target;
+}
+
 function salesReportConfig(reportName, option) {
   const rows = salesReportSourceRows(reportName);
-  if (option === "Bill Wise" || option === "Bill Wise 0 Discount" || option === "Day Report" || option === "Customer Details") return salesBillWiseConfig(rows, option);
+  if (option === "Bill Wise" || option === "Bill Wise 0 Discount") return salesBillWiseConfig(rows, option);
+  if (option === "Customer Details") return salesCustomerDetailsConfig(rows);
+  if (option === "Day Report") return salesDayReportConfig(rows);
+  if (option === "Category Wise") return salesCategoryWiseConfig(rows);
+  if (option === "Category Summary") return salesCategorySummaryConfig(rows);
+  if (option === "Salesman Wise") return salesmanWiseConfig(rows);
+  if (option === "Agent Wise") return agentWiseConfig(rows);
+  if (option === "Agent Summary") return agentSummaryConfig(rows);
+  if (option === "Salesman Summary") return salesmanSummaryConfig(rows);
+  if (option === "Salesman Weight Summary") return salesmanWeightSummaryConfig(rows);
+  if (option === "Salesman Category Summary") return salesmanCategorySummaryConfig(rows);
+  if (isSalesmanCategoryNetOption(option)) return salesmanCategorySummaryConfig(rows, { netWeightAmount: true });
+  if (option === "MC Report Summary") return salesMcReportSummaryConfig(rows);
   if (option.includes("Summary") || option.includes("Payment Mode") || ["Day Summary", "Month Summary", "Category Summary", "Salesman Summary", "Agent Summary", "Brand Summary", "By Payment Mode", "MC Report Summary"].includes(option)) return salesSummaryConfig(rows, option);
   if (option.includes("Weight")) return salesWeightConfig(rows, option);
   if (option.includes("DMD WH")) return salesDmdConfig(option);
   if (option === "Sold and Pending" || option === "CASHPOINT Pending") return salesPendingConfig(option);
+  if (option === "Top Moving") return salesTopMovingConfig(rows);
   return salesItemWiseConfig(rows, option);
 }
 
@@ -10830,7 +10821,9 @@ function salesReportSourceRows(reportName) {
         rate: Number(clean.rate || 0),
         va: Number(clean.va || 0),
         mc: Number(clean.makingCharge || clean.totalMc || 0),
+        mcPerGm: Number(clean.mcPerGm || 0),
         stoneAmount: Number(clean.stoneCharge || clean.stoneAmount || 0),
+        stoneCharge: Number(clean.stoneCharge || clean.stoneAmount || 0),
         dmdAmount: Number(clean.dmdAmount || 0),
         goldAmount: Number(clean.metalValue || clean.amount || clean.itemTotal || 0),
         taxable: Number(clean.amount || clean.itemTotal || 0) - Number(clean.tax || 0),
@@ -10846,7 +10839,11 @@ function salesReportSourceRows(reportName) {
         amount: Number(clean.amount || clean.itemTotal || 0),
         invoiceTotal: financials.invoiceTotal,
         cashReceived: financials.cashReceived,
-        balance: financials.balance
+        balance: financials.balance,
+        sourceBillId: bill.id || "",
+        sourceEntryNo: bill.entryNo || "",
+        sourceBillNo: bill.billNo || "",
+        sourceSection: reportName === "Sales Return" ? "return" : "sales"
       };
     });
   });
@@ -10928,6 +10925,474 @@ function salesItemWiseColumns() {
   ];
 }
 
+function salesCategoryWiseConfig(rows) {
+  const columns = salesCategoryWiseColumns();
+  const reportRows = salesCategoryBaseRows(rows);
+  return {
+    gridClass: "sales-category-wise-grid",
+    columns,
+    rows: reportRows,
+    totals: salesTotalsForColumns(reportRows, columns)
+  };
+}
+
+function salesCategoryBaseRows(rows) {
+  return rows.map((row) => ({
+    ...row,
+    itemCategory: row.category,
+    salesMan: row.staffName || "Not Set",
+    iid: row.itemId,
+    qty: Number(row.qty || 0),
+    grossWeight: Number(row.gross || 0),
+    stoneWeight: Number(row.stone || 0),
+    netWeight: Number(row.net || 0),
+    vaPer: Number(row.va || 0),
+    mcPerGram: Number(row.mcPerGm || 0),
+    stnCharge: Number(row.stoneCharge || row.stoneAmount || 0),
+    tmc: Number(row.mc || 0) + Number(row.stoneCharge || row.stoneAmount || 0),
+    rate: Number(row.rate || 0),
+    amount: Number(row.goldAmount || 0),
+    discount: Number(row.discount || 0),
+    netAmount: Number(row.itemTotal || row.amount || 0)
+  }));
+}
+
+function salesCategoryWiseColumns() {
+  return [
+    { key: "itemCategory", label: "Item_Categ" },
+    { key: "entryNo", label: "EntryNo" },
+    { key: "date", label: "Date" },
+    { key: "salesMan", label: "SalesMan" },
+    { key: "iid", label: "IID" },
+    { key: "itemName", label: "Item_Name" },
+    { key: "qty", label: "QTY", numeric: true, total: true, format: (value) => numberValue(value, 0) },
+    { key: "grossWeight", label: "GrossWt", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "stoneWeight", label: "StoneWt", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "netWeight", label: "NetWt", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "vaPer", label: "VA_Per", numeric: true, total: true, format: (value) => numberValue(value, 2) },
+    { key: "mcPerGram", label: "MCperGrm", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "stnCharge", label: "StnCharge", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "tmc", label: "TMC", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "rate", label: "Rate", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "amount", label: "Amount", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "discount", label: "Discount", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "netAmount", label: "NetAmount", numeric: true, total: true, format: (value) => numberValue(value, 3) }
+  ];
+}
+
+function salesCategorySummaryConfig(rows) {
+  const columns = salesCategorySummaryColumns();
+  const grouped = new Map();
+  salesCategoryBaseRows(rows).forEach((row) => {
+    const key = `${row.itemCategory}::${row.salesMan}`;
+    const item = grouped.get(key) || {
+      itemCategory: row.itemCategory,
+      salesMan: row.salesMan,
+      qty: 0,
+      grossWeight: 0,
+      stoneWeight: 0,
+      netWeight: 0,
+      vaPer: 0,
+      mcPerGram: 0,
+      stnCharge: 0,
+      tmc: 0,
+      amount: 0,
+      discount: 0,
+      netAmount: 0
+    };
+    item.qty += Number(row.qty || 0);
+    item.grossWeight += Number(row.grossWeight || 0);
+    item.stoneWeight += Number(row.stoneWeight || 0);
+    item.netWeight += Number(row.netWeight || 0);
+    item.vaPer += Number(row.vaPer || 0);
+    item.mcPerGram += Number(row.mcPerGram || 0);
+    item.stnCharge += Number(row.stnCharge || 0);
+    item.tmc += Number(row.tmc || 0);
+    item.amount += Number(row.amount || 0);
+    item.discount += Number(row.discount || 0);
+    item.netAmount += Number(row.netAmount || 0);
+    carryReportBillSource(item, row);
+    grouped.set(key, item);
+  });
+  const reportRows = [...grouped.values()].sort((left, right) => `${left.itemCategory} ${left.salesMan}`.localeCompare(`${right.itemCategory} ${right.salesMan}`));
+  return {
+    gridClass: "sales-category-summary-grid",
+    columns,
+    rows: reportRows,
+    totals: salesTotalsForColumns(reportRows, columns)
+  };
+}
+
+function salesCategorySummaryColumns() {
+  return salesCategoryWiseColumns().filter((column) => !["entryNo", "date", "iid", "itemName"].includes(column.key));
+}
+
+function salesmanWiseConfig(rows) {
+  const columns = salesmanWiseColumns();
+  const reportRows = salesCategoryBaseRows(rows)
+    .sort((left, right) => `${left.salesMan} ${left.entryNo} ${left.itemName}`.localeCompare(`${right.salesMan} ${right.entryNo} ${right.itemName}`));
+  return {
+    gridClass: "sales-salesman-wise-grid",
+    columns,
+    rows: reportRows,
+    totals: salesTotalsForColumns(reportRows, columns)
+  };
+}
+
+function salesmanWiseColumns() {
+  return [
+    { key: "itemCategory", label: "Item_Categ" },
+    { key: "salesMan", label: "SalesMan" },
+    { key: "qty", label: "QTY", numeric: true, total: true, format: (value) => numberValue(value, 0) },
+    { key: "grossWeight", label: "GrossWt", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "stoneWeight", label: "StoneWt", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "netWeight", label: "NetWt", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "vaPer", label: "VA_Per", numeric: true, total: true, format: (value) => numberValue(value, 2) },
+    { key: "mcPerGram", label: "MCperGrm", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "stnCharge", label: "StnCharge", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "tmc", label: "TMC", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "amount", label: "Amount", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "entryNo", label: "EntryNo" },
+    { key: "date", label: "Date" },
+    { key: "iid", label: "IID" },
+    { key: "itemName", label: "Item_Name" },
+    { key: "rate", label: "Rate", numeric: true, total: true, format: (value) => numberValue(value, 3) }
+  ];
+}
+
+function agentWiseConfig(rows) {
+  const columns = agentWiseColumns();
+  const reportRows = salesCategoryBaseRows(rows)
+    .map((row) => ({
+      ...row,
+      agentName: row.agent || "Direct",
+      smode: row.salesMode || row.paymentMode || "Cash"
+    }))
+    .sort((left, right) => `${left.agentName} ${left.entryNo} ${left.itemName}`.localeCompare(`${right.agentName} ${right.entryNo} ${right.itemName}`));
+  return {
+    gridClass: "sales-agent-wise-grid",
+    columns,
+    rows: reportRows,
+    totals: salesTotalsForColumns(reportRows, columns)
+  };
+}
+
+function agentWiseColumns() {
+  return [
+    { key: "agentName", label: "Agent" },
+    { key: "smode", label: "smode" },
+    { key: "entryNo", label: "EntryNo" },
+    { key: "date", label: "Date" },
+    { key: "iid", label: "IID" },
+    { key: "itemName", label: "Item_Name" },
+    { key: "qty", label: "QTY", numeric: true, total: true, format: (value) => numberValue(value, 0) },
+    { key: "grossWeight", label: "GrossWt", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "stoneWeight", label: "StoneWt", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "netWeight", label: "NetWt", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "vaPer", label: "VA_Per", numeric: true, total: true, format: (value) => numberValue(value, 2) },
+    { key: "mcPerGram", label: "MCperGrm", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "stnCharge", label: "StnCharge", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "tmc", label: "TMC", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "rate", label: "Rate", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "amount", label: "Amount", numeric: true, total: true, format: (value) => numberValue(value, 3) }
+  ];
+}
+
+function agentSummaryConfig(rows) {
+  const columns = agentSummaryColumns();
+  const grouped = new Map();
+  rows.forEach((row) => {
+    const agentName = row.agent || "Direct";
+    const smode = row.salesMode || row.paymentMode || "Cash";
+    const type = row.category || "Gold";
+    const key = `${agentName}::${smode}::${type}`;
+    const item = grouped.get(key) || {
+      agentName,
+      smode,
+      type,
+      nos: 0,
+      grossWeight: 0,
+      stoneWeight: 0,
+      netWeight: 0,
+      total: 0,
+      dmdAmt: 0,
+      discount: 0,
+      netTotal: 0,
+      cashReceiv: 0,
+      invoiceIds: new Set()
+    };
+    item.nos += Number(row.qty || 0);
+    item.grossWeight += Number(row.gross || 0);
+    item.stoneWeight += Number(row.stone || 0);
+    item.netWeight += Number(row.net || 0);
+    item.total += Number(row.itemTotal || row.amount || 0);
+    item.dmdAmt += Number(row.dmdAmount || 0);
+    item.discount += Number(row.discount || 0);
+    item.netTotal += Number(row.itemTotal || row.amount || 0) - Number(row.discount || 0);
+    const invoiceKey = row.bill?.id || row.billNo || row.entryNo;
+    if (!item.invoiceIds.has(invoiceKey)) {
+    item.cashReceiv += Number(row.cashReceived || 0);
+      item.invoiceIds.add(invoiceKey);
+    }
+    carryReportBillSource(item, row);
+    grouped.set(key, item);
+  });
+  const reportRows = [...grouped.values()]
+    .map(({ invoiceIds, ...row }) => row)
+    .sort((left, right) => `${left.agentName} ${left.smode} ${left.type}`.localeCompare(`${right.agentName} ${right.smode} ${right.type}`));
+  return {
+    gridClass: "sales-agent-summary-grid",
+    columns,
+    rows: reportRows,
+    totals: salesTotalsForColumns(reportRows, columns)
+  };
+}
+
+function agentSummaryColumns() {
+  return [
+    { key: "agentName", label: "Agent" },
+    { key: "smode", label: "smode" },
+    { key: "type", label: "Type" },
+    { key: "nos", label: "Nos", numeric: true, total: true, format: (value) => numberValue(value, 0) },
+    { key: "grossWeight", label: "GrossWght", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "stoneWeight", label: "StoneWght", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "netWeight", label: "NetWght", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "total", label: "Total", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "dmdAmt", label: "DmdAmt", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "discount", label: "Discount", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "netTotal", label: "NetTotal", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "cashReceiv", label: "CashReceiv", numeric: true, total: true, format: (value) => numberValue(value, 3) }
+  ];
+}
+
+function salesmanSummaryConfig(rows) {
+  const columns = salesmanSummaryColumns();
+  const grouped = new Map();
+  rows.forEach((row) => {
+    const itemCategory = row.category || "Not Set";
+    const smanName = row.staffName || "Not Set";
+    const itemType = row.itemType || salesItemType(row.itemName);
+    const key = `${itemCategory}::${smanName}::${itemType}`;
+    const item = grouped.get(key) || {
+      itemCategory,
+      smanName,
+      itemType,
+      nos: 0,
+      gross: 0,
+      stone: 0,
+      slNet: 0,
+      srNet: 0,
+      net: 0,
+      discount: 0,
+      slNetTotal: 0,
+      srNetTotal: 0,
+      netTotal: 0,
+      slDmdAmt: 0,
+      srDmdAmt: 0,
+      netDmdAmt: 0,
+      slDmdCar: 0,
+      srDmdCar: 0,
+      netDmdCar: 0
+    };
+    const qty = Number(row.qty || 0);
+    const gross = Number(row.gross || 0);
+    const stone = Number(row.stone || 0);
+    const net = Number(row.net || 0);
+    const amount = Number(row.itemTotal || row.amount || 0);
+    const dmdAmount = Number(row.dmdAmount || 0);
+    const dmdCarat = Number(row.dmdCarat || 0);
+    item.nos += qty;
+    item.gross += gross;
+    item.stone += stone;
+    item.slNet += net;
+    item.net += net;
+    item.discount += Number(row.discount || 0);
+    item.slNetTotal += amount;
+    item.netTotal += amount;
+    item.slDmdAmt += dmdAmount;
+    item.netDmdAmt += dmdAmount;
+    item.slDmdCar += dmdCarat;
+    item.netDmdCar += dmdCarat;
+    carryReportBillSource(item, row);
+    grouped.set(key, item);
+  });
+  const reportRows = [...grouped.values()].sort((left, right) => `${left.itemCategory} ${left.smanName} ${left.itemType}`.localeCompare(`${right.itemCategory} ${right.smanName} ${right.itemType}`));
+  return {
+    gridClass: "sales-salesman-summary-grid",
+    columns,
+    rows: reportRows,
+    totals: salesTotalsForColumns(reportRows, columns)
+  };
+}
+
+function salesmanSummaryColumns() {
+  return [
+    { key: "itemCategory", label: "Item_Categ" },
+    { key: "smanName", label: "smanName" },
+    { key: "itemType", label: "item_Type" },
+    { key: "nos", label: "Nos", numeric: true, total: true, format: (value) => numberValue(value, 0) },
+    { key: "gross", label: "Gross", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "stone", label: "Stone", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "slNet", label: "Sl_Net", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "srNet", label: "Sr_Net", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "net", label: "Net", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "discount", label: "Discount", numeric: true, total: true, format: (value) => numberValue(value, 2) },
+    { key: "slNetTotal", label: "Sl_NetTotal", numeric: true, total: true, format: (value) => numberValue(value, 2) },
+    { key: "srNetTotal", label: "Sr_NetTota", numeric: true, total: true, format: (value) => numberValue(value, 2) },
+    { key: "netTotal", label: "NetTotal", numeric: true, total: true, format: (value) => numberValue(value, 2) },
+    { key: "slDmdAmt", label: "Sl_DmdAmt", numeric: true, total: true, format: (value) => numberValue(value, 2) },
+    { key: "srDmdAmt", label: "Sr_DmdAm", numeric: true, total: true, format: (value) => numberValue(value, 2) },
+    { key: "netDmdAmt", label: "NetDmdAm", numeric: true, total: true, format: (value) => numberValue(value, 2) },
+    { key: "slDmdCar", label: "Sl_DmdCar", numeric: true, total: true, format: (value) => numberValue(value, 2) },
+    { key: "srDmdCar", label: "Sr_DmdCar", numeric: true, total: true, format: (value) => numberValue(value, 2) },
+    { key: "netDmdCar", label: "NetDmdCar", numeric: true, total: true, format: (value) => numberValue(value, 2) }
+  ];
+}
+
+function salesmanWeightSummaryConfig(rows) {
+  const columns = salesmanWeightSummaryColumns();
+  const grouped = new Map();
+  rows.forEach((row) => {
+    const smanName = row.staffName || "Not Set";
+    const item = grouped.get(smanName) || {
+      smanName,
+      invoiceIds: new Set(),
+      noofInvoice: 0,
+      goldGross: 0,
+      goldStone: 0,
+      goldNet: 0,
+      ogGross: 0,
+      ogLess: 0,
+      ogNet: 0,
+      goldReturn: 0,
+      silverNet: 0,
+      silverPur: 0,
+      silverReturn: 0,
+      caratSales: 0,
+      caratReturn: 0
+    };
+    item.invoiceIds.add(row.bill?.id || row.billNo || row.entryNo);
+    const category = String(row.category || "").toLowerCase();
+    const itemType = String(row.itemType || "").toLowerCase();
+    const itemName = String(row.itemName || "").toLowerCase();
+    const gross = Number(row.gross || 0);
+    const stone = Number(row.stone || 0);
+    const net = Number(row.net || 0);
+    if (category.includes("old") || itemType.includes("old") || itemName.includes("old")) {
+      item.ogGross += gross;
+      item.ogLess += stone;
+      item.ogNet += net;
+    } else if (category.includes("silver") || itemType.includes("silver")) {
+      item.silverNet += net;
+    } else if (category.includes("diamond") || category.includes("carat") || itemType.includes("18ct")) {
+      item.caratSales += Number(row.dmdCarat || 0) || net;
+    } else {
+      item.goldGross += gross;
+      item.goldStone += stone;
+      item.goldNet += net;
+    }
+    item.noofInvoice = item.invoiceIds.size;
+    carryReportBillSource(item, row);
+    grouped.set(smanName, item);
+  });
+  const reportRows = [...grouped.values()]
+    .map(({ invoiceIds, ...row }) => row)
+    .sort((left, right) => left.smanName.localeCompare(right.smanName));
+  return {
+    gridClass: "sales-salesman-weight-summary-grid",
+    columns,
+    rows: reportRows,
+    totals: salesTotalsForColumns(reportRows, columns)
+  };
+}
+
+function salesmanWeightSummaryColumns() {
+  const weightColumn = (key, label) => ({ key, label, numeric: true, total: true, format: (value) => numberValue(value, 3) });
+  return [
+    { key: "smanName", label: "smanName" },
+    { key: "noofInvoice", label: "NoofInvoice", numeric: true, total: true, format: (value) => numberValue(value, 0) },
+    weightColumn("goldGross", "GoldGross"),
+    weightColumn("goldStone", "GoldStone"),
+    weightColumn("goldNet", "GoldNet"),
+    weightColumn("ogGross", "OGGross"),
+    weightColumn("ogLess", "OGLess"),
+    weightColumn("ogNet", "OGNet"),
+    weightColumn("goldReturn", "GoldReturn"),
+    weightColumn("silverNet", "SilverNet"),
+    weightColumn("silverPur", "SilverPur"),
+    weightColumn("silverReturn", "SilverReturn"),
+    weightColumn("caratSales", "CaratSales"),
+    weightColumn("caratReturn", "CaratReturn")
+  ];
+}
+
+function isSalesmanCategoryNetOption(option) {
+  return option === "Salesman Category Summary - Net" || option === "Salesman Category Summary - Net Wt/Amount";
+}
+
+function salesmanCategorySummaryConfig(rows, options = {}) {
+  const columns = salesmanCategorySummaryColumns();
+  const grouped = new Map();
+  rows.forEach((row) => {
+    const salesman = row.staffName || "Not Set";
+    const item = grouped.get(salesman) || {
+      accountId: salesmanAccountId(row),
+      salesman,
+      diamond: 0,
+      gold: 0,
+      silver: 0,
+      platinum: 0,
+      watch: 0,
+      birthStones: 0,
+      leaveDays: 0
+    };
+    const category = String(row.category || "").toLowerCase();
+    const itemType = String(row.itemType || "").toLowerCase();
+    const itemName = String(row.itemName || "").toLowerCase();
+    const net = Number(row.net || 0);
+    const amount = Number(row.itemTotal || row.amount || 0);
+    const dmdMeasure = options.netWeightAmount ? amount : (Number(row.dmdCarat || 0) || net);
+    if (category.includes("diamond") || itemType.includes("18ct") || itemName.includes("diamond")) item.diamond += dmdMeasure;
+    else if (category.includes("silver") || itemType.includes("silver")) item.silver += net;
+    else if (category.includes("platinum") || itemType.includes("platinum")) item.platinum += net;
+    else if (category.includes("watch") || itemName.includes("watch")) item.watch += options.netWeightAmount ? amount : net;
+    else if (category.includes("birth") || itemName.includes("birth stone")) item.birthStones += options.netWeightAmount ? amount : net;
+    else item.gold += net;
+    carryReportBillSource(item, row);
+    grouped.set(salesman, item);
+  });
+  const reportRows = [...grouped.values()].sort((left, right) => left.salesman.localeCompare(right.salesman));
+  return {
+    gridClass: "sales-salesman-category-summary-grid",
+    columns,
+    rows: reportRows,
+    totals: salesTotalsForColumns(reportRows, columns)
+  };
+}
+
+function salesmanAccountId(row) {
+  const name = row.staffName || "";
+  const match = (state.staffs || []).find((staff) => staff.name === name || staff.staffId === row.staffId || staff.employeeId === row.staffId);
+  if (match) return match.employeeId || match.staffId || "";
+  if (row.staffId) return row.staffId;
+  return String(name).split(/\s+/).filter(Boolean).map((part) => part[0]).join("").slice(0, 4).toUpperCase();
+}
+
+function salesmanCategorySummaryColumns() {
+  const amountColumn = (key, label) => ({ key, label, numeric: true, total: true, format: (value) => numberValue(value, 2) });
+  return [
+    { key: "accountId", label: "account_ID" },
+    { key: "salesman", label: "Salesman" },
+    amountColumn("diamond", "Diamond"),
+    amountColumn("gold", "Gold"),
+    amountColumn("silver", "Silver"),
+    amountColumn("platinum", "Platinum"),
+    amountColumn("watch", "Watch"),
+    amountColumn("birthStones", "BirthStones"),
+    { key: "leaveDays", label: "LeaveDays", numeric: true, total: true, format: (value) => numberValue(value, 0) }
+  ];
+}
+
 function salesTotalsForColumns(rows, columns) {
   const totals = {};
   columns.filter((column) => column.total).forEach((column) => {
@@ -10961,6 +11426,10 @@ function salesBillWiseRows(rows) {
     const roundOff = Number(totals.billAmountRoundOff || Math.round(financials.invoiceTotal) - financials.invoiceTotal || 0);
     return {
       entryNo: bill.entryNo || bill.id || "",
+      sourceBillId: bill.id || "",
+      sourceEntryNo: bill.entryNo || "",
+      sourceBillNo: bill.billNo || "",
+      sourceSection: (bill.sections?.return || []).length && !(bill.sections?.sales || []).length ? "return" : "sales",
       branchEntryNo: salesBranchEntryNo(bill, 0),
       date: bill.date || "",
       mode: bill.paymentMode || (financials.balance > 0 ? "Credit" : "Cash"),
@@ -11042,6 +11511,198 @@ function salesBillWiseColumns() {
   ];
 }
 
+function salesCustomerDetailsConfig(rows) {
+  const customers = new Map();
+  uniqueSalesBills(rows).forEach((bill) => {
+    const code = bill.customerId || bill.customerCode || "";
+    const master = findCustomerForReport(bill);
+    const partyId = code || master?.customerCode || master?.id || "";
+    const key = partyId || bill.customer || bill.partyName || bill.billNo || bill.entryNo;
+    if (!key || customers.has(key)) return;
+    customers.set(key, {
+      date: bill.date || "",
+      sourceBillId: bill.id || "",
+      sourceEntryNo: bill.entryNo || "",
+      sourceBillNo: bill.billNo || "",
+      partyId,
+      customerName: bill.customer || bill.partyName || master?.name || "",
+      mobile: bill.customerMobile || bill.phone || master?.mobile || master?.phone || "",
+      address: bill.address || master?.address || ""
+    });
+  });
+  const reportRows = [...customers.values()].sort((left, right) => `${toDateInputValue(left.date)} ${left.partyId}`.localeCompare(`${toDateInputValue(right.date)} ${right.partyId}`));
+  return {
+    gridClass: "sales-customer-details-grid",
+    columns: salesCustomerDetailsColumns(),
+    rows: reportRows
+  };
+}
+
+function findCustomerForReport(bill) {
+  const code = bill.customerId || bill.customerCode || "";
+  const name = bill.customer || bill.partyName || "";
+  return (state.customers || state.parties || []).find((customer) => {
+    const customerCode = customer.customerCode || customer.customerId || customer.id || "";
+    return customerCode === code || customer.name === name || customer.customerName === name;
+  });
+}
+
+function salesCustomerDetailsColumns() {
+  return [
+    { key: "date", label: "Date" },
+    { key: "partyId", label: "PartyID" },
+    { key: "customerName", label: "CustomerName" },
+    { key: "mobile", label: "Mobile" },
+    { key: "address", label: "Address" }
+  ];
+}
+
+function salesDayReportConfig(rows) {
+  const billRows = salesBillWiseRows(rows);
+  const purchaseBills = (state.bills || [])
+    .filter((bill) => String(bill.type || "").toLowerCase().includes("purchase"))
+    .filter((bill) => isDateWithinPeriod(bill.date, salesReportOptions.from, salesReportOptions.to));
+  const expenseRows = (state.expenseEntries || [])
+    .filter((entry) => isDateWithinPeriod(entry.date, salesReportOptions.from, salesReportOptions.to));
+  const schemeRows = (state.schemes || [])
+    .filter((scheme) => isDateWithinPeriod(scheme.opDate || scheme.joinDate, salesReportOptions.from, salesReportOptions.to));
+  const orderAdvanceRows = (state.orderAdvances || [])
+    .filter((entry) => isDateWithinPeriod(entry.date, salesReportOptions.from, salesReportOptions.to));
+  const bankReceiptRows = (state.bankDeposits || [])
+    .filter((entry) => isDateWithinPeriod(entry.date, salesReportOptions.from, salesReportOptions.to));
+  const bankWithdrawalRows = (state.bankWithdrawals || [])
+    .filter((entry) => isDateWithinPeriod(entry.date, salesReportOptions.from, salesReportOptions.to));
+  const directPurchaseRows = purchaseBills.filter((bill) => /direct/i.test(`${bill.type || ""} ${bill.purchaseType || ""}`));
+  const diamondPurchaseRows = purchaseBills.filter((bill) => /diamond|dmd/i.test(`${bill.type || ""} ${bill.purchaseType || ""}`));
+  const oldGoldPurchaseRows = purchaseBills.filter((bill) => /old/i.test(`${bill.type || ""} ${bill.purchaseType || ""}`));
+  const rowsOut = [
+    dayReportRow("Sales", "", sumField(billRows, "salesTotal")),
+    dayReportRow("Tax", "", sumField(billRows, "tax")),
+    dayReportRow("Round Off", "", sumField(billRows, "roundOff")),
+    dayReportRow("Spl.Discount", "", sumField(billRows, "flatDiscount") + sumField(billRows, "coupon")),
+    dayReportRow("Old Gold Purchase", "", sumPurchaseBills(oldGoldPurchaseRows)),
+    dayReportRow("Direct Gold Purchase", "", sumPurchaseBills(directPurchaseRows)),
+    dayReportRow("Diamond Purchase", "", sumPurchaseBills(diamondPurchaseRows)),
+    ...salesDayReportExpenseRows(expenseRows),
+    dayReportRow("Scheme Cash", "", sumField(schemeRows, "collection")),
+    dayReportRow("Order Advance", "", sumField(orderAdvanceRows, "advanceAmount")),
+    dayReportRow("Bank Receipts", "", sumField(bankReceiptRows, "totalAmount")),
+    dayReportRow("Other Receipts", "", sumField(bankWithdrawalRows, "totalAmount"))
+  ];
+  return {
+    gridClass: "sales-day-report-grid",
+    columns: salesDayReportColumns(),
+    rows: rowsOut,
+    totals: { amount: rowsOut.reduce((sum, row) => sum + Number(row.amount || 0), 0) }
+  };
+}
+
+function salesDayReportExpenseRows(expenseRows) {
+  if (!expenseRows.length) return [dayReportRow("Expenses", "", 0)];
+  const grouped = new Map();
+  expenseRows.forEach((entry) => {
+    (entry.lines || []).forEach((line) => {
+      const sub = line.ledgerHead || entry.supplier || entry.remarks || "Expenses";
+      grouped.set(sub, Number(grouped.get(sub) || 0) + Number(line.amount || line.taxable || 0));
+    });
+  });
+  return [...grouped.entries()].map(([sub, amount]) => dayReportRow("Expenses", sub, amount));
+}
+
+function dayReportRow(head, sub, amount) {
+  return { head, sub, amount: Number(amount || 0) };
+}
+
+function sumPurchaseBills(bills) {
+  return bills.reduce((sum, bill) => {
+    const financials = billFinancials({ ...bill, sections: bill.sections || { sales: bill.lines || [], exchange: [], return: [] } });
+    return sum + Number(bill.amount || bill.totalAmount || bill.invoiceTotal || bill.totals?.invoiceTotal || financials.invoiceTotal || 0);
+  }, 0);
+}
+
+function salesDayReportColumns() {
+  return [
+    { key: "head", label: "Head" },
+    { key: "sub", label: "Sub" },
+    { key: "amount", label: "Amount", numeric: true, total: true, format: (value) => numberValue(value, 3) }
+  ];
+}
+
+function salesMcReportSummaryConfig(rows) {
+  const grouped = new Map();
+  rows.forEach((row) => {
+    const category = row.category || "Not Set";
+    const item = grouped.get(category) || {
+      category,
+      grossSalesWeight: 0,
+      grossSalesAmount: 0,
+      stoneWeight: 0,
+      stoneAmount: 0,
+      netSalesWeight: 0,
+      netSalesAmount: 0,
+      salesMc: 0,
+      salesDiscount: 0,
+      salesMcAfterDiscount: 0
+    };
+    item.grossSalesWeight += Number(row.gross || 0);
+    item.grossSalesAmount += Number(row.goldAmount || row.amount || 0);
+    item.stoneWeight += Number(row.stone || 0);
+    item.stoneAmount += Number(row.stoneAmount || 0);
+    item.netSalesWeight += Number(row.net || 0);
+    item.netSalesAmount += Number(row.itemTotal || row.amount || 0);
+    item.salesMc += Number(row.mc || 0);
+    item.salesDiscount += Number(row.discount || 0);
+    item.salesMcAfterDiscount += Number(row.mc || 0) - Number(row.discount || 0);
+    carryReportBillSource(item, row);
+    grouped.set(category, item);
+  });
+  const reportRows = [...grouped.values()].sort((left, right) => left.category.localeCompare(right.category)).flatMap(salesMcReportRowsForCategory);
+  return {
+    gridClass: "sales-mc-report-summary-grid",
+    columns: salesMcReportSummaryColumns(),
+    rows: reportRows
+  };
+}
+
+function salesMcReportRowsForCategory(item) {
+  const avgMc = item.netSalesWeight ? item.salesMc / item.netSalesWeight : 0;
+  const avgRate = item.netSalesWeight ? item.netSalesAmount / item.netSalesWeight : 0;
+  const mcAvgPercent = item.netSalesAmount ? (item.salesMc / item.netSalesAmount) * 100 : 0;
+  const netMc = item.salesMcAfterDiscount;
+  const avgNetMc = item.netSalesWeight ? netMc / item.netSalesWeight : 0;
+  const avgNetMcPercent = item.netSalesAmount ? (netMc / item.netSalesAmount) * 100 : 0;
+  return [
+    salesMcReportRow(item, 1, "Gross Sales", item.grossSalesWeight, item.grossSalesAmount),
+    salesMcReportRow(item, 2, "Stone", item.stoneWeight, item.stoneAmount),
+    salesMcReportRow(item, 3, "Net Sales", item.netSalesWeight, item.netSalesAmount),
+    salesMcReportRow(item, 4, "Sales MC", 0, item.salesMc),
+    salesMcReportRow(item, 5, "Sales Discount", 0, item.salesDiscount),
+    salesMcReportRow(item, 6, "Sales Mc After Discount", 0, item.salesMcAfterDiscount),
+    salesMcReportRow(item, 100, "Avg.Mc", 0, avgMc),
+    salesMcReportRow(item, 120, "Avg.Rate", 0, avgRate),
+    salesMcReportRow(item, 130, "MC Avg%", 0, mcAvgPercent),
+    salesMcReportRow(item, 141, "Net MC", 0, netMc),
+    salesMcReportRow(item, 150, "Net Sales", item.netSalesWeight, item.netSalesAmount),
+    salesMcReportRow(item, 160, "AVG Rate", 0, avgRate),
+    salesMcReportRow(item, 170, "AVG Net MC", 0, avgNetMc),
+    salesMcReportRow(item, 180, "Avg Net MC%", 0, avgNetMcPercent)
+  ];
+}
+
+function salesMcReportRow(item, slno, description, weight, amount) {
+  return carryReportBillSource({ itemCategory: item.category, slno, description, weight: Number(weight || 0), amount: Number(amount || 0) }, item);
+}
+
+function salesMcReportSummaryColumns() {
+  return [
+    { key: "itemCategory", label: "Item_Categ" },
+    { key: "slno", label: "Slno" },
+    { key: "description", label: "Description" },
+    { key: "weight", label: "Weight", numeric: true, format: (value) => numberValue(value, 3) },
+    { key: "amount", label: "Amount", numeric: true, format: (value) => numberValue(value, 2) }
+  ];
+}
+
 function salesSummaryConfig(rows, option) {
   if (option === "Day Summary") return salesDaySummaryConfig(rows);
   if (option === "Month Summary") return salesMonthSummaryConfig(rows);
@@ -11082,6 +11743,7 @@ function summarizeSalesRows(rows, key) {
     item.discount += Number(row.discount || 0);
     item.amount += Number(row.amount || 0);
     item.bills = item.billIds.size;
+    carryReportBillSource(item, row);
     grouped.set(label, item);
   });
   return [...grouped.values()].map(({ billIds, ...row }) => row);
@@ -11155,6 +11817,7 @@ function emptySalesItemDayTotal(itemName, rowClass = "") {
 }
 
 function addSalesItemDayValues(target, row) {
+  carryReportBillSource(target, row);
   target.nos += Number(row.nos ?? row.qty ?? 0);
   target.gross += Number(row.gross || 0);
   target.wastage += Number(row.wastage || 0);
@@ -11367,23 +12030,92 @@ function salesDmdConfig(option) {
   };
 }
 
+function salesTopMovingConfig(rows) {
+  const grouped = new Map();
+  rows.forEach((row) => {
+    const itemId = row.itemId || itemIdForSalesItem(row.itemName);
+    const itemName = row.itemName || "";
+    const key = `${itemId}::${itemName}`;
+    const item = grouped.get(key) || { itemId, itemName, qty: 0, gross: 0, stone: 0, net: 0 };
+    item.qty += Number(row.qty || 0);
+    item.gross += Number(row.gross || 0);
+    item.stone += Number(row.stone || 0);
+    item.net += Number(row.net || 0);
+    carryReportBillSource(item, row);
+    grouped.set(key, item);
+  });
+  const reportRows = [...grouped.values()]
+    .sort((left, right) => Number(right.gross || 0) - Number(left.gross || 0) || left.itemName.localeCompare(right.itemName));
+  const columns = salesTopMovingColumns();
+  return {
+    gridClass: "sales-top-moving-grid",
+    columns,
+    rows: reportRows,
+    totals: salesTotalsForColumns(reportRows, columns)
+  };
+}
+
+function salesTopMovingColumns() {
+  return [
+    { key: "itemId", label: "ItemID" },
+    { key: "itemName", label: "ItemName" },
+    { key: "qty", label: "Qty", numeric: true, total: true, format: (value) => numberValue(value, 0) },
+    { key: "gross", label: "Gross", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "stone", label: "Stone", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+    { key: "net", label: "Net", numeric: true, total: true, format: (value) => numberValue(value, 3) }
+  ];
+}
+
 function salesPendingConfig(option) {
-  const bills = uniqueSalesBills(salesReportSourceRows("Sales"));
+  const salesRows = salesReportSourceRows("Sales");
+  const grouped = new Map();
+  BARCODE_WISE_CLOSING_STOCK.forEach((stock) => {
+    grouped.set(stock.barcode, {
+      category: stock.itemCategory || stock.type || itemCategoryForName(stock.name),
+      itemId: stock.iid || itemIdForSalesItem(stock.name),
+      itemName: stock.name || "",
+      barcode: stock.barcode || "",
+      netIn: Number(stock.net || 0),
+      netOut: 0,
+      netDiff: Number(stock.net || 0)
+    });
+  });
+  salesRows.forEach((row) => {
+    const barcode = row.barcode || `${row.itemId || itemIdForSalesItem(row.itemName)}-${row.entryNo || row.sl}`;
+    const item = grouped.get(barcode) || {
+      category: row.category || itemCategoryForName(row.itemName),
+      itemId: row.itemId || itemIdForSalesItem(row.itemName),
+      itemName: row.itemName || "",
+      barcode,
+      netIn: 0,
+      netOut: 0,
+      netDiff: 0
+    };
+    item.netOut -= Math.abs(Number(row.net || 0));
+    item.netDiff = Number(item.netIn || 0) + Number(item.netOut || 0);
+    grouped.set(barcode, item);
+  });
+  const pendingOnly = option === "CASHPOINT Pending";
+  const reportRows = [...grouped.values()]
+    .filter((row) => !pendingOnly || Math.abs(Number(row.netDiff || 0)) > 0.0005)
+    .sort((left, right) => `${left.category} ${left.itemId} ${left.itemName} ${left.barcode}`.localeCompare(`${right.category} ${right.itemId} ${right.itemName} ${right.barcode}`));
   return {
     gridClass: "sales-pending-grid",
     columns: [
-      { key: "date", label: "Date" },
-      { key: "billNo", label: "BillNo" },
-      { key: "customer", label: "Customer" },
-      { key: "invoiceTotal", label: "InvoiceTotal", numeric: true, format: (value) => trimMoney(value) },
-      { key: "cashReceived", label: "Received", numeric: true, format: (value) => trimMoney(value) },
-      { key: "balance", label: "Pending", numeric: true, format: (value) => trimMoney(value) },
-      { key: "status", label: "Status" }
+      { key: "category", label: "Category" },
+      { key: "itemId", label: "itemID" },
+      { key: "itemName", label: "ItemName" },
+      { key: "barcode", label: "Barcode" },
+      { key: "netIn", label: "Net IN", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+      { key: "netOut", label: "Net OUT", numeric: true, total: true, format: (value) => numberValue(value, 3) },
+      { key: "netDiff", label: "Netdiff", numeric: true, total: true, format: (value) => numberValue(value, 3) }
     ],
-    rows: bills.map((bill) => {
-      const financials = billFinancials(bill);
-      return { ...bill, ...financials, status: financials.balance > 0 ? "Pending" : "Sold" };
-    }).filter((row) => option !== "CASHPOINT Pending" || row.balance > 0)
+    rows: reportRows,
+    totals: salesTotalsForColumns(reportRows, [
+      { key: "netIn", total: true },
+      { key: "netOut", total: true },
+      { key: "netDiff", total: true }
+    ])
   };
 }
 
@@ -14982,6 +15714,29 @@ function selectReport(name) {
   recentReportItems = [selectedReport, ...recentReportItems.filter((item) => item !== selectedReport)].slice(0, 5);
 }
 
+function openReportBillDetail(row) {
+  const billId = row.dataset.reportBillId || "";
+  const entryNo = row.dataset.reportEntryNo || "";
+  const billNo = row.dataset.reportBillNo || "";
+  const section = row.dataset.reportSection || "";
+  const bill = (state.bills || []).find((item) => {
+    return (billId && item.id === billId)
+      || (entryNo && item.entryNo === entryNo)
+      || (billNo && item.billNo === billNo)
+      || (entryNo && item.id === entryNo);
+  });
+  if (!bill) {
+    toast("Detailed bill not found for this report row.");
+    return;
+  }
+  state.bills = [bill, ...(state.bills || []).filter((item) => item !== bill)];
+  active = "Sales";
+  expandedNavGroups.add("Sales");
+  salesView = section === "return" || ((bill.sections?.return || []).length && !(bill.sections?.sales || []).length) ? "Sales Return" : "Sales Invoice";
+  render();
+  toast(`Opened ${salesView} ${bill.entryNo || bill.billNo || bill.id}.`);
+}
+
 function field(label, value) {
   return `<label><span>${label}</span><input value="${value}" /></label>`;
 }
@@ -15241,8 +15996,8 @@ function bindEvents() {
         }
       }
       if (clicked === "Reports") {
-        selectedReport = "";
         reportSearch = "";
+        if (!selectedReport) selectedReport = "Sales";
       }
       active = clicked;
       render();
@@ -15365,6 +16120,10 @@ function bindEvents() {
     target.addEventListener("dblclick", () => {
       selectManagementRecord(target.dataset.masterKind, target.dataset.masterId, target.dataset.masterGroup);
     });
+  });
+
+  document.querySelectorAll(".sales-report-grid tbody tr[data-report-bill-id], .sales-report-grid tbody tr[data-report-entry-no], .sales-report-grid tbody tr[data-report-bill-no]").forEach((row) => {
+    row.addEventListener("dblclick", () => openReportBillDetail(row));
   });
 
   document.querySelectorAll(".inline-master-form").forEach((form) => {
@@ -20379,7 +21138,7 @@ function handleAction(action, source) {
     render();
   }
   if (action === "sales-report-close") {
-    selectedReport = "";
+    selectedReport = "Sales";
     render();
   }
   if (action === "stock-report-date") {

@@ -1253,7 +1253,8 @@ tbody tr:hover td {
   height: calc(100vh - 88px);
   min-height: 0;
   padding: 0;
-  overflow: hidden;
+  overflow: auto;
+  overscroll-behavior: contain;
 }
 
 .focused-classic-report {
@@ -1261,8 +1262,8 @@ tbody tr:hover td {
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr);
   gap: 0;
-  height: 100%;
-  min-height: 0;
+  min-height: 100%;
+  height: auto;
 }
 
 .report-submenu-stack {
@@ -1390,7 +1391,8 @@ tbody tr:hover td {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: auto;
+  overscroll-behavior: contain;
   border: 1px solid #8c8c8c;
   background: #fff;
   color: #000;
@@ -2289,7 +2291,7 @@ tbody tr:hover td {
 }
 
 .content:has(.focused-report-panel) {
-  overflow: hidden;
+  overflow: auto;
   align-content: stretch;
 }
 
@@ -2301,11 +2303,17 @@ tbody tr:hover td {
 .focused-classic-report .stock-compare-grid-wrap,
 .focused-classic-report .other-location-grid-wrap,
 .focused-classic-report .barcode-report-grid-wrap,
-.focused-classic-report .reconciliation-grid-wrap {
+.focused-classic-report .reconciliation-grid-wrap,
+.focused-classic-report .crosstab-detail-wrap,
+.focused-classic-report .stock-ledger-stage,
+.focused-classic-report .stock-ledger-result-wrap,
+.focused-classic-report .stock-ledger-barcode-wrap,
+.focused-classic-report .sales-report-grid-wrap {
   flex: 1 1 auto;
   min-height: 0;
   max-height: none;
   overflow: auto;
+  overscroll-behavior: contain;
 }
 
 .grid-filter {
@@ -2819,6 +2827,54 @@ tbody tr:hover td {
   min-width: 3400px;
 }
 
+.sales-category-wise-grid {
+  min-width: 1900px;
+}
+
+.sales-category-summary-grid {
+  min-width: 1360px;
+}
+
+.sales-salesman-wise-grid {
+  min-width: 1700px;
+}
+
+.sales-agent-wise-grid {
+  min-width: 1700px;
+}
+
+.sales-agent-summary-grid {
+  min-width: 1260px;
+}
+
+.sales-day-report-grid {
+  min-width: 335px;
+}
+
+.sales-customer-details-grid {
+  min-width: 900px;
+}
+
+.sales-mc-report-summary-grid {
+  min-width: 540px;
+}
+
+.sales-top-moving-grid {
+  min-width: 640px;
+}
+
+.sales-salesman-summary-grid {
+  min-width: 2050px;
+}
+
+.sales-salesman-weight-summary-grid {
+  min-width: 1500px;
+}
+
+.sales-salesman-category-summary-grid {
+  min-width: 980px;
+}
+
 .sales-report-grid th:first-child,
 .sales-report-grid td:first-child {
   width: 34px;
@@ -2923,6 +2979,12 @@ tbody tr:hover td {
 .sales-report-grid tbody tr.grand-total-row td {
   font-weight: 800;
   background: #ff744e;
+}
+
+.sales-report-grid tbody tr[data-report-bill-id],
+.sales-report-grid tbody tr[data-report-entry-no],
+.sales-report-grid tbody tr[data-report-bill-no] {
+  cursor: pointer;
 }
 
 .sales-weight-net-grid {
