@@ -2713,11 +2713,212 @@ tbody tr:hover td {
   position: relative;
   min-height: 46px;
   gap: 7px;
+  overflow: visible;
+  z-index: 80;
 }
 
 .sales-report-toolbar .classic-tool {
   width: 45px;
   min-width: 45px;
+}
+
+.sales-profit-toolbar {
+  padding: 0 4px;
+  gap: 4px;
+}
+
+.sales-profit-toolbar .classic-tool {
+  width: 42px;
+  min-width: 42px;
+  min-height: 40px;
+  padding: 2px 0;
+}
+
+.sales-profit-toolbar .classic-tool strong {
+  font-size: 19px;
+}
+
+.sales-profit-options {
+  min-width: 206px;
+  align-self: stretch;
+  margin-left: auto;
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  border-left: 1px solid #aaa;
+  background: #eee;
+  color: #000;
+  font: 11px Arial, sans-serif;
+}
+
+.sales-profit-options > div {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  align-items: center;
+  border-bottom: 1px solid #aaa;
+}
+
+.sales-profit-options label {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 6px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.sales-profit-options input {
+  width: 13px;
+  height: 13px;
+  margin: 0;
+  accent-color: #111;
+}
+
+.sales-profit-title {
+  min-height: 96px;
+}
+
+.sales-profit-scale {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  font-size: calc(14px * var(--profit-zoom));
+}
+
+.sales-profit-scale > .sales-report-grid-wrap {
+  flex: 1 1 auto;
+}
+
+.sales-profit-grid {
+  min-width: 2860px;
+  font-size: inherit;
+}
+
+.sales-profit-grid th,
+.sales-profit-grid td {
+  width: 108px !important;
+  min-width: 108px;
+  height: 22px;
+  padding: 2px 6px;
+}
+
+.sales-profit-grid th:first-child,
+.sales-profit-grid td:first-child {
+  width: 34px !important;
+  min-width: 34px;
+}
+
+.sales-profit-grid-compact th:nth-child(2),
+.sales-profit-grid-compact td:nth-child(2),
+.sales-profit-grid-compact th:nth-child(4),
+.sales-profit-grid-compact td:nth-child(4),
+.sales-profit-grid-compact th:nth-child(5),
+.sales-profit-grid-compact td:nth-child(5),
+.sales-profit-grid-compact th:nth-child(6),
+.sales-profit-grid-compact td:nth-child(6) {
+  display: none;
+}
+
+.sales-return-report-toolbar .classic-a4 {
+  margin-left: auto;
+}
+
+.sales-return-report-select {
+  width: 200px;
+  min-height: 25px;
+  border: 1px solid #0877d1;
+  background: #fff;
+  color: #000;
+  font: 13px Arial, sans-serif;
+}
+
+.sales-return-report-title {
+  min-height: 94px;
+  gap: 5px;
+}
+
+.sales-return-report-title h2 {
+  font-size: 16px;
+}
+
+.sales-return-report-grid {
+  min-width: 2220px;
+}
+
+.sales-return-register-grid {
+  min-width: 1960px;
+}
+
+.sales-return-report-grid th:not(:first-child)::after,
+.sales-return-register-grid th:not(:first-child)::after {
+  content: "▾";
+  float: right;
+  width: 15px;
+  height: 15px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #888;
+  background: #f4f4f4;
+  font-size: 9px;
+}
+
+.sales-return-report-grid tbody tr[data-report-section="return"],
+.sales-return-register-grid tbody tr[data-report-section="return"] {
+  cursor: pointer;
+}
+
+.exchange-report {
+  border-top: 5px solid #16a52d;
+}
+
+.exchange-report-toolbar .classic-a4 {
+  margin-left: auto;
+}
+
+.exchange-report-select {
+  width: 200px;
+  min-height: 25px;
+  border: 1px solid #0877d1;
+  background: #fff;
+  color: #000;
+  font: 13px Arial, sans-serif;
+}
+
+.exchange-report-title {
+  min-height: 92px;
+  gap: 5px;
+}
+
+.exchange-register-grid { min-width: 1550px; }
+.exchange-item-grid { min-width: 1640px; }
+.exchange-salesman-grid { min-width: 1540px; }
+.exchange-salesman-summary-grid { min-width: 940px; }
+
+.exchange-report .sales-report-grid th:not(:first-child)::after {
+  content: "▾";
+  float: right;
+  width: 15px;
+  height: 15px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #888;
+  background: #f4f4f4;
+  font-size: 9px;
+}
+
+.exchange-report tbody tr[data-report-target="purchase"] { cursor: pointer; }
+
+@media print {
+  .sales-profit-toolbar,
+  .report-submenu-stack,
+  .app-sidebar,
+  .topbar {
+    display: none !important;
+  }
+
+  .sales-profit-grid {
+    min-width: 100%;
+    font-size: 7px;
+  }
 }
 
 .sales-green-input {
@@ -2758,7 +2959,7 @@ tbody tr:hover td {
   position: absolute;
   top: 38px;
   right: 36px;
-  z-index: 40;
+  z-index: 120;
   width: 232px;
   display: grid;
   gap: 5px;
@@ -2768,6 +2969,13 @@ tbody tr:hover td {
   box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.25);
   color: #000;
   font: 14px Arial, sans-serif;
+}
+
+.sales-report-title,
+.sales-report-grid-wrap,
+.sales-profit-scale {
+  position: relative;
+  z-index: 1;
 }
 
 .sales-date-popup label {

@@ -564,7 +564,19 @@ let reportSearch = "";
 let globalMenuSearch = "";
 let recentReportItems = [];
 let stockReportOptions = { includeZero: false, groupByType: false, groupByItem: false, noFirmName: false, pageSize: "A4", barcodeType: "", categoryType: "", diamondType: "", typeType: "", summary: false, reportDateOpen: false, reportFrom: "13/07/2026", reportTo: "13/07/2026", reconciliationType: "All", reconciliationOption: "", reconciliationIgnoreZero: true, crosstabMode: "Summary", crosstabItem: "All", crosstabPrintSummarized: false, stockLedgerFrom: "13/07/2026", stockLedgerTo: "13/07/2026", stockLedgerItem: "ANKLET", stockLedgerBarcodeWise: false };
-let salesReportOptions = { option: "Item Wise", shown: false, dateOpen: false, from: "01/01/2025", to: "16/07/2026" };
+let salesReportOptions = {
+  option: "Item Wise",
+  shown: false,
+  dateOpen: false,
+  from: "01/01/2025",
+  to: "16/07/2026",
+  profitGroup: "item",
+  profitTransaction: "all",
+  profitZoom: 1,
+  profitCompact: false,
+  returnReportOption: "Sales Return Report",
+  exchangeReportOption: "Register"
+};
 let classicColumnMenu = null;
 let classicColumnFilters = {};
 let classicColumnSorts = {};
@@ -10600,6 +10612,7 @@ function reportPreview(name) {
   if (isSalesReport(name)) {
     return salesReportScreen(name);
   }
+  if (name === "Exchange") return exchangeReportScreen();
   if (STOCK_REPORT_MENU[0].items.includes(name)) {
     return stockReportSubmenuScreen(name);
   }
@@ -10622,6 +10635,8 @@ function isSalesReport(name) {
 }
 
 function salesReportScreen(name) {
+  if (name === "Sales Profit") return salesProfitReportScreen();
+  if (name === "Sales Return") return salesReturnReportScreen();
   return `
     <div class="classic-report-layout focused-classic-report">
       ${salesReportSubmenus(name)}
@@ -10636,6 +10651,553 @@ function salesReportScreen(name) {
       </section>
     </div>
   `;
+}
+
+function salesReturnReportScreen() {
+  const config = salesReturnReportConfig();
+  return `
+    <div class="classic-report-layout focused-classic-report">
+      ${salesReportSubmenus("Sales Return")}
+      <section class="classic-stock-report sales-report sales-return-report">
+        ${salesReturnReportToolbar()}
+        <header class="classic-report-title sales-report-title sales-return-report-title">
+          <h3>MT GOLD LAND</h3>
+          <h4>MT GOLD LAND</h4>
+          <h2>${escapeHtml(salesReportOptions.returnReportOption)}</h2>
+          <span>From ${escapeHtml(displaySalesDate(salesReportOptions.from))}&nbsp; To ${escapeHtml(displaySalesDate(salesReportOptions.to))}</span>
+        </header>
+        ${salesReportOptions.shown ? salesReportTable(config.columns, config.rows, config.gridClass, config.totals) : salesReportBlankState()}
+      </section>
+    </div>
+  `;
+}
+
+function exchangeReportScreen() {
+  const config = exchangeReportConfig();
+  return `
+    <div class="classic-report-layout focused-classic-report">
+      <section class="classic-stock-report sales-report exchange-report">
+        ${exchangeReportToolbar()}
+        <header class="classic-report-title sales-report-title exchange-report-title">
+          <h3>MT GOLD LAND</h3>
+          <h4>MT GOLD LAND</h4>
+          <h2>${escapeHtml(salesReportOptions.exchangeReportOption)}</h2>
+          <span>From ${escapeHtml(displaySalesDate(salesReportOptions.from))}&nbsp; To ${escapeHtml(displaySalesDate(salesReportOptions.to))}</span>
+        </header>
+        ${salesReportOptions.shown ? salesReportTable(config.columns, config.rows, config.gridClass, config.totals) : salesReportBlankState()}
+      </section>
+    </div>
+  `;
+}
+
+function exchangeReportToolbar() {
+  const tools = [
+    ["SHOW", "sales-report-show"], ["PRINT", "print-now"], ["DIRECT PRINT", "print-now"], ["EXCEL", "export-report"], ["SAVE AS", "export-report"], ["DATE", "sales-report-date"],
+    ["FIRST", "noop"], ["PREV", "noop"], ["NEXT", "noop"], ["LAST", "noop"], ["VIEW/HIDE", "noop"], ["ZOOM IN", "noop"], ["DEFAULT", "noop"], ["ZOOM OUT", "noop"], ["CLOSE", "exchange-report-close"]
+  ];
+  return `
+    <div class="classic-report-toolbar sales-report-toolbar exchange-report-toolbar">
+      <div class="classic-tool-buttons">${tools.map(([label, action]) => `<button class="classic-tool" data-action="${action}" title="${escapeHtml(label)}"><strong>${toolbarGlyph(label)}</strong><span>${escapeHtml(label)}</span></button>`).join("")}</div>
+      <label class="classic-a4"><input type="checkbox" />A4</label>
+      <select class="exchange-report-select" data-exchange-report-option aria-label="Exchange report type">
+        ${["Register", "Item Wise", "Salesman Wise", "Salesman Summary"].map((option) => `<option value="${option}" ${salesReportOptions.exchangeReportOption === option ? "selected" : ""}>${option}</option>`).join("")}
+      </select>
+      ${salesReportOptions.dateOpen ? salesDatePopup() : ""}
+    </div>
+  `;
+}
+
+function exchangeReportSourceRows() {
+  return (state.bills || [])
+    .filter((bill) => String(bill.type || "").toLowerCase().includes("purchase"))
+    .filter((bill) => isDateWithinPeriod(bill.date, salesReportOptions.from, salesReportOptions.to))
+    .filter((bill) => (bill.sections?.exchange || []).length || bill.line)
+    .map((bill) => {
+      const lines = (bill.sections?.exchange || []).length ? bill.sections.exchange : [bill.line].filter(Boolean);
+      const normalized = lines.map((line) => normalizeBillLine(line, line.amount || line.itemTotal || 0, bill, "purchase"));
+      const party = (state.parties || []).find((item) => item.id === bill.customerId || item.customerId === bill.customerId || item.customerCode === bill.customerId || item.name === bill.customer || item.name === bill.partyName) || {};
+      const billAmount = normalized.reduce((sum, line) => sum + Number(line.itemTotal || line.amount || 0), 0);
+      const gst = normalized.reduce((sum, line) => sum + Number(line.tax || 0), 0);
+      const addition = Number(bill.totals?.addition || bill.addition || 0);
+      const discount = Number(bill.totals?.flatDiscount || bill.discount || 0);
+      const invoiceTotal = billAmount + addition - discount + gst;
+      return {
+        bill,
+        lines: normalized,
+        entryNo: bill.entryNo || bill.billNo || bill.id,
+        referenceNo: bill.refNo || bill.referenceNo || "",
+        entryDate: displaySalesDate(bill.date),
+        purchaseMode: bill.paymentMode || (Number(bill.balance || bill.totals?.balance || 0) > 0 ? "Credit" : "Cash"),
+        partyId: bill.customerId || party.customerId || party.customerCode || party.id || "",
+        partyName: bill.customer || bill.partyName || party.name || "",
+        partyAddress: bill.customerAddress || bill.address || party.address || party.place || "",
+        billAmount,
+        addition,
+        discount,
+        gst,
+        invoiceTotal,
+        cashPaid: Number(bill.totals?.cashPaid || bill.totals?.payment || bill.paid || 0),
+        balance: Number(bill.totals?.accountBalance ?? bill.accountBalance ?? bill.balance ?? 0),
+        salesman: bill.staffName || "Not Set",
+        sourceBillId: bill.id || "",
+        sourceEntryNo: bill.entryNo || "",
+        sourceBillNo: bill.billNo || "",
+        sourceSection: "exchange",
+        drillTarget: "purchase"
+      };
+    });
+}
+
+function exchangeReportConfig() {
+  const bills = exchangeReportSourceRows();
+  if (salesReportOptions.exchangeReportOption === "Item Wise") return exchangeItemWiseConfig(bills);
+  if (salesReportOptions.exchangeReportOption === "Salesman Wise") return exchangeSalesmanWiseConfig(bills);
+  if (salesReportOptions.exchangeReportOption === "Salesman Summary") return exchangeSalesmanSummaryConfig(bills);
+  const columns = exchangeRegisterColumns();
+  return { columns, rows: bills, gridClass: "exchange-register-grid", totals: salesTotalsForColumns(bills, columns) };
+}
+
+function exchangeRegisterColumns() {
+  const money = (key, label) => ({ key, label, numeric: true, total: true, format: (value) => numberValue(value, 3) });
+  return [
+    { key: "entryNo", label: "EntryNo" }, { key: "referenceNo", label: "RefNo" }, { key: "entryDate", label: "EDate" },
+    { key: "purchaseMode", label: "PurMode" }, { key: "partyId", label: "PartyID" }, { key: "partyName", label: "PartyName" },
+    { key: "partyAddress", label: "PartyAddress" }, money("billAmount", "BillAmount"), money("addition", "Addition"),
+    money("discount", "Discount"), money("gst", "GST"), money("invoiceTotal", "InvoiceTotal"), money("cashPaid", "CashPaid"), money("balance", "Balance")
+  ];
+}
+
+function exchangeItemWiseConfig(bills) {
+  const rows = bills.flatMap((bill) => bill.lines.map((line) => ({
+    ...bill,
+    itemName: line.itemName || "OLD GOLD",
+    itemDescription: line.description || line.itemDescription || "",
+    nos: Number(line.qty || 0),
+    grossWeight: Number(line.gross || 0),
+    weightLess: Number(line.weightLess || line.lessWeight || 0),
+    mudLess: Number(line.mudLess || 0),
+    rate: Number(line.rate || 0),
+    stoneCharge: Number(line.stoneCharge || 0),
+    touchPercentage: Number(line.touchPct || line.touch || 0),
+    touchLess: Number(line.touchLess || 0),
+    stoneWeight: Number(line.stone || 0),
+    netWeight: Number(line.net || 0),
+    amount: Number(line.itemTotal || line.amount || 0)
+  })));
+  const weight = (key, label) => ({ key, label, numeric: true, total: true, format: (value) => numberValue(value, 3) });
+  const columns = [
+    { key: "entryNo", label: "EntryNo" },
+    { key: "entryDate", label: "EDate" },
+    { key: "itemName", label: "ItemName" },
+    { key: "itemDescription", label: "ItemDescription" },
+    { key: "nos", label: "Nos", numeric: true, total: true, format: (value) => numberValue(value, 0) },
+    weight("grossWeight", "GrossWeight"),
+    weight("weightLess", "WeightLess"),
+    weight("mudLess", "MudLess"),
+    weight("rate", "Rate"),
+    weight("stoneCharge", "StoneCharge"),
+    { key: "touchPercentage", label: "TouchPerc", numeric: true, total: true, format: (value) => numberValue(value, 2) },
+    { key: "touchLess", label: "TouchLess", numeric: true, total: true, format: (value) => numberValue(value, 2) },
+    weight("stoneWeight", "StoneWeight"),
+    weight("netWeight", "NetWeight"),
+    weight("amount", "Amount")
+  ];
+  return { columns, rows, gridClass: "exchange-item-grid", totals: salesTotalsForColumns(rows, columns) };
+}
+
+function exchangeSalesmanWiseConfig(bills) {
+  const rows = bills.flatMap((bill) => bill.lines.map((line) => ({
+    ...bill,
+    itemId: line.item || line.itemId || "OG",
+    itemName: line.itemName || "OLD GOLD",
+    quantity: Number(line.qty || 0),
+    grossWeight: Number(line.gross || 0),
+    stoneWeight: Number(line.stone || 0),
+    mudLess: Number(line.mudLess || 0),
+    touchLess: Number(line.touchLess || 0),
+    weightLess: Number(line.weightLess || line.lessWeight || 0),
+    netWeight: Number(line.net || 0),
+    rate: Number(line.rate || 0),
+    amount: Number(line.itemTotal || line.amount || 0)
+  }))).sort((left, right) => `${left.salesman}|${left.entryNo}`.localeCompare(`${right.salesman}|${right.entryNo}`));
+  const weight = (key, label, decimals = 3) => ({ key, label, numeric: true, total: true, format: (value) => numberValue(value, decimals) });
+  const columns = [
+    { key: "salesman", label: "SalesMan" },
+    { key: "entryNo", label: "EntryNo" },
+    { key: "entryDate", label: "tDate" },
+    { key: "itemId", label: "IID" },
+    { key: "itemName", label: "Item_Name" },
+    weight("quantity", "QTY", 0),
+    weight("grossWeight", "GrossWt"),
+    weight("stoneWeight", "StoneWt"),
+    weight("mudLess", "Mudless"),
+    weight("touchLess", "TouchLess"),
+    weight("weightLess", "WeightLess"),
+    weight("netWeight", "NetWt"),
+    weight("rate", "Rate"),
+    weight("amount", "Amount")
+  ];
+  return { columns, rows, gridClass: "exchange-salesman-grid", totals: salesTotalsForColumns(rows, columns) };
+}
+
+function exchangeSalesmanSummaryConfig(bills) {
+  const grouped = new Map();
+  bills.forEach((bill) => {
+    if (!grouped.has(bill.salesman)) grouped.set(bill.salesman, {
+      salesman: bill.salesman,
+      quantity: 0,
+      grossWeight: 0,
+      stoneWeight: 0,
+      mudLess: 0,
+      touchLess: 0,
+      weightLess: 0,
+      netWeight: 0,
+      amount: 0
+    });
+    const summary = grouped.get(bill.salesman);
+    bill.lines.forEach((line) => {
+      summary.quantity += Number(line.qty || 0);
+      summary.grossWeight += Number(line.gross || 0);
+      summary.stoneWeight += Number(line.stone || 0);
+      summary.mudLess += Number(line.mudLess || 0);
+      summary.touchLess += Number(line.touchLess || 0);
+      summary.weightLess += Number(line.weightLess || line.lessWeight || 0);
+      summary.netWeight += Number(line.net || 0);
+      summary.amount += Number(line.itemTotal || line.amount || 0);
+    });
+  });
+  const rows = [...grouped.values()].sort((left, right) => left.salesman.localeCompare(right.salesman));
+  const numeric = (key, label, decimals = 3) => ({ key, label, numeric: true, total: true, format: (value) => numberValue(value, decimals) });
+  const columns = [
+    { key: "salesman", label: "SalesMan" },
+    numeric("quantity", "QTY", 0),
+    numeric("grossWeight", "GrossWt"),
+    numeric("stoneWeight", "StoneWt"),
+    numeric("mudLess", "Mudless"),
+    numeric("touchLess", "TouchLess"),
+    numeric("weightLess", "WeightLess"),
+    numeric("netWeight", "NetWt"),
+    numeric("amount", "Amount")
+  ];
+  return { columns, rows, gridClass: "exchange-salesman-summary-grid", totals: salesTotalsForColumns(rows, columns) };
+}
+
+function salesReturnReportToolbar() {
+  const tools = [
+    ["SHOW", "sales-report-show"], ["PRINT", "print-now"], ["DIRECT PRINT", "print-now"], ["EXCEL", "export-report"], ["SAVE AS", "export-report"], ["DATE", "sales-report-date"],
+    ["FIRST", "profit-first"], ["PREV", "profit-prev"], ["NEXT", "profit-next"], ["LAST", "profit-last"], ["VIEW/HIDE", "profit-view-hide"], ["ZOOM IN", "profit-zoom-in"], ["DEFAULT", "profit-zoom-default"], ["ZOOM OUT", "profit-zoom-out"], ["CLOSE", "sales-report-close"]
+  ];
+  return `
+    <div class="classic-report-toolbar sales-report-toolbar sales-return-report-toolbar">
+      <div class="classic-tool-buttons">
+        ${tools.map(([label, action]) => `<button class="classic-tool" data-action="${action}" title="${escapeHtml(label)}"><strong>${toolbarGlyph(label)}</strong><span>${escapeHtml(label)}</span></button>`).join("")}
+      </div>
+      <label class="classic-a4"><input type="checkbox" />A4</label>
+      <select class="sales-return-report-select" data-sales-return-report-option aria-label="Sales Return report type">
+        ${["Sales Return Register", "Sales Return Report"].map((option) => `<option value="${option}" ${salesReportOptions.returnReportOption === option ? "selected" : ""}>${option}</option>`).join("")}
+      </select>
+      ${salesReportOptions.dateOpen ? salesDatePopup() : ""}
+    </div>
+  `;
+}
+
+function salesReturnReportConfig() {
+  const detailRows = salesReportSourceRows("Sales Return").map((row) => ({
+    ...row,
+    partyId: row.customerId,
+    partyName: row.partyName,
+    category: row.category,
+    salesman: row.staffName,
+    branchEntryNo: row.branchNo,
+    entryDate: displaySalesDate(row.date),
+    itemId: row.itemId,
+    itemName: row.itemName,
+    barcode: row.barcode,
+    description: row.description,
+    quantity: Number(row.qty || 0),
+    grossWeight: Number(row.gross || 0),
+    stoneWeight: Number(row.stone || 0),
+    netWeight: Number(row.net || 0),
+    vaPercentage: Number(row.va || 0),
+    makingCharge: Number(row.mc || 0),
+    total: Number(row.itemTotal || row.amount || 0),
+    type: row.itemType
+  }));
+  if (salesReportOptions.returnReportOption === "Sales Return Register") return salesReturnRegisterConfig(detailRows);
+  const columns = salesReturnReportColumns();
+  return { columns, rows: detailRows, gridClass: "sales-return-report-grid", totals: salesTotalsForColumns(detailRows, columns) };
+}
+
+function salesReturnReportColumns() {
+  const weight = (key, label) => ({ key, label, numeric: true, total: true, format: (value) => numberValue(value, 3) });
+  const money = (key, label) => ({ key, label, numeric: true, total: true, format: (value) => numberValue(value, 3) });
+  return [
+    { key: "billNo", label: "BillNo" },
+    { key: "partyId", label: "PartyID" },
+    { key: "partyName", label: "PartyName" },
+    { key: "category", label: "Category" },
+    { key: "salesman", label: "Salesman" },
+    { key: "branchEntryNo", label: "BranchENo" },
+    { key: "entryDate", label: "EDate" },
+    { key: "itemId", label: "ItemID" },
+    { key: "itemName", label: "ItemName" },
+    { key: "barcode", label: "Barcode" },
+    { key: "description", label: "Description" },
+    { key: "quantity", label: "Qty", numeric: true, total: true, format: (value) => numberValue(value, 0) },
+    weight("grossWeight", "GrossWeight"),
+    weight("stoneWeight", "StoneWeight"),
+    weight("netWeight", "NetWeight"),
+    { key: "vaPercentage", label: "VAPercentage", numeric: true, format: (value) => numberValue(value, 2) },
+    money("makingCharge", "MC"),
+    money("rate", "Rate"),
+    money("total", "Total"),
+    { key: "type", label: "Type" }
+  ];
+}
+
+function salesReturnRegisterConfig(rows) {
+  const grouped = new Map();
+  rows.forEach((row) => {
+    const key = row.sourceBillId || row.billNo || row.entryNo;
+    if (!grouped.has(key)) grouped.set(key, { ...row, returnLines: [] });
+    const target = grouped.get(key);
+    target.returnLines.push(row);
+  });
+  const reportRows = [...grouped.values()].map((row) => {
+    const bill = row.bill || {};
+    const party = (state.parties || []).find((item) => item.id === row.partyId || item.customerId === row.partyId || item.customerCode === row.partyId || item.name === row.partyName) || {};
+    const staff = (state.staffs || []).find((item) => item.id === bill.staffId || item.staffId === bill.staffId || item.name === row.salesman) || {};
+    const gst = row.returnLines.reduce((sum, line) => sum + Number(line.tax || 0), 0);
+    const grossReturn = row.returnLines.reduce((sum, line) => sum + Number(line.total || 0), 0);
+    const invoiceTotal = Math.max(0, grossReturn - gst);
+    const addition = Number(bill.totals?.addition || bill.addition || 0);
+    const discount = Number(bill.totals?.flatDiscount || bill.discount || 0);
+    const billAmount = invoiceTotal + gst + addition - discount;
+    return {
+      ...row,
+      branchEntryNo: bill.entryNo || row.branchEntryNo || row.billNo,
+      referenceNo: bill.refNo || bill.referenceNo || "",
+      employeeCode: bill.staffId || staff.staffId || staff.id || "",
+      employeeName: row.salesman || staff.name || "",
+      partyAddress: bill.customerAddress || bill.address || party.address || party.place || "",
+      remark: bill.remark || bill.phone || party.mobile || party.phone || "",
+      invoiceTotal,
+      gst,
+      cgst: gst / 2,
+      sgst: gst / 2,
+      addition,
+      discount,
+      billAmount,
+      balance: Number(bill.returnBalance ?? bill.totals?.returnBalance ?? billAmount)
+    };
+  }).sort((left, right) => toDateInputValue(left.entryDate).localeCompare(toDateInputValue(right.entryDate)));
+  const money = (key, label) => ({ key, label, numeric: true, total: true, format: (value) => numberValue(value, 3) });
+  const columns = [
+    { key: "billNo", label: "BillNo" },
+    { key: "branchEntryNo", label: "Branch_ENo" },
+    { key: "referenceNo", label: "RefNo" },
+    { key: "entryDate", label: "EDate" },
+    { key: "employeeCode", label: "Empcode" },
+    { key: "employeeName", label: "EmpName" },
+    { key: "partyId", label: "PartyID" },
+    { key: "partyName", label: "PartyName" },
+    { key: "partyAddress", label: "PartyAddress" },
+    { key: "remark", label: "Remark" },
+    money("invoiceTotal", "InvoiceTotal"),
+    money("gst", "GST"),
+    money("cgst", "CGST"),
+    money("sgst", "SGST"),
+    money("addition", "Addition"),
+    money("discount", "Discount"),
+    money("billAmount", "BillAmount"),
+    money("balance", "Balance")
+  ];
+  return { columns, rows: reportRows, gridClass: "sales-return-register-grid", totals: salesTotalsForColumns(reportRows, columns) };
+}
+
+function salesProfitReportScreen() {
+  return `
+    <div class="classic-report-layout focused-classic-report">
+      ${salesReportSubmenus("Sales Profit")}
+      <section class="classic-stock-report sales-report sales-profit-report">
+        ${salesProfitToolbar()}
+        <header class="classic-report-title sales-report-title sales-profit-title">
+          <h3>MT GOLD LAND</h3>
+          <h4>M.T.PLAZA,OOTY ROAD EDAKKARA</h4>
+          <h2>${escapeHtml(salesProfitTransactionTitle())}&nbsp;&nbsp; Report From ${escapeHtml(displaySalesDate(salesReportOptions.from))} To ${escapeHtml(displaySalesDate(salesReportOptions.to))}</h2>
+        </header>
+        ${salesReportOptions.shown ? salesProfitReportBody() : salesReportBlankState()}
+      </section>
+    </div>
+  `;
+}
+
+function salesProfitTransactionTitle() {
+  if (salesReportOptions.profitTransaction === "sales") return "Sales Only";
+  if (salesReportOptions.profitTransaction === "return") return "Return Only";
+  return "Total Sales";
+}
+
+function salesProfitToolbar() {
+  const tools = [
+    ["SHOW", "sales-report-show"], ["PRINT", "print-now"], ["DIRECT PRINT", "print-now"], ["EXCEL", "export-report"], ["SAVE AS", "export-report"], ["DATE", "sales-report-date"],
+    ["FIRST", "profit-first"], ["PREV", "profit-prev"], ["NEXT", "profit-next"], ["LAST", "profit-last"], ["VIEW/HIDE", "profit-view-hide"], ["ZOOM IN", "profit-zoom-in"], ["DEFAULT", "profit-zoom-default"], ["ZOOM OUT", "profit-zoom-out"], ["CLOSE", "sales-report-close"]
+  ];
+  return `
+    <div class="classic-report-toolbar sales-report-toolbar sales-profit-toolbar">
+      <div class="classic-tool-buttons">
+        ${tools.map(([label, action]) => `<button class="classic-tool" data-action="${action}" title="${escapeHtml(label)}"><strong>${toolbarGlyph(label)}</strong><span>${escapeHtml(label)}</span></button>`).join("")}
+      </div>
+      <div class="sales-profit-options" aria-label="Sales profit report options">
+        <div role="radiogroup" aria-label="Grouping">
+          ${profitRadio("profitGroup", "item", "By Item")}
+          ${profitRadio("profitGroup", "invoice", "By Invoice")}
+          ${profitRadio("profitGroup", "date", "By Date")}
+        </div>
+        <div role="radiogroup" aria-label="Transaction type">
+          ${profitRadio("profitTransaction", "sales", "Sales")}
+          ${profitRadio("profitTransaction", "return", "Return")}
+          ${profitRadio("profitTransaction", "all", "All")}
+        </div>
+      </div>
+      ${salesReportOptions.dateOpen ? salesDatePopup() : ""}
+    </div>
+  `;
+}
+
+function profitRadio(field, value, label) {
+  return `<label><input type="radio" name="${field}" value="${value}" data-sales-profit-option="${field}" ${salesReportOptions[field] === value ? "checked" : ""} /><span>${label}</span></label>`;
+}
+
+function salesProfitReportBody() {
+  const config = salesProfitConfig();
+  const classes = ["sales-profit-grid", salesReportOptions.profitCompact ? "sales-profit-grid-compact" : ""].filter(Boolean).join(" ");
+  return `<div class="sales-profit-scale" style="--profit-zoom:${salesReportOptions.profitZoom}">${salesReportTable(config.columns, config.rows, classes, config.totals)}</div>`;
+}
+
+function salesProfitConfig() {
+  const transaction = salesReportOptions.profitTransaction;
+  const sales = transaction === "return" ? [] : salesReportSourceRows("Sales").map((row) => salesProfitRow(row, 1));
+  const returns = transaction === "sales" ? [] : salesReportSourceRows("Sales Return").map((row) => salesProfitRow(row, -1));
+  const detailRows = [...sales, ...returns].sort((left, right) => toDateInputValue(left.date).localeCompare(toDateInputValue(right.date)));
+  const rows = salesProfitGroupRows(detailRows, salesReportOptions.profitGroup);
+  const columns = salesProfitColumns(salesReportOptions.profitGroup);
+  return { columns, rows, totals: salesTotalsForColumns(rows, columns) };
+}
+
+function salesProfitRow(row, sign) {
+  const taxable = Number(row.taxable || (Number(row.goldAmount) + Number(row.stoneAmount) + Number(row.mc) + Number(row.dmdAmount)) || 0);
+  const taxAmount = Number(row.tax || Math.max(0, Number(row.itemTotal || row.amount) - taxable));
+  const lineAmount = Number(row.itemTotal || row.amount || taxable + taxAmount);
+  const bill = row.bill || {};
+  const financials = billFinancials(bill);
+  const lineOrBill = (lineValue, billValue) => Number(lineValue || (row.sl === 1 ? billValue : 0) || 0);
+  const lineExchange = lineOrBill(row.lineExchange, bill.exchangeAmount || bill.exchange || financials.exchangeAmount);
+  const lineReturn = lineOrBill(row.lineReturn, bill.returnAmount || financials.returnAmount);
+  const orderAmount = lineOrBill(row.orderAmount, bill.orderAdvance || bill.orderAmount);
+  const schemeLess = lineOrBill(row.schemeLess, bill.schemeAmount || bill.schemeLess);
+  const rateDifference = lineOrBill(row.rateDifference, bill.rateDifference);
+  const advance = lineOrBill(row.advance, bill.advance || bill.additionalAdvance);
+  const received = lineAmount - Number(row.discount || 0) - lineExchange - lineReturn - orderAmount - schemeLess + rateDifference - advance;
+  const estimatedCost = Number(row.goldAmount || 0) + Number(row.stoneAmount || 0) + Number(row.dmdAmount || 0) + Number(row.mc || 0) * 0.5;
+  const profitRs = taxable - estimatedCost;
+  const profitPercent = estimatedCost ? profitRs / estimatedCost * 100 : 0;
+  const signed = (value) => sign * Number(value || 0);
+  return {
+    ...row,
+    date: displaySalesDate(row.date),
+    itemCategory: row.category,
+    ornament: row.itemType === "Silver" || String(row.category).toLowerCase() === "silver" ? "Y" : "Y",
+    billNumber: row.billNo || row.entryNo,
+    grossWeight: signed(row.gross),
+    stoneWeight: signed(row.stone),
+    netWeight: signed(row.net),
+    goldAmount: signed(row.goldAmount),
+    stoneCharge: signed(row.stoneAmount),
+    makingCharge: signed(row.mc),
+    diamondCarat: signed(row.dmdCarat),
+    diamondAmount: signed(row.dmdAmount),
+    taxable: signed(taxable),
+    itemTaxAmount: signed(taxAmount),
+    itemAmount: signed(lineAmount),
+    discount: signed(row.discount),
+    lineExchange: signed(lineExchange),
+    lineReturn: signed(lineReturn),
+    orderAmount: signed(orderAmount),
+    schemeLess: signed(schemeLess),
+    rateDifference: signed(rateDifference),
+    advance: signed(advance),
+    received: signed(received),
+    lineVp: sign * profitPercent,
+    lineVpInRs: signed(profitRs),
+    profitCost: signed(estimatedCost),
+    profitRs: signed(profitRs),
+    transactionType: sign < 0 ? "Return" : "Sales"
+  };
+}
+
+function salesProfitGroupRows(rows, group) {
+  if (group === "item") return rows;
+  const keyFor = group === "invoice"
+    ? (row) => `${row.billNumber}|${row.transactionType}`
+    : (row) => `${row.date}|${row.itemCategory}|${row.ornament}|${row.transactionType}`;
+  const grouped = new Map();
+  rows.forEach((row) => {
+    const key = keyFor(row);
+    if (!grouped.has(key)) grouped.set(key, { ...row, barcode: "", itemName: "" });
+    else {
+      const target = grouped.get(key);
+      if (target.itemCategory !== row.itemCategory) target.itemCategory = "Mixed";
+      if (target.ornament !== row.ornament) target.ornament = "";
+      salesProfitColumns(group).filter((column) => column.numeric && !["lineVp", "lineVpInRs"].includes(column.key)).forEach((column) => {
+        target[column.key] = Number(target[column.key] || 0) + Number(row[column.key] || 0);
+      });
+      target.profitCost = Number(target.profitCost || 0) + Number(row.profitCost || 0);
+      target.profitRs = Number(target.profitRs || 0) + Number(row.profitRs || 0);
+    }
+  });
+  return [...grouped.values()].map((row) => ({
+    ...row,
+    lineVp: row.profitCost ? row.profitRs / row.profitCost * 100 : 0,
+    lineVpInRs: row.profitCost ? row.profitRs / row.profitCost * 100 : 0
+  }));
+}
+
+function salesProfitColumns(group = "item") {
+  const weight = (key, label) => ({ key, label, numeric: true, total: true, format: (value) => numberValue(value, 3) });
+  const money = (key, label) => ({ key, label, numeric: true, total: true, format: (value) => numberValue(value, 2) });
+  const sharedStart = [
+    { key: "date", label: "Date" },
+    { key: "itemCategory", label: "item_Categ" },
+    { key: "ornament", label: "Ornament" }
+  ];
+  if (group !== "date") sharedStart.push({ key: "billNumber", label: "BillNo" });
+  if (group === "item") sharedStart.push({ key: "barcode", label: "BarCode" });
+  const sharedAmounts = [
+    weight("grossWeight", "Gross_Weight"),
+    weight("stoneWeight", "Stone_Weight"),
+    weight("netWeight", "Net_Weight"),
+    money("goldAmount", "Gold_Amount"),
+    money("stoneCharge", "stone_Charge"),
+    money("makingCharge", "Making_Charge"),
+    money("diamondCarat", "Diamond_Carat"),
+    money("diamondAmount", "Diamond_Amount"),
+    money("taxable", "Taxable"),
+    money("itemTaxAmount", "ItaxAmt"),
+    money("itemAmount", "IAmount"),
+    money("discount", "Discount"),
+    money("lineExchange", "LineExchange"),
+    money("lineReturn", "Line_Return"),
+    money("orderAmount", "Order_Amount"),
+    money("schemeLess", "Scheme_Less"),
+    money("rateDifference", "Rate_Diff"),
+    money("advance", "Advance"),
+    money("received", "Received")
+  ];
+  if (group === "invoice") sharedAmounts.push(money("lineVpInRs", "LineVp_in"));
+  else if (group === "date") sharedAmounts.push(money("lineVpInRs", "LineVp_da"));
+  else sharedAmounts.push(money("lineVp", "LineVp"), money("lineVpInRs", "LineVp_inRs"));
+  return [...sharedStart, ...sharedAmounts];
 }
 
 function salesReportSubmenus(activeReport) {
@@ -10715,12 +11277,12 @@ function salesReportTable(columns, rows, gridClass = "", totals = null) {
               <td>${index + 1}</td>
               ${columns.map((column) => `<td class="${column.numeric ? "num" : ""}">${escapeHtml(column.format ? column.format(row[column.key], row) : row[column.key] ?? "")}</td>`).join("")}
             </tr>
-          `).join("") : `<tr><td colspan="${columns.length + 1}">No data found for the selected report and date range.</td></tr>`}
+          `).join("") : gridClass.includes("sales-profit-grid") ? "" : `<tr><td colspan="${columns.length + 1}">No data found for the selected report and date range.</td></tr>`}
         </tbody>
         ${totals ? `
           <tfoot>
             <tr>
-              <td>*${rows.length + 1}</td>
+              <td>${gridClass.includes("sales-profit-grid") ? "*" : `*${rows.length + 1}`}</td>
               ${columns.map((column) => `<td class="${column.numeric ? "num" : ""}">${column.total ? escapeHtml(column.format ? column.format(totals[column.key], totals) : totals[column.key] ?? "") : ""}</td>`).join("")}
             </tr>
           </tfoot>
@@ -10737,11 +11299,13 @@ function salesReportDrillAttrs(row = {}) {
   const billNo = row.sourceBillNo || row.billNo || bill.billNo || "";
   if (!billId && !entryNo && !billNo) return "";
   const section = row.sourceSection || "";
+  const target = row.drillTarget || "";
   return [
     billId ? `data-report-bill-id="${escapeHtml(billId)}"` : "",
     entryNo ? `data-report-entry-no="${escapeHtml(entryNo)}"` : "",
     billNo ? `data-report-bill-no="${escapeHtml(billNo)}"` : "",
-    section ? `data-report-section="${escapeHtml(section)}"` : ""
+    section ? `data-report-section="${escapeHtml(section)}"` : "",
+    target ? `data-report-target="${escapeHtml(target)}"` : ""
   ].filter(Boolean).join(" ");
 }
 
@@ -10836,6 +11400,12 @@ function salesReportSourceRows(reportName) {
         counter: clean.counter || bill.counter || "Main",
         tax: Number(clean.tax || 0),
         discount: Number(clean.discount || bill.discount || 0),
+        lineExchange: Number(clean.lineExchange ?? clean.exchangeAmount ?? 0),
+        lineReturn: Number(clean.lineReturn ?? clean.returnAmount ?? 0),
+        orderAmount: Number(clean.orderAmount ?? clean.orderAdvance ?? 0),
+        schemeLess: Number(clean.schemeLess ?? clean.schemeAmount ?? 0),
+        rateDifference: Number(clean.rateDifference ?? 0),
+        advance: Number(clean.advance ?? 0),
         amount: Number(clean.amount || clean.itemTotal || 0),
         invoiceTotal: financials.invoiceTotal,
         cashReceived: financials.cashReceived,
@@ -12493,6 +13063,33 @@ function downloadCsv(filename, rows) {
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+}
+
+function exportSalesProfitCsv() {
+  const config = salesProfitConfig();
+  const heading = ["MT GOLD LAND"], address = ["M.T.PLAZA,OOTY ROAD EDAKKARA"];
+  const period = [`${salesProfitTransactionTitle()} Report From ${displaySalesDate(salesReportOptions.from)} To ${displaySalesDate(salesReportOptions.to)}`];
+  const headers = config.columns.map((column) => column.label);
+  const data = config.rows.map((row) => config.columns.map((column) => column.format ? column.format(row[column.key], row) : row[column.key] ?? ""));
+  const totals = config.columns.map((column) => column.total ? (column.format ? column.format(config.totals[column.key], config.totals) : config.totals[column.key]) : "");
+  downloadCsv(`sales-profit-by-${salesReportOptions.profitGroup}.csv`, [heading, address, period, [], headers, ...data, totals]);
+}
+
+function exportSalesReturnReportCsv() {
+  const config = salesReturnReportConfig();
+  const headers = config.columns.map((column) => column.label);
+  const data = config.rows.map((row) => config.columns.map((column) => column.format ? column.format(row[column.key], row) : row[column.key] ?? ""));
+  const totals = config.columns.map((column) => column.total ? (column.format ? column.format(config.totals[column.key], config.totals) : config.totals[column.key]) : "");
+  const filename = salesReportOptions.returnReportOption === "Sales Return Register" ? "sales-return-register.csv" : "sales-return-report.csv";
+  downloadCsv(filename, [["MT GOLD LAND"], [salesReportOptions.returnReportOption], [`From ${displaySalesDate(salesReportOptions.from)} To ${displaySalesDate(salesReportOptions.to)}`], [], headers, ...data, totals]);
+}
+
+function exportExchangeReportCsv() {
+  const config = exchangeReportConfig();
+  const headers = config.columns.map((column) => column.label);
+  const data = config.rows.map((row) => config.columns.map((column) => column.format ? column.format(row[column.key], row) : row[column.key] ?? ""));
+  const totals = config.columns.map((column) => column.total ? (column.format ? column.format(config.totals[column.key], config.totals) : config.totals[column.key]) : "");
+  downloadCsv(`exchange-${salesReportOptions.exchangeReportOption.toLowerCase().replaceAll(" ", "-")}.csv`, [["MT GOLD LAND"], [salesReportOptions.exchangeReportOption], [], headers, ...data, totals]);
 }
 
 function toolbarGlyph(label) {
@@ -15711,6 +16308,9 @@ function openMenuTarget(target) {
 function selectReport(name) {
   active = "Reports";
   selectedReport = name || "Day Summary";
+  if (selectedReport === "Sales Profit") salesReportOptions = { ...salesReportOptions, shown: true, profitGroup: salesReportOptions.profitGroup || "item" };
+  if (selectedReport === "Sales Return") salesReportOptions = { ...salesReportOptions, shown: true, returnReportOption: salesReportOptions.returnReportOption || "Sales Return Report" };
+  if (selectedReport === "Exchange") salesReportOptions = { ...salesReportOptions, shown: true, exchangeReportOption: salesReportOptions.exchangeReportOption || "Register" };
   recentReportItems = [selectedReport, ...recentReportItems.filter((item) => item !== selectedReport)].slice(0, 5);
 }
 
@@ -15719,6 +16319,7 @@ function openReportBillDetail(row) {
   const entryNo = row.dataset.reportEntryNo || "";
   const billNo = row.dataset.reportBillNo || "";
   const section = row.dataset.reportSection || "";
+  const target = row.dataset.reportTarget || "";
   const bill = (state.bills || []).find((item) => {
     return (billId && item.id === billId)
       || (entryNo && item.entryNo === entryNo)
@@ -15730,6 +16331,14 @@ function openReportBillDetail(row) {
     return;
   }
   state.bills = [bill, ...(state.bills || []).filter((item) => item !== bill)];
+  if (target === "purchase") {
+    active = "Purchase";
+    expandedNavGroups.add("Purchase");
+    purchaseView = "Purchase Invoice";
+    render();
+    toast(`Opened Purchase Invoice ${bill.entryNo || bill.billNo || bill.id}.`);
+    return;
+  }
   active = "Sales";
   expandedNavGroups.add("Sales");
   salesView = section === "return" || ((bill.sections?.return || []).length && !(bill.sections?.sales || []).length) ? "Sales Return" : "Sales Invoice";
@@ -15863,6 +16472,23 @@ function bindEvents() {
   document.querySelector("[data-sales-report-option]")?.addEventListener("change", (event) => {
     salesReportOptions = { ...salesReportOptions, option: event.currentTarget.value, shown: false };
     render();
+  });
+
+  document.querySelector("[data-sales-return-report-option]")?.addEventListener("change", (event) => {
+    salesReportOptions = { ...salesReportOptions, returnReportOption: event.currentTarget.value, shown: true };
+    render();
+  });
+
+  document.querySelector("[data-exchange-report-option]")?.addEventListener("change", (event) => {
+    salesReportOptions = { ...salesReportOptions, exchangeReportOption: event.currentTarget.value, shown: true };
+    render();
+  });
+
+  document.querySelectorAll("[data-sales-profit-option]").forEach((input) => {
+    input.addEventListener("change", () => {
+      salesReportOptions = { ...salesReportOptions, [input.dataset.salesProfitOption]: input.value, shown: true };
+      render();
+    });
   });
 
   document.querySelectorAll("[data-sales-date-field]").forEach((field) => {
@@ -21104,6 +21730,25 @@ function handleAction(action, source) {
     saveState();
   }
   if (action === "export-report") {
+    if (selectedReport === "Sales Profit") {
+      exportSalesProfitCsv();
+      toast("Sales Profit report exported for Excel.");
+      state.audit.unshift(audit("Exported Sales Profit report"));
+      saveState();
+      return;
+    }
+    if (selectedReport === "Sales Return") {
+      exportSalesReturnReportCsv();
+      toast(`${salesReportOptions.returnReportOption} exported for Excel.`);
+      state.audit.unshift(audit(`Exported ${salesReportOptions.returnReportOption}`));
+      saveState();
+      return;
+    }
+    if (selectedReport === "Exchange") {
+      exportExchangeReportCsv();
+      toast(`Exchange ${salesReportOptions.exchangeReportOption} exported for Excel.`);
+      return;
+    }
     if (selectedReport === "Reconciliation Crosstab") {
       exportReconciliationCrosstabCsv();
       toast("Reconciliation Crosstab exported for Excel.");
@@ -21139,6 +21784,27 @@ function handleAction(action, source) {
   }
   if (action === "sales-report-close") {
     selectedReport = "Sales";
+    render();
+  }
+  if (action === "exchange-report-close") {
+    selectedReport = "Sales";
+    render();
+  }
+  if (["profit-first", "profit-prev", "profit-next", "profit-last"].includes(action)) {
+    const scroller = document.querySelector(".sales-profit-report .sales-report-grid-wrap");
+    if (scroller) {
+      const step = Math.max(300, scroller.clientWidth * 0.75);
+      const positions = { "profit-first": 0, "profit-prev": scroller.scrollLeft - step, "profit-next": scroller.scrollLeft + step, "profit-last": scroller.scrollWidth };
+      scroller.scrollTo({ left: positions[action], behavior: "smooth" });
+    }
+  }
+  if (action === "profit-view-hide") {
+    salesReportOptions = { ...salesReportOptions, profitCompact: !salesReportOptions.profitCompact };
+    render();
+  }
+  if (["profit-zoom-in", "profit-zoom-default", "profit-zoom-out"].includes(action)) {
+    const delta = action === "profit-zoom-in" ? 0.1 : action === "profit-zoom-out" ? -0.1 : 0;
+    salesReportOptions = { ...salesReportOptions, profitZoom: action === "profit-zoom-default" ? 1 : Math.min(1.5, Math.max(0.7, salesReportOptions.profitZoom + delta)) };
     render();
   }
   if (action === "stock-report-date") {
