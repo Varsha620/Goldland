@@ -4,7 +4,24 @@ const PURCHASE_ITEMS = ["Purchase Invoice", "Purchase Return", "Diamond Purchase
 const WORK_ORDER_ITEMS = ["Smith", "Jeweller", "Refining", "Sample", "Polishing", "Service / Job", "Complimentary Item"];
 const ACCOUNT_ITEMS = ["Account Ledger", "Cash Receipt", "Cash Payment", "Bank Deposit", "Bank Withdrawal", "Journal Voucher", "PDC Transactions", "Direct Entry", "Expense Entry", "Bill Wise Collection", "Bill Wise Payment", "Discount in Credit Note", "Discount in Debit Note", "Custom Voucher"];
 const MANAGEMENT_ITEMS = ["Customers", "Suppliers", "Smiths", "Refiners", "Employees", "Item Category", "Miscellaneous", "Item Creation", "Account Creation"];
-const EXPANDABLE_NAVS = new Set(["Sales", "Purchase", "Stock", "Work Orders", "Accounts", "Management", "Reports"]);
+const EXPANDABLE_NAVS = new Set(["Sales", "Purchase", "Stock", "Work Orders", "Accounts", "Management", "Financial Reports", "Reports"]);
+const FINANCIAL_REPORT_ITEMS = [
+  "Cash Book", "Bank Book", "Ledger", "Voucher Reports", "Trial Balance",
+  "Trading Account", "Trading & Profit and Loss", "Profit or Loss Account",
+  "Balance Sheet", "Sundry Debtors", "Sundry Creditors", "Opening Balance",
+  "Receipt Due Report", "Sub Schedule Wise Ledger"
+];
+const VOUCHER_REPORT_ITEMS = ["Day Book", "Day Account Transactions", "Account List", "Receipts / Payments", "Journal Register", "Chart Of Accounts"];
+const DAY_ACCOUNT_VIEWS = ["Voucher Summary", "Voucher Summary-2", "Account Details By Voucher Type", "Account Summary", "Staff Summary", "PayMode Report-Summary", "PayMode Report-Details", "Business Report"];
+const RECEIPT_PAYMENT_VIEWS = ["Receipt", "Payment", "Receipt & Payment"];
+const BUSINESS_REPORT_GROUPS = [
+  { id: "liquidity", label: "Cash & Bank", activities: ["Opening Cash", "Opening Bank", "Cash Receipts", "Cash Payments", "Bank Deposits", "Bank Withdrawals"] },
+  { id: "trading", label: "Sales & Purchases", activities: ["Sales", "Sales Returns", "Purchases", "Purchase Returns"] },
+  { id: "orders", label: "Orders & Advances", activities: ["Order Advances", "Advance Refunds"] },
+  { id: "schemes", label: "Schemes", activities: ["Scheme Collections", "Scheme Refunds", "Scheme Closures"] },
+  { id: "operations", label: "Workshop & Services", activities: ["Smith Transactions", "Jeweller Transactions", "Refinery Transactions", "Service / Job"] },
+  { id: "utilities", label: "Utilities & Expenses", activities: ["Utilities", "Other Expenses"] }
+];
 const OPENING_STOCK_VIEW = "Opening Stock Account Entry";
 const STOCK_ITEMS = ["Stock Register", "Barcode Entry", OPENING_STOCK_VIEW, "Stock Adjustments", "Item Transfer", "Gold Deposit", "Gold Withdrawal"];
 const STOCK_CURRENT_REPORTS = ["Item Wise", "Barcode Wise", "Category Wise", "Product Wise", "Diamond Stock", "Type Wise", "Stock Compare", "Other Location Stock"];
@@ -560,6 +577,16 @@ let customVoucherDraft = null;
 let customVoucherEntryDraft = null;
 let customVoucherConfirmDelete = true;
 let selectedReport = "";
+let selectedFinancialReport = "";
+let financialReportOptions = { from: "04/08/2026", to: "04/08/2026", shown: true, dateOpen: false, page: 0, pageSize: 18, zoom: 1, a4: true };
+let selectedLedgerAccount = "";
+let ledgerPickerSelection = "";
+let ledgerAccountSearch = "";
+let selectedVoucherReport = "";
+let dayAccountView = "Voucher Summary";
+let accountListOptions = { search: "", group: "All Groups", hideZero: false };
+let receiptPaymentView = "Receipt";
+let chartAccountOptions = { finalAccount: "All", search: "", hideZero: false };
 let reportSearch = "";
 let globalMenuSearch = "";
 let recentReportItems = [];
@@ -3812,9 +3839,42 @@ function totals() {
   return { sales, purchases, cash, stockWeight, schemeDue };
 }
 
-function render() {
+let preservedSidebarScroll = 0;
+let screenTransitionTimer = null;
+
+function render({ animateScreen = false, contentScrollTop = null } = {}) {
+  const currentSidebar = document.querySelector(".sidebar");
+  if (currentSidebar) preservedSidebarScroll = currentSidebar.scrollTop;
   document.getElementById("app").innerHTML = authenticated ? appShell() : loginScreen();
+  const sidebar = document.querySelector(".sidebar");
+  if (sidebar) sidebar.scrollTop = preservedSidebarScroll;
+  const content = document.querySelector(".content");
+  if (contentScrollTop !== null && content) content.scrollTop = contentScrollTop;
+  if (animateScreen && content) content.classList.add("screen-enter");
+  const businessReport = document.querySelector(".business-report");
+  if (businessReport) {
+    businessReport.classList.add("business-report-content");
+    businessReport.classList.toggle("a4", financialReportOptions.a4);
+    businessReport.style.setProperty("--financial-zoom", financialReportOptions.zoom);
+  }
   bindEvents();
+}
+
+function renderScreen() {
+  const content = document.querySelector(".content");
+  const sidebar = document.querySelector(".sidebar");
+  if (sidebar) preservedSidebarScroll = sidebar.scrollTop;
+  if (!content || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    render({ animateScreen: true, contentScrollTop: 0 });
+    return;
+  }
+  content.classList.remove("screen-enter");
+  content.classList.add("screen-exit");
+  window.clearTimeout(screenTransitionTimer);
+  screenTransitionTimer = window.setTimeout(() => {
+    render({ animateScreen: true, contentScrollTop: 0 });
+    screenTransitionTimer = null;
+  }, 120);
 }
 
 function renderAndFocus(selector) {
@@ -3908,6 +3968,12 @@ function sidebar() {
             ${MANAGEMENT_ITEMS.map((item) => `<button class="subnav-item ${active === "Management" && managementView === item ? "active" : ""}" data-management="${item}">${item}</button>`).join("")}
           </div>
         </div>
+        <div class="nav-group ${isGroupOpen("Financial Reports") || active === "Financial Reports" ? "open" : ""}">
+          <button class="nav ${active === "Financial Reports" ? "active" : ""}" data-nav="Financial Reports">${icon("Financial Reports")}<span>Financial Reports</span><span class="chevron">v</span></button>
+          <div class="subnav financial-reports-subnav">
+            ${FINANCIAL_REPORT_ITEMS.map((item) => `<div class="financial-subnav-entry"><button class="subnav-item ${active === "Financial Reports" && selectedFinancialReport === item ? "active" : ""}" data-financial-report="${escapeHtml(item)}"><span>${escapeHtml(item)}</span>${item === "Voucher Reports" ? "<b>›</b>" : ""}</button>${item === "Voucher Reports" && selectedFinancialReport === "Voucher Reports" ? `<div class="voucher-sidebar-submenu">${VOUCHER_REPORT_ITEMS.map((child) => `<button class="subnav-item ${selectedVoucherReport === child ? "active" : ""}" data-voucher-report="${escapeHtml(child)}">${escapeHtml(child)}</button>`).join("")}</div>` : ""}</div>`).join("")}
+          </div>
+        </div>
         <div class="nav-group ${isGroupOpen("Reports") || active === "Reports" ? "open" : ""}">
           <button class="nav ${active === "Reports" ? "active" : ""}" data-nav="Reports">${icon("Reports")}<span>Reports</span><span class="chevron">v</span></button>
           <div class="subnav reports-subnav">
@@ -3936,7 +4002,7 @@ function topbar() {
     .filter((item) => item.type === "Gold")
     .map((item) => `${item.grade} ${money(item.price)}/g`)
     .join(" | ");
-  const title = active === "Management" ? managementView : active === "Sales" ? salesView : active === "Purchase" ? purchaseView : active === "Stock" ? stockView : active === "Work Orders" ? (workOrderView === "Complimentary Item" ? complimentaryView : workOrderView) : active === "Accounts" ? accountView : active === "Reports" ? selectedReport || "Reports" : active;
+  const title = active === "Management" ? managementView : active === "Sales" ? salesView : active === "Purchase" ? purchaseView : active === "Stock" ? stockView : active === "Work Orders" ? (workOrderView === "Complimentary Item" ? complimentaryView : workOrderView) : active === "Accounts" ? accountView : active === "Financial Reports" ? selectedFinancialReport || "Financial Reports" : active === "Reports" ? selectedReport || "Reports" : active;
 
   return `
     <header class="topbar">
@@ -3986,6 +4052,7 @@ function route() {
   if (active === "Management") return management();
   if (active === "Schemes") return schemes();
   if (active === "Accounts") return accounts();
+  if (active === "Financial Reports") return financialReports();
   return reports();
 }
 
@@ -10552,6 +10619,546 @@ function reports() {
   `;
 }
 
+function financialReports() {
+  if (selectedFinancialReport) return financialReportView(selectedFinancialReport);
+  const groups = [
+    ["Books & Ledgers", "Daily transaction records", ["Cash Book", "Bank Book", "Ledger", "Voucher Reports", "Sub Schedule Wise Ledger"]],
+    ["Financial Statements", "Period-end accounts", ["Trial Balance", "Trading Account", "Trading & Profit and Loss", "Profit or Loss Account", "Balance Sheet"]],
+    ["Balances & Dues", "Outstanding and opening figures", ["Sundry Debtors", "Sundry Creditors", "Opening Balance", "Receipt Due Report"]]
+  ];
+  return `<section class="financial-report-home">
+    <header class="financial-report-hero"><div><p class="eyebrow">Accounts & finance</p><h2>Financial Reports</h2><p>Review books, balances and financial statements from one focused workspace.</p></div><div class="financial-report-count"><strong>${FINANCIAL_REPORT_ITEMS.length}</strong><span>reports available</span></div></header>
+    <div class="financial-report-groups">${groups.map(([title, note, items]) => `<article class="financial-report-group"><header><div><h3>${title}</h3><p>${note}</p></div><span>${items.length}</span></header><div>${items.map((item) => `<button data-financial-report="${escapeHtml(item)}"><span class="financial-report-icon">${financialReportGlyph(item)}</span><span><strong>${escapeHtml(item)}</strong><small>${financialReportDescription(item)}</small></span><b>›</b></button>`).join("")}</div></article>`).join("")}</div>
+  </section>`;
+}
+
+function financialReportGlyph(name) {
+  if (name.includes("Cash")) return "₹";
+  if (name.includes("Bank")) return "▦";
+  if (name.includes("Balance")) return "≡";
+  if (/Due|Debtor|Creditor/.test(name)) return "◷";
+  return "▤";
+}
+
+function financialReportDescription(name) {
+  return ({
+    "Cash Book": "Cash in hand and daily movements", "Bank Book": "Bank-wise deposits and withdrawals", "Ledger": "Account-wise transaction history", "Voucher Reports": "Receipts, payments and journal vouchers", "Trial Balance": "Debit and credit closing balances", "Trading Account": "Trading income and direct expenses", "Trading & Profit and Loss": "Combined trading and profit statement", "Profit or Loss Account": "Income, expenses and net result", "Balance Sheet": "Assets and liabilities snapshot", "Sundry Debtors": "Customer receivables", "Sundry Creditors": "Supplier payables", "Opening Balance": "Opening account balances", "Receipt Due Report": "Upcoming and overdue receipts", "Sub Schedule Wise Ledger": "Ledger grouped by sub schedule"
+  })[name] || "Open financial report";
+}
+
+function financialReportView(name) {
+  if (name === "Cash Book") return cashBookReportScreen();
+  if (name === "Bank Book") return bankBookReportScreen();
+  if (name === "Ledger") return ledgerReportScreen();
+  if (name === "Voucher Reports") return voucherReportsScreen();
+  return `<section class="financial-report-view">${financialReportToolbar()}<div class="financial-report-view-card"><div class="financial-report-view-heading"><span class="financial-report-icon">${financialReportGlyph(name)}</span><div><p class="eyebrow">Financial report</p><h2>${escapeHtml(name)}</h2><p>${financialReportDescription(name)}</p></div></div><div class="financial-report-coming"><strong>Report workspace ready</strong><p>This screen uses the shared financial-report controls. Its accounting-specific columns will be implemented when we enter this report.</p></div></div></section>`;
+}
+
+function voucherReportsScreen() {
+  if (selectedVoucherReport) return voucherReportPlaceholder(selectedVoucherReport);
+  return `<section class="voucher-reports-home"><header class="financial-report-hero"><div><p class="eyebrow">Financial reports</p><h2>Voucher Reports</h2><p>Select a voucher report. Each screen will be completed from its individual reference.</p></div><div class="financial-report-count"><strong>${VOUCHER_REPORT_ITEMS.length}</strong><span>voucher reports</span></div></header><div class="voucher-report-menu">${VOUCHER_REPORT_ITEMS.map((item, index) => `<button data-voucher-report="${escapeHtml(item)}"><span class="voucher-report-number">${String(index + 1).padStart(2, "0")}</span><span><strong>${escapeHtml(item)}</strong><small>Open report placeholder</small></span><b>›</b></button>`).join("")}</div></section>`;
+}
+
+function voucherReportPlaceholder(name) {
+  if (name === "Day Book") return dayBookReportScreen();
+  if (name === "Day Account Transactions") return dayAccountTransactionsScreen();
+  if (name === "Account List") return accountListReportScreen();
+  if (name === "Receipts / Payments") return receiptsPaymentsReportScreen();
+  if (name === "Journal Register") return journalRegisterReportScreen();
+  if (name === "Chart Of Accounts") return chartOfAccountsReportScreen();
+  return `<section class="voucher-report-placeholder"><button class="financial-report-back" data-voucher-report-home>← Voucher Reports</button><div class="financial-report-view-card"><div class="financial-report-view-heading"><span class="financial-report-icon">▤</span><div><p class="eyebrow">Voucher report</p><h2>${escapeHtml(name)}</h2><p>This report is ready for its reference screen and confirmed accounting rules.</p></div></div><div class="financial-report-coming"><strong>${escapeHtml(name)} placeholder</strong><p>No calculations or report behavior have been assumed. Share the individual screen when you are ready.</p><button class="secondary" data-voucher-report-home>Back to Voucher Reports</button></div></div></section>`;
+}
+
+function dayBookPostingRows() {
+  const rows = [], add = (record, account, debit = 0, credit = 0, particular = "", drWeight = 0, crWeight = 0, lineOrder = 0) => {
+    if (!financialRecordIsPosted(record) || (!Number(debit) && !Number(credit) && !Number(drWeight) && !Number(crWeight))) return;
+    const date = record.date || record.entryDate || record.voucherDate; if (!date) return;
+    const vouNo = record.voucherNo || record.entryNo || record.billNo || record.refNo || record.id || "";
+    rows.push({ date: formatDisplayDate(date), sortDate: toDateInputValue(date), time: record.time || "00:00:00", vouNo, particular: particular || account || "Posting", account: account || "", debit: Number(debit || 0), credit: Number(credit || 0), drWeight: Number(drWeight || 0), crWeight: Number(crWeight || 0), lineOrder, voucherType: record.voucherType || record.type || String(vouNo).split(/[\/-]/)[0] || "Other", invoiceNo: record.invoiceNo || record.entryNo || record.billNo || "", paymentMode: record.paymentMode || record.mode || (record.cashAccount ? "Cash" : record.bankAccount ? "Bank" : ""), paymentRef: record.paymentReference || record.reference || record.refNo || "", staffName: record.staffName || record.preparedBy || record.handledBy || "" });
+  };
+  (state.accounts || []).forEach((r) => add(r, r.ledger, r.debit, r.credit, r.particular, r.drWeight || r.debitWeight, r.crWeight || r.creditWeight));
+  (state.cashReceipts || []).forEach((r) => { const total = cashVoucherFinancials(r, "receipt").totalAmount; add(r, "Cash in Hand", total, 0, r.narration || "Cash Receipt", r.drWeight, 0, 0); (r.lines || []).forEach((l, i) => add(r, l.accountHead, 0, Number(l.amount || 0) - Number(l.discount || 0), l.remarks || l.accountHead, l.drWeight || l.debitWeight, l.crWeight || l.creditWeight, i + 1)); });
+  (state.cashPayments || []).forEach((r) => { (r.lines || []).forEach((l, i) => add(r, l.accountHead, l.amount, 0, l.remarks || l.accountHead, l.drWeight || l.debitWeight, l.crWeight || l.creditWeight, i)); add(r, "Cash in Hand", 0, cashVoucherFinancials(r, "payment").totalAmount, r.narration || "Cash Payment", 0, r.crWeight, 99); });
+  (state.bankDeposits || []).forEach((r) => { const total = bankTransactionFinancials(r).totalAmount; add(r, r.bankAccount, total, 0, r.narration || "Bank Deposit", r.drWeight, 0, 0); (r.lines || []).forEach((l, i) => add(r, l.accountHead, 0, l.amount, l.remarks || l.accountHead, l.drWeight, l.crWeight, i + 1)); });
+  (state.bankWithdrawals || []).forEach((r) => { (r.lines || []).forEach((l, i) => add(r, l.accountHead, l.amount, 0, l.remarks || l.accountHead, l.drWeight, l.crWeight, i)); add(r, r.bankAccount, 0, bankTransactionFinancials(r).totalAmount, r.narration || "Bank Withdrawal", 0, r.crWeight, 99); });
+  (state.journalVouchers || []).forEach((r) => (r.lines || []).forEach((l, i) => add(r, l.accountHead, l.debit, l.credit, l.remark || r.narration, l.drWeight || l.debitWeight, l.crWeight || l.creditWeight, i)));
+  (state.directEntries || []).forEach((r) => (r.lines || []).forEach((l, i) => { add({ ...r, date: l.date }, l.accountHead, l.payment, l.receipt, l.remark || l.accountHead, l.drWeight, l.crWeight, i); add({ ...r, date: l.date }, r.cashBank, l.receipt, l.payment, l.remark || r.cashBank, l.crWeight, l.drWeight, i + 100); }));
+  (state.bills || []).forEach((r) => appendBillDayBookRows(r, add));
+  ["directPurchases", "diamondPurchases", "dmdStonePurchases"].forEach((key) => (state[key] || []).forEach((r) => appendBillDayBookRows({ ...r, type: r.type || "Purchase" }, add)));
+  ["directPurchaseReturns", "diamondPurchaseReturns", "dmdReturns"].forEach((key) => (state[key] || []).forEach((r) => appendReturnDayBookRows(r, add, "Purchase Return")));
+  (state.orderAdvances || []).forEach((r) => { const amount = Number(r.amount || r.advanceAmount || r.totalAmount || 0), account = isCanaraBank(r.cashBank) ? r.cashBank : "Cash in Hand"; add(r, account, amount, 0, `Order advance - ${r.partyName || r.customer || ""}`, r.drWeight, 0, 0); add(r, r.partyName || r.customer || "Sales Order Advance", 0, amount, "Order advance liability", 0, r.crWeight, 1); });
+  (state.orderAdvanceRefunds || []).forEach((r) => { const amount = Number(r.amount || r.refundAmount || r.totalAmount || 0), account = isCanaraBank(r.cashBank) ? r.cashBank : "Cash in Hand"; add(r, r.partyName || r.customer || "Sales Order Advance", amount, 0, "Order advance refund", r.drWeight, 0, 0); add(r, account, 0, amount, `Refund paid - ${r.partyName || r.customer || ""}`, 0, r.crWeight, 1); });
+  (state.schemes || []).forEach((r) => { const amount = Number(r.collection || 0), digital = isCanaraBank(r.bankAccount || paymentModeBank(r.paymentMode)) || /gpay|upi|bank/i.test(String(r.paymentMode || "")); add({ ...r, date: r.collectionDate || r.date || r.joinDate, voucherNo: r.receiptNo || r.book }, digital ? "Canara Bank Edakkara" : "Cash in Hand", amount, 0, `Scheme collection - ${r.member || ""}`, r.drWeight, 0, 0); add({ ...r, date: r.collectionDate || r.date || r.joinDate, voucherNo: r.receiptNo || r.book }, r.member || "Scheme Account", 0, amount, `Scheme A/c, Book No: ${r.book || ""}`, 0, r.crWeight, 1); });
+  (state.expenseEntries || []).forEach((r) => { const total = Number(r.totalAmount || r.amount || expenseEntryFinancials(r).totalAmount || 0), cashBank = r.cashBank || r.bankAccount || "Cash in Hand"; add(r, r.expenseHead || r.accountHead || "Expense", total, 0, r.remarks || r.narration || "Expense", r.drWeight, 0, 0); add(r, cashBank, 0, total, r.remarks || "Expense payment", 0, r.crWeight, 1); });
+  (state.customVouchers || []).forEach((r) => (r.lines || []).forEach((l, i) => add({ ...r, date: l.paymentDate || r.date }, r.partyName || r.accountType, r.accountType === "Payable" ? l.amount : 0, r.accountType === "Receivable" ? l.amount : 0, l.description || l.remarks || "Custom Voucher", l.drWeight, l.crWeight, i)));
+  return rows.sort((a, b) => a.sortDate.localeCompare(b.sortDate) || a.time.localeCompare(b.time) || a.vouNo.localeCompare(b.vouNo) || a.lineOrder - b.lineOrder);
+}
+
+function appendReturnDayBookRows(record, add, label = "Return") {
+  if (!financialRecordIsPosted(record)) return; const total = Number(record.invoiceTotal || record.totalAmount || record.amount || record.totals?.invoiceTotal || 0), party = record.partyName || record.customer || record.supplierName || "Party", lines = record.lines || (record.line ? [record.line] : []), drWeight = lines.reduce((s, l) => s + Number(l.drWeight || l.debitWeight || 0), 0), crWeight = lines.reduce((s, l) => s + Number(l.crWeight || l.creditWeight || 0), 0);
+  add(record, party, total, 0, `${label} - ${party}`, drWeight, 0, 0); add(record, label, 0, total, label, 0, crWeight, 1);
+}
+
+function appendBillDayBookRows(bill, add) {
+  const purchase = String(bill.type || "").toLowerCase().includes("purchase"), totals = bill.totals || {}, invoice = Number(totals.invoiceTotal ?? bill.invoiceTotal ?? bill.amount ?? 0), salesTotal = Number(totals.salesTotal ?? bill.salesTotal ?? Math.max(0, invoice - Number(bill.taxAmount || 0))), tax = Number(bill.taxAmount || totals.gst || totals.taxAmount || 0), discount = Number(totals.flatDiscount || bill.discount || 0), addition = Number(totals.addition || 0), round = Number(totals.billAmountRoundOff || bill.roundOff || 0), party = bill.customer || bill.partyName || (purchase ? "Supplier" : "Customer");
+  const lines = bill.lines || (bill.line ? [bill.line] : []), drWeight = lines.reduce((s, l) => s + Number(l.drWeight || l.debitWeight || 0), 0), crWeight = lines.reduce((s, l) => s + Number(l.crWeight || l.creditWeight || 0), 0);
+  add(bill, party, purchase ? 0 : invoice, purchase ? invoice : 0, `${purchase ? "Purchase" : "Sales"} invoice`, purchase ? 0 : drWeight, purchase ? crWeight : 0, 0);
+  add(bill, purchase ? "Purchase" : "Sales", purchase ? salesTotal : 0, purchase ? 0 : salesTotal, `${purchase ? "Purchase" : "Sales"} account`, purchase ? drWeight : 0, purchase ? 0 : crWeight, 1);
+  if (tax) add(bill, purchase ? "Input Tax" : "Output Tax", purchase ? tax : 0, purchase ? 0 : tax, "Tax", 0, 0, 2);
+  if (discount) add(bill, "Discount", purchase ? 0 : discount, purchase ? discount : 0, "Discount", 0, 0, 3);
+  if (addition) add(bill, "Addition", purchase ? addition : 0, purchase ? 0 : addition, "Addition", 0, 0, 4);
+  if (round) add(bill, "RoundOff", round > 0 ? (purchase ? round : 0) : (purchase ? 0 : Math.abs(round)), round > 0 ? (purchase ? 0 : round) : (purchase ? Math.abs(round) : 0), "RoundOff", 0, 0, 5);
+}
+
+function dayBookReportData() {
+  const from = toDateInputValue(financialReportOptions.from), to = toDateInputValue(financialReportOptions.to), cashOpening = cashBookReportData().rows[0]?.balance || 0, bankOpening = bankBookReportData().rows[0]?.balance || 0, opening = cashOpening + bankOpening;
+  const cashMaster = (state.accountMasters || []).find((a) => a.accountName === "Cash in Hand"), bankMaster = (state.accountMasters || []).find((a) => isCanaraBank(a.accountName)), openingWeight = Number(cashMaster?.openingDrWeight || cashMaster?.openingWeight || 0) - Number(cashMaster?.openingCrWeight || 0) + Number(bankMaster?.openingDrWeight || bankMaster?.openingWeight || 0) - Number(bankMaster?.openingCrWeight || 0);
+  const rows = [{ date: financialReportOptions.from, sortDate: from, time: "00:00:00", vouNo: "0", particular: "Opening Balance", debit: opening >= 0 ? opening : 0, credit: opening < 0 ? Math.abs(opening) : 0, drWeight: openingWeight >= 0 ? openingWeight : 0, crWeight: openingWeight < 0 ? Math.abs(openingWeight) : 0, lineOrder: -1 }, ...dayBookPostingRows().filter((r) => r.sortDate >= from && r.sortDate <= to)];
+  return { rows, totalDebit: sumField(rows, "debit"), totalCredit: sumField(rows, "credit"), totalDrWeight: sumField(rows, "drWeight"), totalCrWeight: sumField(rows, "crWeight") };
+}
+
+function dayBookReportScreen() {
+  const report = dayBookReportData(), pages = Math.max(1, Math.ceil(report.rows.length / financialReportOptions.pageSize)), page = Math.min(financialReportOptions.page, pages - 1), visible = financialReportOptions.shown ? report.rows.slice(page * financialReportOptions.pageSize, (page + 1) * financialReportOptions.pageSize) : [];
+  return `<section class="financial-report-view day-book-report">${financialReportToolbar()}<button class="financial-report-back" data-voucher-report-home>← Voucher Reports</button><div class="financial-report-paper ${financialReportOptions.a4 ? "a4" : ""}" style="--financial-zoom:${financialReportOptions.zoom}"><header><h3>***MT GOLD LAND***</h3><h4>M.T.PLAZA, OOTY ROAD</h4><h2>Daybook Report for the period From ${financialReportOptions.from} To ${financialReportOptions.to}</h2></header><div class="cash-book-page-status">Page ${page + 1} of ${pages}</div><div class="cash-book-grid-wrap"><table class="cash-book-grid day-book-grid"><thead><tr><th>SL</th><th>Date</th><th>Vou.No</th><th>Particular</th><th>Debit</th><th>Credit</th><th>DrWeight</th><th>CrWeight</th></tr></thead><tbody>${visible.length ? visible.map((r, i) => `<tr><td>${page * financialReportOptions.pageSize + i + 1}</td><td>${r.date}</td><td>${escapeHtml(r.vouNo)}</td><td>${escapeHtml(r.particular)}</td><td class="num">${numberValue(r.debit, 3)}</td><td class="num">${numberValue(r.credit, 3)}</td><td class="num">${numberValue(r.drWeight, 3)}</td><td class="num">${numberValue(r.crWeight, 3)}</td></tr>`).join("") : `<tr class="empty"><td colspan="8">No records</td></tr>`}</tbody>${financialReportOptions.shown ? `<tfoot><tr><td colspan="3"></td><td>Total</td><td class="num">${numberValue(report.totalDebit, 3)}</td><td class="num">${numberValue(report.totalCredit, 3)}</td><td class="num">${numberValue(report.totalDrWeight, 3)}</td><td class="num">${numberValue(report.totalCrWeight, 3)}</td></tr></tfoot>` : ""}</table></div></div></section>`;
+}
+
+function dayAccountPeriodRows() {
+  const from = toDateInputValue(financialReportOptions.from), to = toDateInputValue(financialReportOptions.to);
+  return dayBookPostingRows().filter((r) => r.sortDate >= from && r.sortDate <= to);
+}
+
+function accountMeta(name) {
+  const account = ledgerAccountCandidates().find((r) => r.name.toLowerCase() === String(name || "").toLowerCase()) || {};
+  const master = (state.accountMasters || []).find((r) => String(r.accountName).toLowerCase() === String(name || "").toLowerCase()) || {};
+  return { id: account.id || master.accountId || "", name: account.name || name || "", subSchedule: master.subSchedule || account.source || "" };
+}
+
+function aggregateDayAccountRows(rows, keys) {
+  const map = new Map(); rows.forEach((row) => { const key = keys.map((k) => row[k] || "").join("\u0001"), current = map.get(key) || { ...row, debit: 0, credit: 0, count: 0 }; current.debit += row.debit; current.credit += row.credit; current.count += 1; current.balance = current.debit - current.credit; map.set(key, current); }); return [...map.values()];
+}
+
+function paymentModeReportRows() {
+  const rows = [], inPeriod = (date) => isDateWithinPeriod(date, financialReportOptions.from, financialReportOptions.to);
+  const add = (record, type, amount, mode = "", bank = "", extra = {}) => {
+    const date = record.collectionDate || record.date || record.joinDate; amount = Number(amount || 0);
+    if (!financialRecordIsPosted(record) || !date || !inPeriod(date) || amount <= 0) return;
+    const normalizedMode = /gpay|google\s*pay|phonepe/i.test(mode) ? "UPI" : mode || "Cash", mappedBank = bank || paymentModeBank(normalizedMode);
+    rows.push({ type, date: formatDisplayDate(date), sortDate: toDateInputValue(date), entryNo: record.entryNo || record.voucherNo || record.receiptNo || record.refNo || record.book || record.id || "", partyId: extra.partyId || record.partyId || record.customerId || record.memberId || "", customer: extra.customer || record.customer || record.partyName || record.member || "", bookNo: extra.bookNo || record.book || "", amount, cardName: extra.cardName || record.cardName || record.paymentModeName || normalizedMode, bank: mappedBank || record.bankName || record.bankAccount || "" });
+  };
+  (state.schemes || []).forEach((r) => add(r, "Scheme", r.collection, r.paymentMode || r.cardName, r.bankName || r.bankAccount, { partyId: r.memberId, customer: `${r.member || ""}${r.book ? ` (${r.book})` : ""}`, bookNo: r.book }));
+  (state.bills || []).filter((r) => !String(r.type || "").toLowerCase().includes("purchase")).forEach((r) => { const breakup = r.paymentBreakup || {}, entries = Object.entries(breakup).filter(([key, value]) => key !== "reference" && Number(value) > 0); if (entries.length) entries.forEach(([mode, amount]) => add(r, "Sales", amount, mode, r.bankAccount || r.cashBank, { partyId: r.customerId, customer: r.customer, bookNo: r.billNo })); else add(r, "Sales", r.paid || r.totals?.cashReceived, r.paymentMode, r.bankAccount || r.cashBank, { partyId: r.customerId, customer: r.customer, bookNo: r.billNo }); });
+  (state.billwiseCollections || []).forEach((r) => add(r, "Collection", r.totalAmount || sumField(r.lines || [], "received") || sumField(r.lines || [], "amount"), r.paymentMode, r.bankAccount, { partyId: r.partyId, customer: r.partyName, bookNo: r.invoiceNo }));
+  (state.orderAdvances || []).forEach((r) => add(r, "Order Advance", r.amount || r.advanceAmount || r.totalAmount, r.paymentMode, r.cashBank, { partyId: r.customerId || r.partyId, customer: r.customer || r.partyName, bookNo: r.orderNo }));
+  (state.cashReceipts || []).forEach((r) => (r.lines || []).forEach((line) => add(r, "Cash Receipt", Number(line.amount || 0) - Number(line.discount || 0), "Cash", "", { partyId: line.headId, customer: line.accountHead, bookNo: line.voucherNo })));
+  return rows.sort((a, b) => a.sortDate.localeCompare(b.sortDate) || a.entryNo.localeCompare(b.entryNo));
+}
+
+function dayAccountReportConfig() {
+  const rows = dayAccountPeriodRows();
+  if (dayAccountView === "Voucher Summary") return { columns: ["Tdate", "Vou.No", "eType", "Debit", "Credit", "Balance"], rows: aggregateDayAccountRows(rows, ["sortDate", "vouNo"]).map((r) => [r.date, r.vouNo, r.voucherType, r.debit, r.credit, r.balance]) };
+  if (dayAccountView === "Voucher Summary-2") return { columns: ["Tdate", "eType", "Debit", "Credit", "Balance"], rows: aggregateDayAccountRows(rows, ["sortDate", "voucherType"]).map((r) => [r.date, r.voucherType, r.debit, r.credit, r.balance]) };
+  if (dayAccountView === "Account Details By Voucher Type") return { columns: ["Tdate", "Accid", "Account_Name", "eType", "invNo", "eMode", "eModeno", "Debit", "Credit", "Balance"], rows: rows.map((r) => { const meta = accountMeta(r.account); return [r.date, meta.id, meta.name, r.voucherType, r.invoiceNo, r.paymentMode, r.paymentRef, r.debit, r.credit, r.debit - r.credit]; }) };
+  if (dayAccountView === "Account Summary") return { columns: ["Tdate", "Accid", "Account_Name", "sub_schedule", "Debit", "Credit", "Balance"], rows: aggregateDayAccountRows(rows, ["sortDate", "account"]).map((r) => { const meta = accountMeta(r.account); return [r.date, meta.id, meta.name, meta.subSchedule, r.debit, r.credit, r.balance]; }) };
+  if (dayAccountView === "Staff Summary") return staffSummaryConfig(rows);
+  if (dayAccountView === "PayMode Report-Summary") { const paymentRows = paymentModeReportRows(), grouped = new Map(); paymentRows.forEach((r) => { const key = `${r.sortDate}\u0001${r.cardName}`, item = grouped.get(key) || { ...r, amount: 0 }; item.amount += r.amount; grouped.set(key, item); }); return { columns: ["Date", "CardName", "Amount"], rows: [...grouped.values()].map((r) => [r.date, r.cardName, r.amount]) }; }
+  if (dayAccountView === "PayMode Report-Details") return { columns: ["Type_", "Date", "Entryno", "PartyID", "Customer", "bookno", "Amount", "CardName", "Bank"], rows: paymentModeReportRows().map((r) => [r.type, r.date, r.entryNo, r.partyId, r.customer, r.bookNo, r.amount, r.cardName, r.bank]) };
+  return { columns: [], rows: [] };
+}
+
+function staffSummaryConfig(periodRows) {
+  const staffAccounts = ledgerAccountCandidates().filter((r) => r.source === "Employee");
+  return { columns: ["Accid", "Account_Name", "OP", "Debit", "Credit", "CB"], rows: staffAccounts.map((staff) => { const from = toDateInputValue(financialReportOptions.from), prior = ledgerTransactions(staff.name).filter((r) => r.sortDate < from), opening = prior.reduce((sum, r) => sum + r.debit - r.credit, staff.opening), own = periodRows.filter((r) => r.account.toLowerCase() === staff.name.toLowerCase() || r.staffName.toLowerCase() === staff.name.toLowerCase()), debit = sumField(own, "debit"), credit = sumField(own, "credit"); return [staff.id, staff.name, opening, debit, credit, opening + debit - credit]; }) };
+}
+
+function dayAccountTransactionsScreen() {
+  if (dayAccountView === "Business Report") return businessReportScreen();
+  const config = dayAccountReportConfig(), pages = Math.max(1, Math.ceil(config.rows.length / financialReportOptions.pageSize)), page = Math.min(financialReportOptions.page, pages - 1), visible = financialReportOptions.shown ? config.rows.slice(page * financialReportOptions.pageSize, (page + 1) * financialReportOptions.pageSize) : [], numericStart = config.columns.findIndex((c) => ["OP", "Debit"].includes(c));
+  const totals = config.columns.map((column, index) => ["Amount", "Debit", "Credit", "Balance"].includes(column) ? config.rows.reduce((s, row) => s + Number(row[index] || 0), 0) : "");
+  return `<section class="financial-report-view day-account-report">${financialReportToolbar()}<div class="day-account-view-select"><span>Report view</span><select data-day-account-view>${DAY_ACCOUNT_VIEWS.map((item) => `<option ${item === dayAccountView ? "selected" : ""}>${item}</option>`).join("")}</select></div><button class="financial-report-back" data-voucher-report-home>← Voucher Reports</button><div class="financial-report-paper ${financialReportOptions.a4 ? "a4" : ""}" style="--financial-zoom:${financialReportOptions.zoom}"><header><h3>***MT GOLD LAND***</h3><h4>M.T.PLAZA, OOTY ROAD</h4><h2>${escapeHtml(dayAccountView)} From ${financialReportOptions.from} To ${financialReportOptions.to}</h2></header><div class="cash-book-page-status">Page ${page + 1} of ${pages}</div><div class="day-account-grid-wrap"><table class="day-account-grid"><thead><tr>${config.columns.map((c) => `<th>${escapeHtml(c)}</th>`).join("")}</tr></thead><tbody>${visible.length ? visible.map((row) => `<tr>${row.map((cell, i) => `<td class="${i >= numericStart && typeof cell === "number" ? "num" : ""}">${typeof cell === "number" ? numberValue(cell, 3) : escapeHtml(cell)}</td>`).join("")}</tr>`).join("") : `<tr><td colspan="${config.columns.length}">No records</td></tr>`}</tbody>${financialReportOptions.shown && config.rows.length ? `<tfoot><tr>${totals.map((cell, i) => `<td class="${cell !== "" ? "num" : ""}">${i === Math.max(0, numericStart - 1) ? "Total" : cell !== "" ? numberValue(cell, 3) : ""}</td>`).join("")}</tr></tfoot>` : ""}</table></div></div></section>`;
+}
+
+function businessReportData() {
+  const inPeriod = (record) => financialRecordIsPosted(record) && isDateWithinPeriod(record.date || record.collectionDate || record.joinDate || record.paymentDate, financialReportOptions.from, financialReportOptions.to);
+  const sumRecords = (records, value) => (records || []).filter(inPeriod).reduce((sum, record) => sum + Number(typeof value === "function" ? value(record) : record[value] || 0), 0);
+  const countRecords = (records) => (records || []).filter(inPeriod).length;
+  const activities = new Map(), set = (name, count, moneyIn = 0, moneyOut = 0, note = "") => activities.set(name, { name, count, moneyIn: Number(moneyIn || 0), moneyOut: Number(moneyOut || 0), net: Number(moneyIn || 0) - Number(moneyOut || 0), note });
+  const bills = (state.bills || []).filter(inPeriod), sales = bills.filter((r) => /sale/i.test(r.type || "") && !/return/i.test(r.type || "")), billPurchases = bills.filter((r) => /purchase/i.test(r.type || "") && !/return/i.test(r.type || ""));
+  const purchaseCollections = [...(state.directPurchases || []), ...(state.diamondPurchases || []), ...(state.dmdStonePurchases || [])], purchaseReturns = [...(state.directPurchaseReturns || []), ...(state.diamondPurchaseReturns || []), ...(state.dmdReturns || [])];
+  const salesAmount = sumRecords(sales, (r) => r.totals?.invoiceTotal ?? r.invoiceTotal ?? r.amount), purchaseAmount = sumRecords([...billPurchases, ...purchaseCollections], (r) => r.totals?.invoiceTotal ?? r.invoiceTotal ?? r.totalAmount ?? r.amount), salesReturns = sumRecords(bills.filter((r) => /sale.*return|return.*sale/i.test(r.type || "")), (r) => r.totalAmount || r.amount || r.totals?.invoiceTotal), purchaseReturnAmount = sumRecords(purchaseReturns, (r) => r.totalAmount || r.amount || r.invoiceTotal);
+  const cashOpening = cashBookReportData().rows[0]?.balance || 0, bankOpening = bankBookReportData().rows[0]?.balance || 0, cashClosing = cashBookReportData().closing, bankClosing = bankBookReportData().closing;
+  set("Opening Cash", 1, cashOpening > 0 ? cashOpening : 0, cashOpening < 0 ? Math.abs(cashOpening) : 0, "Balance brought forward"); set("Opening Bank", 1, bankOpening > 0 ? bankOpening : 0, bankOpening < 0 ? Math.abs(bankOpening) : 0, bankOpening < 0 ? "Overdraft brought forward" : "Balance brought forward");
+  set("Cash Receipts", countRecords(state.cashReceipts), sumRecords(state.cashReceipts, (r) => cashVoucherFinancials(r, "receipt").totalAmount), 0); set("Cash Payments", countRecords(state.cashPayments), 0, sumRecords(state.cashPayments, (r) => cashVoucherFinancials(r, "payment").totalAmount));
+  set("Bank Deposits", countRecords(state.bankDeposits), sumRecords(state.bankDeposits, (r) => bankTransactionFinancials(r).totalAmount), 0, "Transfer/activity; not treated as revenue"); set("Bank Withdrawals", countRecords(state.bankWithdrawals), 0, sumRecords(state.bankWithdrawals, (r) => bankTransactionFinancials(r).totalAmount), "Transfer/activity; not treated as expense");
+  set("Sales", sales.length, salesAmount, 0); set("Sales Returns", bills.filter((r) => /sale.*return|return.*sale/i.test(r.type || "")).length, 0, salesReturns); set("Purchases", [...billPurchases, ...purchaseCollections].filter(inPeriod).length, 0, purchaseAmount); set("Purchase Returns", purchaseReturns.filter(inPeriod).length, purchaseReturnAmount, 0);
+  set("Order Advances", countRecords(state.orderAdvances), sumRecords(state.orderAdvances, (r) => r.amount || r.advanceAmount || r.totalAmount), 0); set("Advance Refunds", countRecords(state.orderAdvanceRefunds), 0, sumRecords(state.orderAdvanceRefunds, (r) => r.amount || r.refundAmount || r.totalAmount));
+  set("Scheme Collections", countRecords(state.schemes), sumRecords(state.schemes, "collection"), 0); set("Scheme Refunds", countRecords(state.schemeRefunds), 0, sumRecords(state.schemeRefunds, (r) => r.amount || r.totalAmount)); set("Scheme Closures", countRecords(state.schemeClosures), 0, sumRecords(state.schemeClosures, (r) => r.amount || r.totalAmount));
+  set("Smith Transactions", countRecords(state.smithWorkOrders), 0, sumRecords(state.smithWorkOrders, (r) => r.totalAmount || r.cashPaid || 0)); set("Jeweller Transactions", countRecords(state.jewellerWorkOrders), 0, sumRecords(state.jewellerWorkOrders, (r) => r.totalAmount || r.cashPaid || 0)); set("Refinery Transactions", countRecords(state.refineryFinalReturns), 0, sumRecords(state.refineryFinalReturns, (r) => r.refinerCharge || r.totalAmount || 0)); set("Service / Job", countRecords(state.serviceJobs), sumRecords(state.serviceJobs, (r) => r.receivedAmount || r.totalAmount || 0), sumRecords(state.serviceJobs, (r) => r.expenseAmount || 0));
+  const expenses = (state.expenseEntries || []).filter(inPeriod), utility = expenses.filter((r) => /electric|water|internet|telephone|rent|utility|fuel|maintenance/i.test(`${r.expenseHead || ""} ${r.accountHead || ""} ${r.remarks || ""}`)), other = expenses.filter((r) => !utility.includes(r));
+  set("Utilities", utility.length, 0, sumRecords(utility, (r) => r.totalAmount || r.amount || expenseEntryFinancials(r).totalAmount), utility.length ? "Electricity, water, connectivity, rent and maintenance" : "Ready for upcoming Utility entries"); set("Other Expenses", other.length, 0, sumRecords(other, (r) => r.totalAmount || r.amount || expenseEntryFinancials(r).totalAmount));
+  return { activities, cashClosing, bankClosing, salesAmount, purchaseAmount, schemeCollections: activities.get("Scheme Collections").moneyIn, expenseTotal: activities.get("Utilities").moneyOut + activities.get("Other Expenses").moneyOut };
+}
+
+function businessReportScreen() {
+  const data = businessReportData();
+  if (!financialReportOptions.shown) return `<section class="financial-report-view business-report">${financialReportToolbar()}<div class="day-account-view-select"><span>Report view</span><select data-day-account-view>${DAY_ACCOUNT_VIEWS.map((item) => `<option ${item === dayAccountView ? "selected" : ""}>${item}</option>`).join("")}</select></div><div class="financial-report-view-card"><div class="financial-report-coming"><strong>No records</strong><p>Click Show to load the Business Report.</p></div></div></section>`;
+  return `<section class="financial-report-view business-report">${financialReportToolbar()}<div class="day-account-view-select"><span>Report view</span><select data-day-account-view>${DAY_ACCOUNT_VIEWS.map((item) => `<option ${item === dayAccountView ? "selected" : ""}>${item}</option>`).join("")}</select></div><button class="financial-report-back" data-voucher-report-home>← Voucher Reports</button><div class="business-report-head"><div><p class="eyebrow">Owner overview</p><h2>Business Report</h2><p>${financialReportOptions.from} to ${financialReportOptions.to} · Cost center: cost1</p></div><span>Posted records only</span></div><div class="business-kpi-grid">${businessKpi("Sales", data.salesAmount, "Revenue billed")}${businessKpi("Purchases", data.purchaseAmount, "Stock and direct purchases")}${businessKpi("Cash closing", data.cashClosing, data.cashClosing < 0 ? "Credit balance" : "Available balance")}${businessKpi("Bank closing", data.bankClosing, data.bankClosing < 0 ? "Overdraft" : "Available balance")}${businessKpi("Scheme collections", data.schemeCollections, "Collected in period")}${businessKpi("Operating expenses", data.expenseTotal, "Utilities and other expenses")}</div><div class="business-section-list">${BUSINESS_REPORT_GROUPS.map((group) => businessReportGroup(group, data.activities)).join("")}</div></section>`;
+}
+
+function businessKpi(label, value, note) { return `<article><span>${escapeHtml(label)}</span><strong>${numberValue(Math.abs(value), 3)}${value < 0 ? " Cr" : ""}</strong><small>${escapeHtml(note)}</small></article>`; }
+
+function businessReportGroup(group, activities) {
+  const rows = group.activities.map((name) => activities.get(name)).filter(Boolean), activeRows = rows.filter((r) => r.count || r.moneyIn || r.moneyOut || /^Opening/.test(r.name));
+  const moneyIn = sumField(activeRows, "moneyIn"), moneyOut = sumField(activeRows, "moneyOut");
+  return `<details class="business-report-group" ${activeRows.length ? "open" : ""}><summary><span><strong>${escapeHtml(group.label)}</strong><small>${activeRows.length ? `${activeRows.length} active lines` : "No activity in this period"}</small></span><span class="business-section-total">In ${numberValue(moneyIn, 3)} · Out ${numberValue(moneyOut, 3)}</span></summary><div class="business-report-table-wrap"><table><thead><tr><th>Activity</th><th>Transactions</th><th>Money In</th><th>Money Out</th><th>Net Movement</th><th>Notes</th></tr></thead><tbody>${activeRows.length ? activeRows.map((r) => `<tr><td>${escapeHtml(r.name)}</td><td class="num">${r.count}</td><td class="num">${numberValue(r.moneyIn, 3)}</td><td class="num">${numberValue(r.moneyOut, 3)}</td><td class="num ${r.net < 0 ? "negative" : ""}">${numberValue(Math.abs(r.net), 3)} ${r.net < 0 ? "Out" : "In"}</td><td>${escapeHtml(r.note)}</td></tr>`).join("") : `<tr><td colspan="6">No posted activity. This section is ready for future ${escapeHtml(group.label)} entries.</td></tr>`}</tbody></table></div></details>`;
+}
+
+function financialReportToolbar() {
+  const tools = [["SHOW", "financial-show"], [financialReportOptions.shown ? "HIDE" : "VIEW", "financial-view-hide"], ["PRINT", "financial-print"], ["EXCEL", "financial-excel"], ["SAVE AS", "financial-save-as"], ["DATE", "financial-date"], ["FIRST", "financial-first"], ["PREV", "financial-prev"], ["NEXT", "financial-next"], ["LAST", "financial-last"], ["ZOOM IN", "financial-zoom-in"], ["DEFAULT", "financial-zoom-default"], ["ZOOM OUT", "financial-zoom-out"], ["CLOSE", "financial-close"]];
+  return `<div class="classic-report-toolbar financial-report-toolbar"><div class="classic-tool-buttons">${tools.map(([label, action]) => `<button class="classic-tool" data-action="${action}"><strong>${toolbarGlyph(label === "VIEW" || label === "HIDE" ? "VIEW/HIDE" : label)}</strong><span>${label}</span></button>`).join("")}</div><label class="classic-a4"><input type="checkbox" data-financial-a4 ${financialReportOptions.a4 ? "checked" : ""}/>A4</label>${financialReportOptions.dateOpen ? financialDatePopup() : ""}</div>`;
+}
+
+function financialDatePopup() {
+  return `<div class="sales-date-popup financial-date-popup"><strong>Report period</strong><label>From<input type="date" data-financial-date-field="from" value="${toDateInputValue(financialReportOptions.from)}" /></label><label>To<input type="date" data-financial-date-field="to" value="${toDateInputValue(financialReportOptions.to)}" /></label><div><button class="secondary" data-action="financial-date-cancel">Cancel</button><button class="primary" data-action="financial-date-set">Apply</button></div></div>`;
+}
+
+function financialRecordIsPosted(record = {}) {
+  const status = String(record.status || record.state || "posted").toLowerCase();
+  return !["cancelled", "canceled", "deleted", "draft", "unposted", "void", "voided"].includes(status) && !record.deleted && !record.cancelled && !record.isDraft;
+}
+
+function cashBookSourceRows() {
+  const rows = [];
+  const add = (date, vouNo, particular, debit = 0, credit = 0, source = "") => {
+    if (!date || (!Number(debit) && !Number(credit))) return;
+    rows.push({ date: formatDisplayDate(date), sortDate: toDateInputValue(date), vouNo: vouNo || "", particular: particular || source, debit: Number(debit || 0), credit: Number(credit || 0), source });
+  };
+  (state.accounts || []).filter(financialRecordIsPosted).filter((r) => r.ledger === "Cash in Hand").forEach((r) => add(r.date, r.vouNo, r.particular, r.debit, r.credit, "Ledger"));
+  (state.cashReceipts || []).filter(financialRecordIsPosted).filter((r) => r.cashAccount === "Cash in Hand").forEach((r) => add(r.date, r.voucherNo || r.refNo, r.narration || r.lines?.map((l) => l.accountHead).filter(Boolean).join(", ") || "Cash Receipt", cashVoucherFinancials(r, "receipt").totalAmount, 0, "Cash Receipt"));
+  (state.cashPayments || []).filter(financialRecordIsPosted).filter((r) => r.cashAccount === "Cash in Hand").forEach((r) => add(r.date, r.voucherNo || r.refNo, r.narration || r.lines?.map((l) => l.accountHead).filter(Boolean).join(", ") || "Cash Payment", 0, cashVoucherFinancials(r, "payment").totalAmount, "Cash Payment"));
+  (state.billwiseCollections || []).filter(financialRecordIsPosted).filter((r) => r.paymentMode === "Cash").forEach((r) => add(r.date, r.entryNo || r.refNo, `Bill-wise collection - ${r.partyName || ""}`, Number(r.totalAmount || sumField(r.lines || [], "received") || sumField(r.lines || [], "amount")), 0, "Bill-wise Collection"));
+  (state.billwisePayments || []).filter(financialRecordIsPosted).filter((r) => r.paymentMode === "Cash").forEach((r) => add(r.date, r.entryNo || r.refNo, `Bill-wise payment - ${r.partyName || ""}`, 0, Number(r.totalAmount || sumField(r.lines || [], "paid") || sumField(r.lines || [], "amount")), "Bill-wise Payment"));
+  (state.bankDeposits || []).filter(financialRecordIsPosted).forEach((r) => (r.lines || []).filter((l) => l.accountHead === "Cash in Hand").forEach((l) => add(r.date, r.voucherNo || r.refNo, `Bank deposit - ${r.bankAccount || ""}`, 0, l.amount, "Bank Deposit")));
+  (state.bankWithdrawals || []).filter(financialRecordIsPosted).forEach((r) => (r.lines || []).filter((l) => l.accountHead === "Cash in Hand").forEach((l) => add(r.date, r.voucherNo || r.refNo, `Bank withdrawal - ${r.bankAccount || ""}`, l.amount, 0, "Bank Withdrawal")));
+  (state.bills || []).filter(financialRecordIsPosted).forEach((bill) => {
+    const isPurchase = String(bill.type || "").toLowerCase().includes("purchase");
+    const cash = Number(bill.totals?.cashReceived ?? bill.totals?.cashPaid ?? bill.paymentBreakup?.cash ?? bill.paid ?? 0);
+    add(bill.date, bill.entryNo || bill.billNo || bill.id, `${isPurchase ? "Purchase" : "Sales"} - ${bill.customer || bill.partyName || "Cash party"}`, isPurchase ? 0 : cash, isPurchase ? cash : 0, "Bill");
+  });
+  (state.schemes || []).filter(financialRecordIsPosted).forEach((r) => add(r.collectionDate || r.date || r.joinDate, r.receiptNo || r.book, `Scheme collection - ${r.member || ""}`, Number(r.collection || 0), 0, "Scheme"));
+  (state.directEntries || []).filter(financialRecordIsPosted).filter((r) => r.cashBank === "Cash in Hand" && /cash/i.test(r.mode || "Cash")).forEach((r) => (r.lines || []).forEach((l) => add(l.date, r.entryNo, l.remark || l.accountHead || "Direct Entry", l.receipt, l.payment, "Direct Entry")));
+  (state.journalVouchers || []).filter(financialRecordIsPosted).forEach((r) => (r.lines || []).filter((l) => l.accountHead === "Cash in Hand").forEach((l) => add(r.date, r.voucherNo || r.refNo, l.remark || r.narration || "Journal Voucher", l.debit, l.credit, "Journal")));
+  (state.expenseEntries || []).filter(financialRecordIsPosted).filter((r) => r.cashBank === "Cash in Hand" || /cash/i.test(r.paymentMode || r.mode || "")).forEach((r) => add(r.date, r.entryNo || r.voucherNo, r.narration || r.remarks || r.expenseHead || "Expense", 0, Number(r.totalAmount || r.amount || expenseEntryFinancials?.(r)?.totalAmount || 0), "Expense"));
+  return rows.sort((a, b) => a.sortDate.localeCompare(b.sortDate) || a.vouNo.localeCompare(b.vouNo));
+}
+
+function cashBookReportData() {
+  const from = toDateInputValue(financialReportOptions.from), to = toDateInputValue(financialReportOptions.to);
+  const cashMaster = (state.accountMasters || []).find((a) => a.accountName === "Cash in Hand");
+  let opening = Number(cashMaster?.openingBalance || 0) * (cashMaster?.balanceType === "Cr" ? -1 : 1);
+  const source = cashBookSourceRows();
+  source.filter((r) => r.sortDate < from).forEach((r) => { opening += r.debit - r.credit; });
+  let running = opening;
+  const period = source.filter((r) => r.sortDate >= from && r.sortDate <= to);
+  const rows = [{ date: financialReportOptions.from, sortDate: from, vouNo: "0", particular: "Day Opening", debit: opening >= 0 ? opening : 0, credit: opening < 0 ? Math.abs(opening) : 0, balance: opening }];
+  period.forEach((r) => { running += r.debit - r.credit; rows.push({ ...r, balance: running }); });
+  return { rows, totalDebit: rows.reduce((s, r) => s + r.debit, 0), totalCredit: rows.reduce((s, r) => s + r.credit, 0), closing: running };
+}
+
+function isCanaraBank(value = "") {
+  return /canara\s+bank\s+edak/i.test(String(value));
+}
+
+function paymentModeBank(mode = "") {
+  const normalizedMode = /gpay|google\s*pay|phonepe|upi/i.test(String(mode)) ? "upi" : String(mode).toLowerCase();
+  const configured = (state.miscellaneous?.paymentModes || []).find((item) => String(item.name || item.mode || "").toLowerCase() === normalizedMode);
+  return configured?.bank || configured?.bankAccount || configured?.account || "";
+}
+
+function bankBookSourceRows() {
+  const rows = [], add = (date, vouNo, particular, debit = 0, credit = 0, source = "") => {
+    if (!date || (!Number(debit) && !Number(credit))) return;
+    rows.push({ date: formatDisplayDate(date), sortDate: toDateInputValue(date), vouNo: vouNo || "", particular: particular || source, debit: Number(debit || 0), credit: Number(credit || 0), source });
+  };
+  (state.accounts || []).filter(financialRecordIsPosted).filter((r) => isCanaraBank(r.ledger) && !/^balance$/i.test(String(r.particular || "").trim())).forEach((r) => add(r.date, r.vouNo, r.particular, r.debit, r.credit, "Ledger"));
+  (state.bankDeposits || []).filter(financialRecordIsPosted).filter((r) => isCanaraBank(r.bankAccount)).forEach((r) => add(r.date, r.voucherNo || r.refNo, r.narration || `Bank deposit${r.lines?.[0]?.accountHead ? ` from ${r.lines[0].accountHead}` : ""}`, bankTransactionFinancials(r).totalAmount, 0, "Bank Deposit"));
+  (state.bankWithdrawals || []).filter(financialRecordIsPosted).filter((r) => isCanaraBank(r.bankAccount)).forEach((r) => add(r.date, r.voucherNo || r.refNo, r.narration || `Bank withdrawal${r.lines?.[0]?.accountHead ? ` to ${r.lines[0].accountHead}` : ""}`, 0, bankTransactionFinancials(r).totalAmount, "Bank Withdrawal"));
+  (state.bills || []).filter(financialRecordIsPosted).forEach((bill) => {
+    const isPurchase = String(bill.type || "").toLowerCase().includes("purchase"), breakup = bill.paymentBreakup || {};
+    const mapped = Object.entries(breakup).reduce((sum, [mode, amount]) => sum + (isCanaraBank(paymentModeBank(mode)) || (mode === "bank" && isCanaraBank(bill.bankAccount || bill.cashBank)) ? Number(amount || 0) : 0), 0);
+    const directBank = isCanaraBank(bill.bankAccount || bill.cashBank) ? Number(bill.bankPaid || bill.totals?.bankPaid || 0) : 0, amount = mapped + directBank;
+    add(bill.date, bill.entryNo || bill.billNo || bill.id, `${isPurchase ? "Purchase payment" : "Sales receipt"} - ${bill.customer || bill.partyName || "Party"}`, isPurchase ? 0 : amount, isPurchase ? amount : 0, "Bill");
+  });
+  (state.schemes || []).filter(financialRecordIsPosted).filter((r) => isCanaraBank(r.bankAccount || paymentModeBank(r.paymentMode)) || /gpay|upi|canara/i.test(`${r.paymentMode || ""} ${r.particular || ""}`)).forEach((r) => add(r.collectionDate || r.date || r.joinDate, r.receiptNo || r.book, `Scheme A/c - ${r.member || ""}, Book No: ${r.book || ""}, ${r.paymentMode || "Digital receipt"}${r.reference ? ` ${r.reference}` : ""}`, Number(r.collection || 0), 0, "Scheme"));
+  (state.billwiseCollections || []).filter(financialRecordIsPosted).filter((r) => isCanaraBank(r.bankAccount || paymentModeBank(r.paymentMode))).forEach((r) => add(r.date, r.entryNo || r.refNo, `Bill-wise bank collection - ${r.partyName || ""}`, Number(r.totalAmount || sumField(r.lines || [], "received") || sumField(r.lines || [], "amount")), 0, "Bill-wise Collection"));
+  (state.billwisePayments || []).filter(financialRecordIsPosted).filter((r) => isCanaraBank(r.bankAccount || paymentModeBank(r.paymentMode))).forEach((r) => add(r.date, r.entryNo || r.refNo, `Bill-wise bank payment - ${r.partyName || ""}`, 0, Number(r.totalAmount || sumField(r.lines || [], "paid") || sumField(r.lines || [], "amount")), "Bill-wise Payment"));
+  (state.directEntries || []).filter(financialRecordIsPosted).filter((r) => isCanaraBank(r.cashBank)).forEach((r) => (r.lines || []).forEach((l) => add(l.date, r.entryNo, l.remark || l.accountHead || "Direct Entry", l.receipt, l.payment, "Direct Entry")));
+  (state.journalVouchers || []).filter(financialRecordIsPosted).forEach((r) => (r.lines || []).filter((l) => isCanaraBank(l.accountHead)).forEach((l) => add(r.date, r.voucherNo || r.refNo, l.remark || r.narration || "Journal Voucher", l.debit, l.credit, "Journal")));
+  (state.expenseEntries || []).filter(financialRecordIsPosted).filter((r) => isCanaraBank(r.bankAccount || r.cashBank)).forEach((r) => add(r.date, r.entryNo || r.voucherNo, r.narration || r.remarks || r.expenseHead || "Bank expense", 0, Number(r.totalAmount || r.amount || expenseEntryFinancials(r).totalAmount || 0), "Expense"));
+  appendClearedPdcBankRows(rows, add);
+  return rows.sort((a, b) => a.sortDate.localeCompare(b.sortDate) || a.vouNo.localeCompare(b.vouNo));
+}
+
+function appendClearedPdcBankRows(rows, add) {
+  const collections = [["pdcReceipts", true], ["pdcIssues", false], ["pdcBankSubmissions", true]];
+  collections.forEach(([key, incoming]) => (state[key] || []).filter(financialRecordIsPosted).filter((r) => isCanaraBank(r.bankName || r.bankAccount) && /clear|realized|honoured/i.test(String(r.status || r.chequeStatus || ""))).forEach((r) => { const amount = Number(r.chequeAmount || r.totalAmount || sumField(r.lines || [], incoming ? "received" : "paid")); add(r.clearedDate || r.date, r.entryNo || r.chequeNo, `${incoming ? "Cheque cleared" : "Cheque payment cleared"} - ${r.partyName || r.party || ""}; Cheque ${r.chequeNo || ""}`, incoming ? amount : 0, incoming ? 0 : amount, "PDC Cleared"); }));
+  (state.pdcChequeBounces || []).filter(financialRecordIsPosted).filter((r) => isCanaraBank(r.bankName || r.bankAccount) && r.originalCleared !== false).forEach((r) => { const incoming = !/issue|payment/i.test(String(r.originalType || r.type || "")), amount = Number(r.chequeAmount || r.totalAmount || 0); add(r.date, r.entryNo || r.chequeNo, `Cheque bounce reversal - ${r.partyName || r.party || ""}; Cheque ${r.chequeNo || ""}`, incoming ? 0 : amount, incoming ? amount : 0, "PDC Bounce Reversal"); });
+}
+
+function bankBookReportData() {
+  const from = toDateInputValue(financialReportOptions.from), to = toDateInputValue(financialReportOptions.to), master = (state.accountMasters || []).find((a) => isCanaraBank(a.accountName));
+  let opening = Number(master?.openingBalance || 0) * (master?.balanceType === "Cr" ? -1 : 1), running = opening;
+  const source = bankBookSourceRows().filter((r) => !master?.opDate || r.sortDate >= toDateInputValue(master.opDate));
+  source.filter((r) => r.sortDate < from).forEach((r) => { opening += r.debit - r.credit; running = opening; });
+  const rows = [{ date: financialReportOptions.from, sortDate: from, vouNo: "0", particular: "Day Opening", debit: opening >= 0 ? opening : 0, credit: opening < 0 ? Math.abs(opening) : 0, balance: opening }];
+  source.filter((r) => r.sortDate >= from && r.sortDate <= to).forEach((r) => { running += r.debit - r.credit; rows.push({ ...r, balance: running }); });
+  return { rows, totalDebit: rows.reduce((s, r) => s + r.debit, 0), totalCredit: rows.reduce((s, r) => s + r.credit, 0), closing: running };
+}
+
+function ledgerAccountCandidates() {
+  const rows = [], add = (id, name, mobile = "", opening = 0, type = "Dr", costCenter = "cost1", source = "") => {
+    if (!name) return; const key = String(name).trim().toLowerCase(), existing = rows.find((r) => r.key === key);
+    if (existing) { if (!existing.mobile) existing.mobile = mobile || ""; if (!existing.id) existing.id = id || ""; return; }
+    rows.push({ key, id: id || "", name: String(name).trim(), mobile: mobile || "", opening: Number(opening || 0) * (type === "Cr" ? -1 : 1), costCenter: costCenter || "cost1", source });
+  };
+  (state.accountMasters || []).forEach((r) => add(r.accountId, r.accountName, r.mobile, r.openingBalance, r.balanceType, r.costCenter, "Account"));
+  (state.parties || []).forEach((r) => add(r.customerId || r.supplierId || r.partyId || r.id, r.name, r.mobile || r.phone, r.openingBalance || 0, r.balanceType || "Dr", r.costCenter, r.type || "Party"));
+  (state.staffs || []).forEach((r) => add(r.staffId || r.employeeId || r.id, r.name, r.mobile || r.phone, r.openingBalance || 0, r.balanceType || "Dr", r.costCenter, "Employee"));
+  (state.schemes || []).forEach((r) => add(r.memberId || r.book, r.member, r.mobile, r.opAmount || 0, "Cr", r.costCenter, "Scheme Member"));
+  (state.accounts || []).forEach((r) => add(r.accountId || "", r.ledger, "", 0, "Dr", r.costCenter, "Ledger"));
+  return rows.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function accountListGroup(account) {
+  const master = (state.accountMasters || []).find((r) => String(r.accountName || "").toLowerCase() === account.name.toLowerCase());
+  const raw = master?.subSchedule || account.source || "Other Accounts";
+  const text = String(raw).trim();
+  if (/bank/i.test(text) || isCanaraBank(account.name)) return "Bank Accounts";
+  if (/cash/i.test(text) || account.name === "Cash in Hand") return "Cash Accounts";
+  if (/customer|debtor|receivable/i.test(text)) return "Sundry Debtors";
+  if (/supplier|creditor|payable/i.test(text)) return "Sundry Creditors";
+  if (/employee|staff|agent/i.test(text)) return "Staff & Agents";
+  if (/scheme/i.test(text)) return "Scheme Accounts";
+  if (/direct expense|purchase/i.test(text)) return "Direct Expenses";
+  if (/indirect expense|expense/i.test(text)) return "Indirect Expenses";
+  if (/income|sales/i.test(text)) return "Income Accounts";
+  if (/capital|liability/i.test(text)) return "Capital & Liabilities";
+  if (/asset|deposit|advance/i.test(text)) return "Assets & Advances";
+  return text || "Other Accounts";
+}
+
+function accountListReportData(applyFilters = true) {
+  const from = toDateInputValue(financialReportOptions.from), to = toDateInputValue(financialReportOptions.to), search = accountListOptions.search.trim().toLowerCase();
+  let rows = ledgerAccountCandidates().map((account) => { const transactions = ledgerTransactions(account.name), prior = transactions.filter((r) => r.sortDate < from), period = transactions.filter((r) => r.sortDate >= from && r.sortDate <= to), opening = prior.reduce((sum, r) => sum + r.debit - r.credit, account.opening), debit = sumField(period, "debit"), credit = sumField(period, "credit"), closing = opening + debit - credit; return { id: account.id, name: account.name, group: accountListGroup(account), opening, debit, credit, closing }; });
+  rows = rows.filter((r) => !applyFilters || ((!search || `${r.name} ${r.id} ${r.group}`.toLowerCase().includes(search)) && (accountListOptions.group === "All Groups" || r.group === accountListOptions.group) && (!accountListOptions.hideZero || Math.abs(r.opening) > .0005 || Math.abs(r.debit) > .0005 || Math.abs(r.credit) > .0005 || Math.abs(r.closing) > .0005)));
+  rows.sort((a, b) => a.group.localeCompare(b.group) || a.name.localeCompare(b.name));
+  return { rows, groups: [...new Set(ledgerAccountCandidates().map(accountListGroup))].sort(), debitClosing: rows.filter((r) => r.closing >= 0).reduce((s, r) => s + r.closing, 0), creditClosing: rows.filter((r) => r.closing < 0).reduce((s, r) => s + Math.abs(r.closing), 0), periodDebit: sumField(rows, "debit"), periodCredit: sumField(rows, "credit") };
+}
+
+function accountListReportScreen() {
+  const data = accountListReportData(), pages = Math.max(1, Math.ceil(data.rows.length / financialReportOptions.pageSize)), page = Math.min(financialReportOptions.page, pages - 1), visible = financialReportOptions.shown ? data.rows.slice(page * financialReportOptions.pageSize, (page + 1) * financialReportOptions.pageSize) : [], grouped = new Map(); visible.forEach((r) => { if (!grouped.has(r.group)) grouped.set(r.group, []); grouped.get(r.group).push(r); });
+  return `<section class="financial-report-view account-list-report">${financialReportToolbar()}<div class="account-list-controls"><label><span>Find account</span><input data-account-list-search value="${escapeHtml(accountListOptions.search)}" placeholder="Name, code or group" /></label><label><span>Account group</span><select data-account-list-group><option>All Groups</option>${data.groups.map((group) => `<option ${group === accountListOptions.group ? "selected" : ""}>${escapeHtml(group)}</option>`).join("")}</select></label><label class="account-list-zero"><input type="checkbox" data-account-list-hide-zero ${accountListOptions.hideZero ? "checked" : ""}/> Hide zero records</label></div><button class="financial-report-back" data-voucher-report-home>← Voucher Reports</button><div class="financial-report-paper account-list-paper ${financialReportOptions.a4 ? "a4" : ""}" style="--financial-zoom:${financialReportOptions.zoom}"><header><h3>***MT GOLD LAND***</h3><h2>Account List</h2><p>${financialReportOptions.from} to ${financialReportOptions.to} · Cost center: cost1</p></header>${financialReportOptions.shown ? `<div class="account-list-kpis"><article><span>Accounts shown</span><strong>${data.rows.length}</strong></article><article><span>Period debit</span><strong>${numberValue(data.periodDebit, 3)}</strong></article><article><span>Period credit</span><strong>${numberValue(data.periodCredit, 3)}</strong></article><article><span>Closing Dr</span><strong>${numberValue(data.debitClosing, 3)}</strong></article><article><span>Closing Cr</span><strong>${numberValue(data.creditClosing, 3)}</strong></article></div><div class="cash-book-page-status">Page ${page + 1} of ${pages}</div><div class="account-list-groups">${grouped.size ? [...grouped].map(([group, rows]) => accountListGroupTable(group, rows)).join("") : `<div class="financial-report-coming"><strong>No matching accounts</strong><p>Change the filters or turn off Hide Zero Records.</p></div>`}</div>` : `<div class="financial-report-coming"><strong>No records</strong><p>Click Show to load the Account List.</p></div>`}</div></section>`;
+}
+
+function accountListGroupTable(group, rows) {
+  const debit = sumField(rows, "debit"), credit = sumField(rows, "credit"), net = rows.reduce((s, r) => s + r.closing, 0);
+  return `<details class="account-list-group" open><summary><span><strong>${escapeHtml(group)}</strong><small>${rows.length} account${rows.length === 1 ? "" : "s"}</small></span><span>Dr ${numberValue(debit, 3)} · Cr ${numberValue(credit, 3)}</span></summary><div><table><thead><tr><th>SL</th><th>Account</th><th>Code</th><th>Opening</th><th>Dr/Cr</th><th>Period Debit</th><th>Period Credit</th><th>Closing</th><th>Dr/Cr</th></tr></thead><tbody>${rows.map((r, i) => `<tr><td>${i + 1}</td><td>${escapeHtml(r.name)}</td><td>${escapeHtml(r.id)}</td><td class="num">${numberValue(Math.abs(r.opening), 3)}</td><td>${r.opening < 0 ? "Cr" : "Dr"}</td><td class="num">${numberValue(r.debit, 3)}</td><td class="num">${numberValue(r.credit, 3)}</td><td class="num ${r.closing < 0 ? "negative" : ""}">${numberValue(Math.abs(r.closing), 3)}</td><td>${r.closing < 0 ? "Cr" : "Dr"}</td></tr>`).join("")}</tbody><tfoot><tr><td colspan="5">Group closing</td><td class="num">${numberValue(debit, 3)}</td><td class="num">${numberValue(credit, 3)}</td><td class="num">${numberValue(Math.abs(net), 3)}</td><td>${net < 0 ? "Cr" : "Dr"}</td></tr></tfoot></table></div></details>`;
+}
+
+function receiptPaymentAccountInfo(line = {}) {
+  const name = line.accountHead || "", master = (state.accountMasters || []).find((r) => r.accountId === line.headId || String(r.accountName || "").toLowerCase() === name.toLowerCase()), party = (state.parties || []).find((r) => [r.id, r.customerId, r.supplierId, r.partyId].includes(line.headId) || String(r.name || "").toLowerCase() === name.toLowerCase());
+  return { name: name || master?.accountName || party?.name || "Unassigned account", phone: party?.phone || master?.phone || "", mobile: party?.mobile || master?.mobile || "", subSchedule: master?.subSchedule || party?.type || accountListGroup({ name: name || party?.name || "", source: party?.type || "Other Accounts" }) };
+}
+
+function receiptPaymentReportRows() {
+  const rows = [], addRecords = (records, type) => (records || []).filter(financialRecordIsPosted).forEach((record) => (record.lines || []).forEach((line, index) => { const info = receiptPaymentAccountInfo(line), amount = type === "Receipt" ? Math.max(0, Number(line.amount || 0) - Number(line.discount || 0)) : Number(line.amount || 0), date = line.voucherDate || record.date; if (!amount || !isDateWithinPeriod(date, financialReportOptions.from, financialReportOptions.to)) return; rows.push({ type, date: formatDisplayDate(date), sortDate: toDateInputValue(date), time: record.time || "00:00:00", voucherNo: line.voucherNo || record.voucherNo || record.entryNo || record.refNo || "", particulars: info.name, amount, debit: type === "Receipt" ? amount : 0, credit: type === "Payment" ? amount : 0, phone: info.phone, mobile: info.mobile, narration: line.remarks || record.narration || "", subSchedule: info.subSchedule, lineOrder: index }); }));
+  addRecords(state.cashReceipts, "Receipt"); addRecords(state.cashPayments, "Payment");
+  return rows.sort((a, b) => a.sortDate.localeCompare(b.sortDate) || a.time.localeCompare(b.time) || a.voucherNo.localeCompare(b.voucherNo) || a.lineOrder - b.lineOrder);
+}
+
+function receiptsPaymentsReportConfig() {
+  const all = receiptPaymentReportRows(), rows = receiptPaymentView === "Receipt & Payment" ? all : all.filter((r) => r.type === receiptPaymentView);
+  if (receiptPaymentView === "Receipt & Payment") return { columns: ["Voucher No", "Date", "Particulars", "Debit", "Credit", "Phone", "Mobile", "Remark", "Sub-schedule"], rows: rows.map((r) => [r.voucherNo, r.date, r.particulars, r.debit, r.credit, r.phone, r.mobile, r.narration, r.subSchedule]), source: rows };
+  return { columns: ["Voucher No", "Date", "Particulars", "Amount", "Phone", "Mobile", "Narration", "Sub-schedule"], rows: rows.map((r) => [r.voucherNo, r.date, r.particulars, r.amount, r.phone, r.mobile, r.narration, r.subSchedule]), source: rows };
+}
+
+function receiptsPaymentsReportScreen() {
+  const config = receiptsPaymentsReportConfig(), pages = Math.max(1, Math.ceil(config.rows.length / financialReportOptions.pageSize)), page = Math.min(financialReportOptions.page, pages - 1), visible = financialReportOptions.shown ? config.rows.slice(page * financialReportOptions.pageSize, (page + 1) * financialReportOptions.pageSize) : [], amountColumns = new Set(["Amount", "Debit", "Credit"]), totals = config.columns.map((column, i) => amountColumns.has(column) ? config.rows.reduce((sum, row) => sum + Number(row[i] || 0), 0) : "");
+  return `<section class="financial-report-view receipts-payments-report">${financialReportToolbar()}<div class="day-account-view-select"><span>Report view</span><select data-receipt-payment-view>${RECEIPT_PAYMENT_VIEWS.map((item) => `<option ${item === receiptPaymentView ? "selected" : ""}>${item}</option>`).join("")}</select></div><button class="financial-report-back" data-voucher-report-home>← Voucher Reports</button><div class="financial-report-paper ${financialReportOptions.a4 ? "a4" : ""}" style="--financial-zoom:${financialReportOptions.zoom}"><header><h3>***MT GOLD LAND***</h3><h4>M.T.PLAZA, OOTY ROAD</h4><h2>${escapeHtml(receiptPaymentView)} Report for the period from ${financialReportOptions.from} to ${financialReportOptions.to}</h2></header><div class="cash-book-page-status">Page ${page + 1} of ${pages}</div><div class="receipt-payment-grid-wrap"><table class="receipt-payment-grid"><thead><tr>${config.columns.map((column) => `<th>${escapeHtml(column)}</th>`).join("")}</tr></thead><tbody>${visible.length ? visible.map((row) => `<tr>${row.map((cell, i) => `<td class="${amountColumns.has(config.columns[i]) ? "num" : ""}">${amountColumns.has(config.columns[i]) ? numberValue(cell, 3) : escapeHtml(cell)}</td>`).join("")}</tr>`).join("") : `<tr><td colspan="${config.columns.length}">No records</td></tr>`}</tbody>${financialReportOptions.shown && config.rows.length ? `<tfoot><tr>${totals.map((value, i) => `<td class="${value !== "" ? "num" : ""}">${i === Math.max(0, config.columns.findIndex((c) => amountColumns.has(c)) - 1) ? "Total" : value !== "" ? numberValue(value, 3) : ""}</td>`).join("")}</tr></tfoot>` : ""}</table></div></div></section>`;
+}
+
+function journalRegisterReportData() {
+  const rows = [];
+  (state.journalVouchers || []).filter(financialRecordIsPosted).filter((r) => isDateWithinPeriod(r.date, financialReportOptions.from, financialReportOptions.to)).forEach((record) => (record.lines || []).forEach((line, index) => { const meta = accountMeta(line.accountHead), debit = Number(line.debit || 0), credit = Number(line.credit || 0); rows.push({ date: formatDisplayDate(record.date), sortDate: toDateInputValue(record.date), time: record.time || "00:00:00", voucherType: record.type || "JE", invoiceNo: record.voucherNo || record.entryNo || record.refNo || "", accountId: line.accountId || meta.id, accountName: line.accountHead || meta.name, accountType: meta.subSchedule || "Other", debit, credit, balance: debit - credit, remark: line.remark || "", narration: record.narration || "", lineOrder: index }); }));
+  rows.sort((a, b) => a.sortDate.localeCompare(b.sortDate) || a.time.localeCompare(b.time) || a.invoiceNo.localeCompare(b.invoiceNo) || a.lineOrder - b.lineOrder);
+  return { rows, totalDebit: sumField(rows, "debit"), totalCredit: sumField(rows, "credit") };
+}
+
+function journalRegisterReportScreen() {
+  const report = journalRegisterReportData(), pages = Math.max(1, Math.ceil(report.rows.length / financialReportOptions.pageSize)), page = Math.min(financialReportOptions.page, pages - 1), visible = financialReportOptions.shown ? report.rows.slice(page * financialReportOptions.pageSize, (page + 1) * financialReportOptions.pageSize) : [];
+  return `<section class="financial-report-view journal-register-report">${financialReportToolbar()}<button class="financial-report-back" data-voucher-report-home>← Voucher Reports</button><div class="financial-report-paper ${financialReportOptions.a4 ? "a4" : ""}" style="--financial-zoom:${financialReportOptions.zoom}"><header><h3>***MT GOLD LAND***</h3><h4>M.T.PLAZA, OOTY ROAD</h4><h2>Journal Report From ${financialReportOptions.from} To ${financialReportOptions.to}</h2></header><div class="cash-book-page-status">Page ${page + 1} of ${pages}</div><div class="journal-register-grid-wrap"><table class="journal-register-grid"><thead><tr><th>Date</th><th>Type</th><th>Voucher No</th><th>AccID</th><th>Account Name</th><th>Account Type</th><th>Debit</th><th>Credit</th><th>Balance</th><th>Remark</th><th>Narration</th></tr></thead><tbody>${visible.length ? visible.map((r) => `<tr><td>${r.date}</td><td>${escapeHtml(r.voucherType)}</td><td>${escapeHtml(r.invoiceNo)}</td><td>${escapeHtml(r.accountId)}</td><td>${escapeHtml(r.accountName)}</td><td>${escapeHtml(r.accountType)}</td><td class="num">${numberValue(r.debit, 3)}</td><td class="num">${numberValue(r.credit, 3)}</td><td class="num ${r.balance < 0 ? "negative" : ""}">${numberValue(Math.abs(r.balance), 3)} ${r.balance < 0 ? "Cr" : "Dr"}</td><td>${escapeHtml(r.remark)}</td><td>${escapeHtml(r.narration)}</td></tr>`).join("") : `<tr><td colspan="11">No journal entries</td></tr>`}</tbody>${financialReportOptions.shown && report.rows.length ? `<tfoot><tr><td colspan="6">Total</td><td class="num">${numberValue(report.totalDebit, 3)}</td><td class="num">${numberValue(report.totalCredit, 3)}</td><td class="num">${numberValue(Math.abs(report.totalDebit - report.totalCredit), 3)}</td><td colspan="2"></td></tr></tfoot>` : ""}</table></div></div></section>`;
+}
+
+function chartAccountClassification(group) {
+  if (["Bank Accounts", "Cash Accounts", "Sundry Debtors", "Assets & Advances"].includes(group)) return { finalAccount: "Assets", schedule: group === "Assets & Advances" ? "Current Assets" : group };
+  if (["Capital & Liabilities", "Sundry Creditors", "Scheme Accounts"].includes(group)) return { finalAccount: "Liabilities", schedule: group };
+  if (group === "Income Accounts") return { finalAccount: "Income", schedule: "Income" };
+  if (["Direct Expenses", "Indirect Expenses"].includes(group)) return { finalAccount: "Expenses", schedule: group };
+  return { finalAccount: "Other", schedule: group };
+}
+
+function chartOfAccountsReportData() {
+  const source = accountListReportData(false).rows, search = chartAccountOptions.search.trim().toLowerCase();
+  const rows = source.map((r) => { const classification = chartAccountClassification(r.group), openingDebit = r.opening > 0 ? r.opening : 0, openingCredit = r.opening < 0 ? Math.abs(r.opening) : 0, debit = openingDebit + r.debit, credit = openingCredit + r.credit, balance = debit - credit; return { ...r, ...classification, subSchedule: r.group, debit, credit, balance }; }).filter((r) => (chartAccountOptions.finalAccount === "All" || r.finalAccount === chartAccountOptions.finalAccount) && (!search || `${r.name} ${r.id} ${r.finalAccount} ${r.schedule} ${r.subSchedule}`.toLowerCase().includes(search)) && (!chartAccountOptions.hideZero || Math.abs(r.debit) > .0005 || Math.abs(r.credit) > .0005 || Math.abs(r.balance) > .0005));
+  rows.sort((a, b) => a.finalAccount.localeCompare(b.finalAccount) || a.schedule.localeCompare(b.schedule) || a.subSchedule.localeCompare(b.subSchedule) || a.name.localeCompare(b.name)); return { rows, totalDebit: sumField(rows, "debit"), totalCredit: sumField(rows, "credit") };
+}
+
+function chartOfAccountsReportScreen() {
+  const report = chartOfAccountsReportData(), pages = Math.max(1, Math.ceil(report.rows.length / financialReportOptions.pageSize)), page = Math.min(financialReportOptions.page, pages - 1), visible = financialReportOptions.shown ? report.rows.slice(page * financialReportOptions.pageSize, (page + 1) * financialReportOptions.pageSize) : [];
+  return `<section class="financial-report-view chart-accounts-report">${financialReportToolbar()}<div class="chart-account-controls"><label><span>Find account</span><input data-chart-account-search value="${escapeHtml(chartAccountOptions.search)}" placeholder="Name, ID or classification" /></label><label><span>Final account</span><select data-chart-final-account>${["All", "Assets", "Liabilities", "Income", "Expenses", "Other"].map((item) => `<option ${item === chartAccountOptions.finalAccount ? "selected" : ""}>${item}</option>`).join("")}</select></label><label><input type="checkbox" data-chart-hide-zero ${chartAccountOptions.hideZero ? "checked" : ""}/> Hide zero records</label></div><button class="financial-report-back" data-voucher-report-home>← Voucher Reports</button><div class="financial-report-paper ${financialReportOptions.a4 ? "a4" : ""}" style="--financial-zoom:${financialReportOptions.zoom}"><header><h3>***MT GOLD LAND***</h3><h2>Chart Of Accounts</h2><p>Balances through ${financialReportOptions.to}</p></header><div class="cash-book-page-status">Page ${page + 1} of ${pages}</div><div class="chart-account-grid-wrap"><table class="chart-account-grid"><thead><tr><th>Final Account</th><th>Schedule</th><th>Sub-schedule</th><th>AccID</th><th>Name</th><th>Debit</th><th>Credit</th><th>Balance</th><th>Dr/Cr</th></tr></thead><tbody>${visible.length ? visible.map((r) => `<tr><td>${r.finalAccount}</td><td>${escapeHtml(r.schedule)}</td><td>${escapeHtml(r.subSchedule)}</td><td>${escapeHtml(r.id)}</td><td>${escapeHtml(r.name)}</td><td class="num">${numberValue(r.debit, 3)}</td><td class="num">${numberValue(r.credit, 3)}</td><td class="num ${r.balance < 0 ? "negative" : ""}">${numberValue(Math.abs(r.balance), 3)}</td><td>${r.balance < 0 ? "Cr" : "Dr"}</td></tr>`).join("") : `<tr><td colspan="9">No matching accounts</td></tr>`}</tbody>${financialReportOptions.shown && report.rows.length ? `<tfoot><tr><td colspan="5">Total</td><td class="num">${numberValue(report.totalDebit, 3)}</td><td class="num">${numberValue(report.totalCredit, 3)}</td><td class="num">${numberValue(Math.abs(report.totalDebit - report.totalCredit), 3)}</td><td>${report.totalDebit - report.totalCredit < 0 ? "Cr" : "Dr"}</td></tr></tfoot>` : ""}</table></div></div></section>`;
+}
+
+function ledgerTransactions(accountName) {
+  if (accountName === "Cash in Hand") return cashBookSourceRows();
+  if (isCanaraBank(accountName)) return bankBookSourceRows();
+  const rows = [], same = (value) => String(value || "").trim().toLowerCase() === String(accountName).trim().toLowerCase();
+  const add = (date, vouNo, particular, debit = 0, credit = 0, costCenter = "cost1") => { if (date && (Number(debit) || Number(credit)) && (!costCenter || costCenter === "cost1")) rows.push({ date: formatDisplayDate(date), sortDate: toDateInputValue(date), vouNo: vouNo || "", particular: particular || "Ledger posting", debit: Number(debit || 0), credit: Number(credit || 0) }); };
+  (state.accounts || []).filter(financialRecordIsPosted).filter((r) => same(r.ledger) && !/^balance$/i.test(String(r.particular || "").trim())).forEach((r) => add(r.date, r.vouNo, r.particular, r.debit, r.credit, r.costCenter));
+  (state.cashReceipts || []).filter(financialRecordIsPosted).forEach((r) => (r.lines || []).filter((l) => same(l.accountHead)).forEach((l) => add(r.date, r.voucherNo || r.refNo, l.remarks || r.narration || "Cash receipt", 0, Number(l.amount || 0) - Number(l.discount || 0), r.costCenter)));
+  (state.cashPayments || []).filter(financialRecordIsPosted).forEach((r) => (r.lines || []).filter((l) => same(l.accountHead)).forEach((l) => add(r.date, r.voucherNo || r.refNo, l.remarks || r.narration || "Cash payment", l.amount, 0, r.costCenter)));
+  (state.bankDeposits || []).filter(financialRecordIsPosted).forEach((r) => (r.lines || []).filter((l) => same(l.accountHead)).forEach((l) => add(r.date, r.voucherNo || r.refNo, l.remarks || r.narration || `Bank deposit to ${r.bankAccount}`, 0, l.amount, r.costCenter)));
+  (state.bankWithdrawals || []).filter(financialRecordIsPosted).forEach((r) => (r.lines || []).filter((l) => same(l.accountHead)).forEach((l) => add(r.date, r.voucherNo || r.refNo, l.remarks || r.narration || `Bank withdrawal from ${r.bankAccount}`, l.amount, 0, r.costCenter)));
+  (state.journalVouchers || []).filter(financialRecordIsPosted).forEach((r) => (r.lines || []).filter((l) => same(l.accountHead)).forEach((l) => add(r.date, r.voucherNo || r.refNo, l.remark || r.narration || "Journal Voucher", l.debit, l.credit, r.costCenter)));
+  (state.directEntries || []).filter(financialRecordIsPosted).forEach((r) => (r.lines || []).filter((l) => same(l.accountHead)).forEach((l) => add(l.date, r.entryNo, l.remark || "Direct Entry", l.payment, l.receipt, r.costCenter)));
+  (state.bills || []).filter(financialRecordIsPosted).filter((r) => same(r.customer) || same(r.partyName)).forEach((r) => { const purchase = String(r.type || "").toLowerCase().includes("purchase"), total = Number(r.invoiceTotal || r.totals?.invoiceTotal || r.amount || 0), paid = Number(r.paid || r.totals?.cashPaid || r.totals?.cashReceived || 0); add(r.date, r.entryNo || r.billNo || r.id, `${purchase ? "Purchase" : "Sales"} invoice`, purchase ? paid : total, purchase ? total : paid, r.costCenter); });
+  (state.billwiseCollections || []).filter(financialRecordIsPosted).filter((r) => same(r.partyName)).forEach((r) => add(r.date, r.entryNo || r.refNo, "Bill-wise collection", 0, Number(r.totalAmount || sumField(r.lines || [], "received") || sumField(r.lines || [], "amount")), r.costCenter));
+  (state.billwisePayments || []).filter(financialRecordIsPosted).filter((r) => same(r.partyName)).forEach((r) => add(r.date, r.entryNo || r.refNo, "Bill-wise payment", Number(r.totalAmount || sumField(r.lines || [], "paid") || sumField(r.lines || [], "amount")), 0, r.costCenter));
+  (state.schemes || []).filter(financialRecordIsPosted).filter((r) => same(r.member)).forEach((r) => add(r.collectionDate || r.date || r.joinDate, r.receiptNo || r.book, `Scheme collection - ${r.scheme || ""}`, 0, r.collection, r.costCenter));
+  return rows.sort((a, b) => a.sortDate.localeCompare(b.sortDate) || a.vouNo.localeCompare(b.vouNo));
+}
+
+function ledgerReportData(accountName = selectedLedgerAccount) {
+  const from = toDateInputValue(financialReportOptions.from), to = toDateInputValue(financialReportOptions.to), account = ledgerAccountCandidates().find((r) => r.name === accountName);
+  let opening = Number(account?.opening || 0), running = opening; const source = ledgerTransactions(accountName);
+  source.filter((r) => r.sortDate < from).forEach((r) => { opening += r.debit - r.credit; running = opening; });
+  const rows = [{ date: financialReportOptions.from, vouNo: "0", particular: "Day Opening", debit: opening >= 0 ? opening : 0, credit: opening < 0 ? Math.abs(opening) : 0, balance: opening }];
+  source.filter((r) => r.sortDate >= from && r.sortDate <= to).forEach((r) => { running += r.debit - r.credit; rows.push({ ...r, balance: running }); });
+  return { rows, totalDebit: rows.reduce((s, r) => s + r.debit, 0), totalCredit: rows.reduce((s, r) => s + r.credit, 0), closing: running };
+}
+
+function cashBookReportScreen() {
+  const report = cashBookReportData(), pages = Math.max(1, Math.ceil(report.rows.length / financialReportOptions.pageSize));
+  const page = Math.min(financialReportOptions.page, pages - 1), visible = financialReportOptions.shown ? report.rows.slice(page * financialReportOptions.pageSize, (page + 1) * financialReportOptions.pageSize) : [];
+  return `<section class="financial-report-view cash-book-report">${financialReportToolbar()}<div class="financial-report-paper ${financialReportOptions.a4 ? "a4" : ""}" style="--financial-zoom:${financialReportOptions.zoom}"><header><h3>***MT GOLD LAND***</h3><h4>M.T.PLAZA, OOTY ROAD</h4><h2>Cash in Hand - Statement for the period From ${financialReportOptions.from} To ${financialReportOptions.to}</h2></header><div class="cash-book-page-status">Page ${page + 1} of ${pages}</div><div class="cash-book-grid-wrap"><table class="cash-book-grid"><thead><tr><th>SL</th><th>Date</th><th>Vou.No</th><th>Particular</th><th>Debit Amt</th><th>Credit Amt</th><th>Balance</th><th>Cr/Dr</th></tr></thead><tbody>${visible.length ? visible.map((r, i) => `<tr><td>${page * financialReportOptions.pageSize + i + 1}</td><td>${r.date}</td><td>${escapeHtml(r.vouNo)}</td><td>${escapeHtml(r.particular)}</td><td class="num">${numberValue(r.debit, 3)}</td><td class="num">${numberValue(r.credit, 3)}</td><td class="num">${numberValue(Math.abs(r.balance), 3)}</td><td>${r.balance < 0 ? "Cr" : "Dr"}</td></tr>`).join("") : `<tr class="empty"><td colspan="8">No records</td></tr>`}</tbody>${financialReportOptions.shown ? `<tfoot><tr><td colspan="3"></td><td>Total</td><td class="num">${numberValue(report.totalDebit, 3)}</td><td class="num">${numberValue(report.totalCredit, 3)}</td><td class="num">${numberValue(Math.abs(report.closing), 3)}</td><td>${report.closing < 0 ? "Cr" : "Dr"}</td></tr><tr><td colspan="3"></td><td>Balance Amount</td><td class="num">${report.closing >= 0 ? numberValue(report.closing, 3) : ""}</td><td class="num">${report.closing < 0 ? numberValue(Math.abs(report.closing), 3) : ""}</td><td></td><td></td></tr></tfoot>` : ""}</table></div></div></section>`;
+}
+
+function bankBookReportScreen() {
+  const report = bankBookReportData(), pages = Math.max(1, Math.ceil(report.rows.length / financialReportOptions.pageSize));
+  const page = Math.min(financialReportOptions.page, pages - 1), visible = financialReportOptions.shown ? report.rows.slice(page * financialReportOptions.pageSize, (page + 1) * financialReportOptions.pageSize) : [];
+  return `<section class="financial-report-view bank-book-report">${financialReportToolbar()}<div class="financial-report-paper ${financialReportOptions.a4 ? "a4" : ""}" style="--financial-zoom:${financialReportOptions.zoom}"><header><h3>***MT GOLD LAND***</h3><h4>M.T.PLAZA, OOTY ROAD</h4><h2>Canara Bank Edakkara - Statement for the period From ${financialReportOptions.from} To ${financialReportOptions.to}</h2></header><div class="cash-book-page-status">Page ${page + 1} of ${pages}</div><div class="cash-book-grid-wrap"><table class="cash-book-grid"><thead><tr><th>SL</th><th>Date</th><th>Vou.No</th><th>Particular</th><th>Debit Amt</th><th>Credit Amt</th><th>Balance</th><th>Cr/Dr</th></tr></thead><tbody>${visible.length ? visible.map((r, i) => `<tr><td>${page * financialReportOptions.pageSize + i + 1}</td><td>${r.date}</td><td>${escapeHtml(r.vouNo)}</td><td>${escapeHtml(r.particular)}</td><td class="num">${numberValue(r.debit, 3)}</td><td class="num">${numberValue(r.credit, 3)}</td><td class="num">${numberValue(Math.abs(r.balance), 3)}</td><td>${r.balance < 0 ? "Cr" : "Dr"}</td></tr>`).join("") : `<tr class="empty"><td colspan="8">No records</td></tr>`}</tbody>${financialReportOptions.shown ? `<tfoot><tr><td colspan="3"></td><td>Total</td><td class="num">${numberValue(report.totalDebit, 3)}</td><td class="num">${numberValue(report.totalCredit, 3)}</td><td class="num">${numberValue(Math.abs(report.closing), 3)}</td><td>${report.closing < 0 ? "Cr" : "Dr"}</td></tr><tr><td colspan="3"></td><td>Balance Amount</td><td class="num">${report.closing >= 0 ? numberValue(report.closing, 3) : ""}</td><td class="num">${report.closing < 0 ? numberValue(Math.abs(report.closing), 3) : ""}</td><td></td><td></td></tr></tfoot>` : ""}</table></div></div></section>`;
+}
+
+function ledgerReportScreen() {
+  return selectedLedgerAccount ? ledgerStatementScreen() : ledgerAccountPickerScreen();
+}
+
+function ledgerAccountPickerScreen() {
+  const query = ledgerAccountSearch.trim().toLowerCase(), accounts = ledgerAccountCandidates().filter((r) => !query || `${r.name} ${r.id} ${r.mobile}`.toLowerCase().includes(query));
+  return `<section class="ledger-picker panel"><div class="ledger-picker-controls"><label><span>Date From</span><input type="date" data-ledger-date-field="from" value="${toDateInputValue(financialReportOptions.from)}" /></label><button data-action="ledger-today">Today</button><label><span>Date To</span><input type="date" data-ledger-date-field="to" value="${toDateInputValue(financialReportOptions.to)}" /></label><button data-action="ledger-term">Term</button><label><span>Cost Center</span><select disabled><option>cost1</option></select></label><span></span><label class="ledger-account-search"><span>Account Head</span><input data-ledger-account-search value="${escapeHtml(ledgerAccountSearch)}" placeholder="Search Acc Name, ID or mobile" autocomplete="off" /></label></div><div class="ledger-picker-grid-wrap"><table class="ledger-picker-grid"><thead><tr><th></th><th>AccID</th><th>AccName</th><th>Mobile</th><th>Ledger Balance</th><th>Dr/Cr</th><th>Cost Center</th><th>Source</th></tr></thead><tbody>${accounts.length ? accounts.map((r) => { const balance = ledgerReportData(r.name).closing, activeRow = ledgerPickerSelection === r.name ? "selected" : ""; return `<tr class="${activeRow}" data-ledger-account="${escapeHtml(r.name)}"><td>›</td><td>${escapeHtml(r.id)}</td><td>${escapeHtml(r.name)}</td><td>${escapeHtml(r.mobile)}</td><td class="num">${numberValue(Math.abs(balance), 3)}</td><td>${balance < 0 ? "Cr" : "Dr"}</td><td>cost1</td><td>${escapeHtml(r.source)}</td></tr>`; }).join("") : `<tr><td colspan="8">No matching accounts</td></tr>`}</tbody></table></div><footer><button class="secondary" data-financial-report-home>Cancel</button><button class="primary" data-action="ledger-open" ${ledgerPickerSelection ? "" : "disabled"}>OK</button></footer></section>`;
+}
+
+function ledgerStatementScreen() {
+  const report = ledgerReportData(), pages = Math.max(1, Math.ceil(report.rows.length / financialReportOptions.pageSize)), page = Math.min(financialReportOptions.page, pages - 1), visible = financialReportOptions.shown ? report.rows.slice(page * financialReportOptions.pageSize, (page + 1) * financialReportOptions.pageSize) : [];
+  return `<section class="financial-report-view ledger-statement-report">${financialReportToolbar()}<button class="financial-report-back" data-action="ledger-change-account">← Change account</button><div class="financial-report-paper ${financialReportOptions.a4 ? "a4" : ""}" style="--financial-zoom:${financialReportOptions.zoom}"><header><h3>***MT GOLD LAND***</h3><h4>M.T.PLAZA, OOTY ROAD</h4><h2>${escapeHtml(selectedLedgerAccount)} - Ledger Statement From ${financialReportOptions.from} To ${financialReportOptions.to}</h2></header><div class="cash-book-page-status">Page ${page + 1} of ${pages}</div><div class="cash-book-grid-wrap"><table class="cash-book-grid"><thead><tr><th>SL</th><th>Date</th><th>Vou.No</th><th>Particular</th><th>Debit Amt</th><th>Credit Amt</th><th>Balance</th><th>Cr/Dr</th></tr></thead><tbody>${visible.length ? visible.map((r, i) => `<tr><td>${page * financialReportOptions.pageSize + i + 1}</td><td>${r.date}</td><td>${escapeHtml(r.vouNo)}</td><td>${escapeHtml(r.particular)}</td><td class="num">${numberValue(r.debit, 3)}</td><td class="num">${numberValue(r.credit, 3)}</td><td class="num">${numberValue(Math.abs(r.balance), 3)}</td><td>${r.balance < 0 ? "Cr" : "Dr"}</td></tr>`).join("") : `<tr class="empty"><td colspan="8">No records</td></tr>`}</tbody>${financialReportOptions.shown ? `<tfoot><tr><td colspan="3"></td><td>Total</td><td class="num">${numberValue(report.totalDebit, 3)}</td><td class="num">${numberValue(report.totalCredit, 3)}</td><td class="num">${numberValue(Math.abs(report.closing), 3)}</td><td>${report.closing < 0 ? "Cr" : "Dr"}</td></tr></tfoot>` : ""}</table></div></div></section>`;
+}
+
+function handleFinancialReportAction(action) {
+  const report = selectedVoucherReport === "Chart Of Accounts" ? chartOfAccountsReportData() : selectedVoucherReport === "Journal Register" ? journalRegisterReportData() : selectedVoucherReport === "Receipts / Payments" ? receiptsPaymentsReportConfig() : selectedVoucherReport === "Account List" ? accountListReportData() : selectedVoucherReport === "Day Book" ? dayBookReportData() : selectedVoucherReport === "Day Account Transactions" ? dayAccountReportConfig() : selectedFinancialReport === "Bank Book" ? bankBookReportData() : selectedFinancialReport === "Ledger" && selectedLedgerAccount ? ledgerReportData() : cashBookReportData(), pages = Math.max(1, Math.ceil(report.rows.length / financialReportOptions.pageSize));
+  if (action === "financial-show") financialReportOptions = { ...financialReportOptions, shown: true, dateOpen: false, page: 0 };
+  if (action === "financial-view-hide") financialReportOptions = { ...financialReportOptions, shown: !financialReportOptions.shown };
+  if (action === "financial-date") financialReportOptions = { ...financialReportOptions, dateOpen: !financialReportOptions.dateOpen };
+  if (action === "financial-date-cancel") financialReportOptions = { ...financialReportOptions, dateOpen: false };
+  if (action === "financial-date-set") {
+    const from = toDateInputValue(financialReportOptions.from), to = toDateInputValue(financialReportOptions.to);
+    if (from > to) { toast("From date cannot be after To date."); return; }
+    financialReportOptions = { ...financialReportOptions, dateOpen: false, shown: true, page: 0 };
+  }
+  if (action === "financial-first") financialReportOptions = { ...financialReportOptions, page: 0 };
+  if (action === "financial-prev") financialReportOptions = { ...financialReportOptions, page: Math.max(0, financialReportOptions.page - 1) };
+  if (action === "financial-next") financialReportOptions = { ...financialReportOptions, page: Math.min(pages - 1, financialReportOptions.page + 1) };
+  if (action === "financial-last") financialReportOptions = { ...financialReportOptions, page: pages - 1 };
+  if (action === "financial-zoom-in") financialReportOptions = { ...financialReportOptions, zoom: Math.min(1.5, financialReportOptions.zoom + 0.1) };
+  if (action === "financial-zoom-out") financialReportOptions = { ...financialReportOptions, zoom: Math.max(0.7, financialReportOptions.zoom - 0.1) };
+  if (action === "financial-zoom-default") financialReportOptions = { ...financialReportOptions, zoom: 1 };
+  if (action === "financial-close") { if (selectedVoucherReport) selectedVoucherReport = ""; else selectedFinancialReport = ""; financialReportOptions = { ...financialReportOptions, dateOpen: false }; }
+  if (action === "financial-print") { openFinancialPrintPreview(); return; }
+  if (action === "financial-excel") { exportFinancialReportXlsx(); return; }
+  if (action === "financial-save-as") { openFinancialSaveAs(); return; }
+  render();
+}
+
+function financialExportRows() {
+  if (selectedVoucherReport === "Journal Register") { const report = journalRegisterReportData(); return [["Date", "Type", "Voucher No", "AccID", "Account Name", "Account Type", "Debit", "Credit", "Balance", "Remark", "Narration"], ...report.rows.map((r) => [r.date, r.voucherType, r.invoiceNo, r.accountId, r.accountName, r.accountType, r.debit, r.credit, r.balance, r.remark, r.narration])]; }
+  if (selectedVoucherReport === "Chart Of Accounts") { const report = chartOfAccountsReportData(); return [["Final Account", "Schedule", "Sub-schedule", "AccID", "Name", "Debit", "Credit", "Balance", "Dr/Cr"], ...report.rows.map((r) => [r.finalAccount, r.schedule, r.subSchedule, r.id, r.name, r.debit, r.credit, Math.abs(r.balance), r.balance < 0 ? "Cr" : "Dr"])]; }
+  if (selectedVoucherReport === "Receipts / Payments") { const config = receiptsPaymentsReportConfig(); return [config.columns, ...config.rows]; }
+  if (selectedVoucherReport === "Account List") { const data = accountListReportData(); return [["Group", "Account", "Code", "Opening", "Opening Dr/Cr", "Period Debit", "Period Credit", "Closing", "Closing Dr/Cr"], ...data.rows.map((r) => [r.group, r.name, r.id, Math.abs(r.opening), r.opening < 0 ? "Cr" : "Dr", r.debit, r.credit, Math.abs(r.closing), r.closing < 0 ? "Cr" : "Dr"])]; }
+  if (selectedVoucherReport === "Day Book") { const report = dayBookReportData(); return [["SL", "Date", "Vou.No", "Particular", "Debit", "Credit", "DrWeight", "CrWeight"], ...report.rows.map((r, i) => [i + 1, r.date, r.vouNo, r.particular, r.debit, r.credit, r.drWeight, r.crWeight]), ["", "", "", "Total", report.totalDebit, report.totalCredit, report.totalDrWeight, report.totalCrWeight]]; }
+  if (selectedVoucherReport === "Day Account Transactions") { if (dayAccountView === "Business Report") { const data = businessReportData(), rows = []; BUSINESS_REPORT_GROUPS.forEach((group) => group.activities.map((name) => data.activities.get(name)).filter((r) => r && (r.count || r.moneyIn || r.moneyOut || /^Opening/.test(r.name))).forEach((r) => rows.push([group.label, r.name, r.count, r.moneyIn, r.moneyOut, r.net, r.note]))); return [["Section", "Activity", "Transactions", "Money In", "Money Out", "Net Movement", "Notes"], ...rows]; } const config = dayAccountReportConfig(); return [config.columns, ...config.rows]; }
+  const report = selectedFinancialReport === "Bank Book" ? bankBookReportData() : selectedFinancialReport === "Ledger" && selectedLedgerAccount ? ledgerReportData() : cashBookReportData();
+  return [["SL", "Date", "Vou.No", "Particular", "Debit Amt", "Credit Amt", "Balance", "Cr/Dr"], ...report.rows.map((r, i) => [i + 1, r.date, r.vouNo, r.particular, r.debit, r.credit, Math.abs(r.balance), r.balance < 0 ? "Cr" : "Dr"]), ["", "", "", "Total", report.totalDebit, report.totalCredit, Math.abs(report.closing), report.closing < 0 ? "Cr" : "Dr"]];
+}
+
+function openFinancialPrintPreview() {
+  const paper = document.querySelector(".financial-report-paper, .business-report-content")?.outerHTML || document.querySelector(".business-report")?.outerHTML || "";
+  document.body.insertAdjacentHTML("beforeend", `<div class="modal-backdrop financial-print-backdrop"><section class="financial-print-preview"><header><div><p class="eyebrow">A4 print preview</p><h2>${escapeHtml(selectedVoucherReport || selectedFinancialReport)}</h2></div><button class="icon-close" data-action="close-modal">×</button></header><div class="financial-print-sheet">${paper}</div><footer><button class="secondary" data-action="close-modal">Close</button><button class="primary" data-action="financial-browser-print">Print / Save PDF</button></footer></section></div>`);
+  document.querySelectorAll("[data-action='close-modal']").forEach((b) => b.addEventListener("click", closeModal));
+  document.querySelector("[data-action='financial-browser-print']")?.addEventListener("click", () => window.print());
+}
+
+function openFinancialSaveAs() {
+  document.body.insertAdjacentHTML("beforeend", `<div class="modal-backdrop"><form class="modal financial-save-modal" data-financial-save-form><div class="modal-titlebar"><div><p class="eyebrow">Save report</p><h2>Save As</h2><p>Choose the output format and file name.</p></div><button type="button" class="icon-close" data-action="close-modal">×</button></div><div class="form-grid"><label><span>File name</span><input name="filename" value="${(selectedVoucherReport || selectedFinancialReport).replace(/\s+/g, "-").toLowerCase()}-${toDateInputValue(financialReportOptions.to)}" required /></label><label><span>Format</span><select name="format"><option value="xlsx">Excel Workbook (.xlsx)</option><option value="csv">CSV (.csv)</option><option value="pdf">PDF via print preview</option></select></label></div><footer><button type="button" class="secondary" data-action="close-modal">Cancel</button><button class="primary">Continue</button></footer></form></div>`);
+  document.querySelectorAll("[data-action='close-modal']").forEach((b) => b.addEventListener("click", closeModal));
+  document.querySelector("[data-financial-save-form]")?.addEventListener("submit", (event) => { event.preventDefault(); const data = new FormData(event.currentTarget), format = data.get("format"), filename = String(data.get("filename") || "financial-report"); closeModal(); if (format === "xlsx") exportFinancialReportXlsx(filename); else if (format === "csv") exportFinancialReportCsv(filename); else openFinancialPrintPreview(); });
+}
+
+function exportFinancialReportCsv(filename = selectedVoucherReport === "Chart Of Accounts" ? "chart-of-accounts" : selectedVoucherReport === "Journal Register" ? "journal-register" : selectedVoucherReport === "Receipts / Payments" ? receiptPaymentView.replace(/\s*&\s*|\s+/g, "-").toLowerCase() : selectedVoucherReport === "Account List" ? "account-list" : selectedVoucherReport === "Day Account Transactions" ? dayAccountView.replace(/\s+/g, "-").toLowerCase() : selectedVoucherReport === "Day Book" ? "day-book" : selectedFinancialReport === "Ledger" ? `ledger-${selectedLedgerAccount.replace(/\s+/g, "-").toLowerCase()}` : selectedFinancialReport === "Bank Book" ? "bank-book" : "cash-book") {
+  const csv = financialExportRows().map((row) => row.map((v) => `"${String(v ?? "").replaceAll('"', '""')}"`).join(",")).join("\r\n");
+  downloadBlob(new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" }), `${filename}.csv`);
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob), link = document.createElement("a");
+  link.href = url; link.download = filename; document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function exportFinancialReportXlsx(filename = selectedVoucherReport === "Chart Of Accounts" ? "chart-of-accounts" : selectedVoucherReport === "Journal Register" ? "journal-register" : selectedVoucherReport === "Receipts / Payments" ? receiptPaymentView.replace(/\s*&\s*|\s+/g, "-").toLowerCase() : selectedVoucherReport === "Account List" ? "account-list" : selectedVoucherReport === "Day Account Transactions" ? dayAccountView.replace(/\s+/g, "-").toLowerCase() : selectedVoucherReport === "Day Book" ? "day-book" : selectedFinancialReport === "Ledger" ? `ledger-${selectedLedgerAccount.replace(/\s+/g, "-").toLowerCase()}` : selectedFinancialReport === "Bank Book" ? "bank-book" : "cash-book") {
+  const rows = financialExportRows(), encoder = new TextEncoder();
+  const esc = (v) => escapeHtml(String(v ?? ""));
+  const col = (n) => { let s = ""; for (n++; n; n = Math.floor((n - 1) / 26)) s = String.fromCharCode(65 + (n - 1) % 26) + s; return s; };
+  const sheetRows = rows.map((row, ri) => `<row r="${ri + 1}">${row.map((value, ci) => { const ref = `${col(ci)}${ri + 1}`, style = ri === 0 || ri === rows.length - 1 ? 1 : (ci >= 4 && ci <= 6 ? 2 : 0); return typeof value === "number" ? `<c r="${ref}" s="${style}"><v>${value}</v></c>` : `<c r="${ref}" s="${style}" t="inlineStr"><is><t>${esc(value)}</t></is></c>`; }).join("")}</row>`).join("");
+  const files = {
+    "[Content_Types].xml": `<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`,
+    "_rels/.rels": `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`,
+    "xl/workbook.xml": `<?xml version="1.0"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${selectedVoucherReport === "Chart Of Accounts" ? "Chart Of Accounts" : selectedVoucherReport === "Journal Register" ? "Journal Register" : selectedVoucherReport === "Receipts / Payments" ? receiptPaymentView.replace(" & ", "-") : selectedVoucherReport === "Account List" ? "Account List" : selectedVoucherReport === "Day Account Transactions" ? "Day Account" : selectedVoucherReport === "Day Book" ? "Day Book" : selectedFinancialReport === "Ledger" ? "Ledger" : selectedFinancialReport === "Bank Book" ? "Bank Book" : "Cash Book"}" sheetId="1" r:id="rId1"/></sheets></workbook>`,
+    "xl/_rels/workbook.xml.rels": `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`,
+    "xl/styles.xml": `<?xml version="1.0"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="10"/><name val="Arial"/></font><font><b/><sz val="10"/><name val="Arial"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="3"><xf fontId="0"/><xf fontId="1" applyFont="1"/><xf fontId="0" numFmtId="4" applyNumberFormat="1"/></cellXfs></styleSheet>`,
+    "xl/worksheets/sheet1.xml": `<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols><col min="1" max="1" width="7" customWidth="1"/><col min="2" max="3" width="15" customWidth="1"/><col min="4" max="4" width="45" customWidth="1"/><col min="5" max="8" width="16" customWidth="1"/></cols><sheetData>${sheetRows}</sheetData><pageSetup paperSize="9" orientation="landscape" fitToWidth="1"/></worksheet>`
+  };
+  downloadBlob(createStoredZip(Object.entries(files).map(([name, value]) => [name, encoder.encode(value)])), `${filename}.xlsx`);
+  toast("Excel workbook downloaded.");
+}
+
+function createStoredZip(files) {
+  const chunks = [], central = []; let offset = 0;
+  const u16 = (n) => [n & 255, (n >>> 8) & 255], u32 = (n) => [n & 255, (n >>> 8) & 255, (n >>> 16) & 255, (n >>> 24) & 255];
+  files.forEach(([name, data]) => { const nameBytes = new TextEncoder().encode(name), crc = crc32(data); const local = new Uint8Array([...u32(0x04034b50), ...u16(20), ...u16(0), ...u16(0), ...u16(0), ...u16(0), ...u32(crc), ...u32(data.length), ...u32(data.length), ...u16(nameBytes.length), ...u16(0), ...nameBytes]); chunks.push(local, data); central.push(new Uint8Array([...u32(0x02014b50), ...u16(20), ...u16(20), ...u16(0), ...u16(0), ...u16(0), ...u16(0), ...u32(crc), ...u32(data.length), ...u32(data.length), ...u16(nameBytes.length), ...u16(0), ...u16(0), ...u16(0), ...u16(0), ...u32(0), ...u32(offset), ...nameBytes])); offset += local.length + data.length; });
+  const centralSize = central.reduce((s, c) => s + c.length, 0), end = new Uint8Array([...u32(0x06054b50), ...u16(0), ...u16(0), ...u16(files.length), ...u16(files.length), ...u32(centralSize), ...u32(offset), ...u16(0)]);
+  return new Blob([...chunks, ...central, end], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+}
+
+function crc32(data) {
+  let crc = -1; for (const byte of data) { crc ^= byte; for (let i = 0; i < 8; i++) crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1)); } return (crc ^ -1) >>> 0;
+}
+
 function reportsHomePlaceholder() {
   return `
     <section class="panel reports-home-placeholder">
@@ -11236,11 +11843,46 @@ function salesReportToolbar() {
 function salesDatePopup() {
   return `
     <div class="sales-date-popup">
+      <div class="sales-date-popup-head" data-sales-date-drag-handle title="Drag to move">
+        <strong>Date Range</strong><span aria-hidden="true">⠿</span>
+      </div>
       <label><span>From</span><input data-sales-date-field="from" value="${escapeHtml(displaySalesDate(salesReportOptions.from))}" /><button data-action="sales-date-prev">◄</button></label>
       <label><span>To</span><input data-sales-date-field="to" value="${escapeHtml(displaySalesDate(salesReportOptions.to))}" /><button data-action="sales-date-today">▲</button></label>
       <button class="sales-date-set" data-action="sales-date-set">SET</button>
     </div>
   `;
+}
+
+function bindDraggableSalesDatePopup() {
+  const popup = document.querySelector(".sales-date-popup");
+  const handle = popup?.querySelector("[data-sales-date-drag-handle]");
+  if (!popup || !handle) return;
+  handle.addEventListener("pointerdown", (event) => {
+    if (event.button !== undefined && event.button !== 0) return;
+    event.preventDefault();
+    const parent = popup.offsetParent || popup.parentElement;
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const startLeft = popup.offsetLeft;
+    const startTop = popup.offsetTop;
+    popup.style.right = "auto";
+    handle.setPointerCapture?.(event.pointerId);
+    const move = (moveEvent) => {
+      const maxLeft = Math.max(0, (parent?.clientWidth || window.innerWidth) - popup.offsetWidth);
+      const reportHeight = parent?.closest(".classic-stock-report")?.clientHeight || window.innerHeight;
+      const maxTop = Math.max(0, reportHeight - popup.offsetHeight);
+      popup.style.left = `${Math.min(maxLeft, Math.max(0, startLeft + moveEvent.clientX - startX))}px`;
+      popup.style.top = `${Math.min(maxTop, Math.max(0, startTop + moveEvent.clientY - startY))}px`;
+    };
+    const stop = () => {
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", stop);
+      handle.removeEventListener("pointercancel", stop);
+    };
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", stop);
+    handle.addEventListener("pointercancel", stop);
+  });
 }
 
 function salesReportDisplayTitle(option) {
@@ -16410,6 +17052,7 @@ function select(name, label, options, selectedValue = "") {
 }
 
 function bindEvents() {
+  bindDraggableSalesDatePopup();
   document.getElementById("loginForm")?.addEventListener("submit", (event) => {
     event.preventDefault();
     const password = new FormData(event.currentTarget).get("password");
@@ -16451,6 +17094,53 @@ function bindEvents() {
       selectReport(button.dataset.reportItem);
       render();
     });
+  });
+
+  document.querySelectorAll("[data-financial-report]").forEach((button) => {
+    button.addEventListener("click", () => {
+      active = "Financial Reports";
+      expandedNavGroups.add("Financial Reports");
+      selectedFinancialReport = button.dataset.financialReport;
+      if (selectedFinancialReport === "Ledger") { selectedLedgerAccount = ""; ledgerPickerSelection = ""; }
+      if (selectedFinancialReport === "Voucher Reports") selectedVoucherReport = "";
+      renderScreen();
+    });
+  });
+  document.querySelectorAll("[data-voucher-report]").forEach((button) => {
+    button.addEventListener("click", () => { active = "Financial Reports"; selectedFinancialReport = "Voucher Reports"; selectedVoucherReport = button.dataset.voucherReport; expandedNavGroups.add("Financial Reports"); renderScreen(); });
+  });
+  document.querySelectorAll("[data-voucher-report-home]").forEach((button) => {
+    button.addEventListener("click", () => { selectedVoucherReport = ""; renderScreen(); });
+  });
+  document.querySelector("[data-day-account-view]")?.addEventListener("change", (event) => { dayAccountView = event.currentTarget.value; financialReportOptions = { ...financialReportOptions, page: 0, shown: true }; render(); });
+  document.querySelector("[data-account-list-search]")?.addEventListener("input", (event) => { accountListOptions = { ...accountListOptions, search: event.currentTarget.value }; financialReportOptions = { ...financialReportOptions, page: 0 }; renderAndFocus("[data-account-list-search]"); });
+  document.querySelector("[data-account-list-group]")?.addEventListener("change", (event) => { accountListOptions = { ...accountListOptions, group: event.currentTarget.value }; financialReportOptions = { ...financialReportOptions, page: 0 }; render(); });
+  document.querySelector("[data-account-list-hide-zero]")?.addEventListener("change", (event) => { accountListOptions = { ...accountListOptions, hideZero: event.currentTarget.checked }; financialReportOptions = { ...financialReportOptions, page: 0 }; render(); });
+  document.querySelector("[data-receipt-payment-view]")?.addEventListener("change", (event) => { receiptPaymentView = event.currentTarget.value; financialReportOptions = { ...financialReportOptions, page: 0, shown: true }; render(); });
+  document.querySelector("[data-chart-account-search]")?.addEventListener("input", (event) => { chartAccountOptions = { ...chartAccountOptions, search: event.currentTarget.value }; financialReportOptions = { ...financialReportOptions, page: 0 }; renderAndFocus("[data-chart-account-search]"); });
+  document.querySelector("[data-chart-final-account]")?.addEventListener("change", (event) => { chartAccountOptions = { ...chartAccountOptions, finalAccount: event.currentTarget.value }; financialReportOptions = { ...financialReportOptions, page: 0 }; render(); });
+  document.querySelector("[data-chart-hide-zero]")?.addEventListener("change", (event) => { chartAccountOptions = { ...chartAccountOptions, hideZero: event.currentTarget.checked }; financialReportOptions = { ...financialReportOptions, page: 0 }; render(); });
+  document.querySelectorAll("[data-financial-report-home]").forEach((button) => {
+    button.addEventListener("click", () => { selectedFinancialReport = ""; renderScreen(); });
+  });
+  document.querySelectorAll("[data-financial-date-field]").forEach((input) => {
+    input.addEventListener("change", () => { financialReportOptions = { ...financialReportOptions, [input.dataset.financialDateField]: formatDisplayDate(input.value), shown: false, page: 0 }; render(); });
+  });
+  document.querySelector("[data-financial-a4]")?.addEventListener("change", (event) => {
+    financialReportOptions = { ...financialReportOptions, a4: event.currentTarget.checked };
+    render();
+  });
+  document.querySelector("[data-ledger-account-search]")?.addEventListener("input", (event) => {
+    ledgerAccountSearch = event.currentTarget.value;
+    renderAndFocus("[data-ledger-account-search]");
+  });
+  document.querySelectorAll("[data-ledger-date-field]").forEach((input) => input.addEventListener("change", () => {
+    financialReportOptions = { ...financialReportOptions, [input.dataset.ledgerDateField]: formatDisplayDate(input.value), page: 0 };
+    render();
+  }));
+  document.querySelectorAll("[data-ledger-account]").forEach((row) => {
+    row.addEventListener("click", () => { ledgerPickerSelection = row.dataset.ledgerAccount; render(); });
+    row.addEventListener("dblclick", () => { selectedLedgerAccount = row.dataset.ledgerAccount; financialReportOptions = { ...financialReportOptions, shown: true, page: 0 }; render(); });
   });
 
   document.querySelectorAll("[data-stock-report-option]").forEach((input) => {
@@ -16625,8 +17315,9 @@ function bindEvents() {
         reportSearch = "";
         if (!selectedReport) selectedReport = "Sales";
       }
+      if (clicked === "Financial Reports" && active !== "Financial Reports") selectedFinancialReport = "";
       active = clicked;
-      render();
+      renderScreen();
     });
   });
 
@@ -16635,7 +17326,7 @@ function bindEvents() {
       active = "Management";
       expandedNavGroups.add("Management");
       managementView = button.dataset.management;
-      render();
+      renderScreen();
     });
   });
 
@@ -16664,7 +17355,7 @@ function bindEvents() {
       active = "Sales";
       expandedNavGroups.add("Sales");
       salesView = button.dataset.salesSection;
-      render();
+      renderScreen();
     });
   });
 
@@ -16673,7 +17364,7 @@ function bindEvents() {
       active = "Purchase";
       expandedNavGroups.add("Purchase");
       purchaseView = button.dataset.purchaseSection;
-      render();
+      renderScreen();
     });
   });
 
@@ -16686,7 +17377,7 @@ function bindEvents() {
       active = "Stock";
       expandedNavGroups.add("Stock");
       stockView = button.dataset.stockSection;
-      render();
+      renderScreen();
     });
   });
 
@@ -21143,6 +21834,14 @@ function removeDiscount(button) {
 }
 
 function handleAction(action, source) {
+  if (action.startsWith("financial-")) {
+    handleFinancialReportAction(action);
+    return;
+  }
+  if (action === "ledger-today") { const today = formatDisplayDate(new Date()); financialReportOptions = { ...financialReportOptions, from: today, to: today, page: 0 }; render(); return; }
+  if (action === "ledger-term") { const now = new Date(), year = now.getMonth() < 3 ? now.getFullYear() - 1 : now.getFullYear(); financialReportOptions = { ...financialReportOptions, from: `01/04/${year}`, to: `31/03/${year + 1}`, page: 0 }; render(); return; }
+  if (action === "ledger-open") { if (!ledgerPickerSelection) return; selectedLedgerAccount = ledgerPickerSelection; financialReportOptions = { ...financialReportOptions, shown: true, page: 0 }; render(); return; }
+  if (action === "ledger-change-account") { selectedLedgerAccount = ""; render(); return; }
   if (action === "logout") {
     authenticated = false;
     sessionStorage.removeItem("goldland-authenticated");
@@ -23558,6 +24257,7 @@ function icon(name) {
     Staffs: "M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm8 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM3 21a5 5 0 0 1 10 0M11 21a5 5 0 0 1 10 0",
     Schemes: "M12 3v18M5 8h14M7 16h10",
     Accounts: "M4 4h16v16H4V4Zm4 4h8M8 12h8M8 16h5",
+    "Financial Reports": "M4 20V10m5 10V4m5 16v-7m5 7V7M3 20h18",
     Reports: "M5 3h10l4 4v14H5V3Zm9 0v5h5",
     "Complimentary Item": "M4 7h16v10H4V7Zm2 3h5v2H6v-2Zm7 0h5v2h-5v-2ZM6 14h12"
   };
