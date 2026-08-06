@@ -72,7 +72,11 @@ const REPORT_ROOT_MENU_ITEMS = [
   { label: "Purchase Return" },
   { label: "Direct Gold Purchase" },
   { label: "Direct Gold Purchase Return" },
-  { label: "Diamond", hasSubmenu: true },
+  { label: "Diamond", hasSubmenu: true, children: [
+    { label: "Purchase", target: "Diamond Purchase" },
+    { label: "Purchase Return", target: "Diamond Purchase Return" },
+    { label: "Sales", target: "Diamond Sales" }
+  ] },
   { label: "Stock Adjustment" },
   { label: "Transfers", hasSubmenu: true },
   { label: "Sample Issue/Return" },
@@ -202,7 +206,7 @@ const REPORT_MENU_GROUPS = [
   { title: "Stock", items: ["CurrentStock", ...STOCK_CURRENT_REPORTS, "Opening Stock", "Stock Reconciliation", "Reconciliation Crosstab", "Stock Ledger", "Smith/Jeweller Stock"] },
   { title: "Sales", items: ["Sales", "Sales Profit", "Sales Return", "Exchange", "Sales Order"] },
   { title: "Purchase", items: ["Purchase", "Purchase Return", "Direct Gold Purchase", "Direct Gold Purchase Return"] },
-  { title: "Diamond", items: ["Diamond"] },
+  { title: "Diamond", items: ["Diamond", "Diamond Purchase", "Diamond Purchase Return", "Diamond Sales"] },
   { title: "Transfers", items: ["Transfers"] },
   { title: "Barcode", items: ["Barcode Entry", "Barcode/HUID Stock Report"] },
   { title: "Tax", items: ["Tax Reports", "GST Invoice Export"] },
@@ -583,6 +587,9 @@ let selectedLedgerAccount = "";
 let ledgerPickerSelection = "";
 let ledgerAccountSearch = "";
 let selectedVoucherReport = "";
+let trialBalanceView = "General";
+let trialBalanceMeasure = "Both";
+let trialBalance22Ct = false;
 let dayAccountView = "Voucher Summary";
 let accountListOptions = { search: "", group: "All Groups", hideZero: false };
 let receiptPaymentView = "Receipt";
@@ -602,7 +609,13 @@ let salesReportOptions = {
   profitZoom: 1,
   profitCompact: false,
   returnReportOption: "Sales Return Report",
-  exchangeReportOption: "Register"
+  exchangeReportOption: "Register",
+  purchaseReportOption: "Purchase Register",
+  purchaseReturnReportOption: "Purchase Return Register",
+  directGoldPurchaseReportOption: "Purchase Register",
+  directGoldPurchaseReturnReportOption: "Purchase Return Register"
+  ,diamondPurchaseReportOption: "Purchase Register"
+  ,diamondSalesMode: "detailed"
 };
 let classicColumnMenu = null;
 let classicColumnFilters = {};
@@ -1530,6 +1543,9 @@ function normalizeBillLine(line, fallbackAmount = 0, bill = {}, sectionKey = "sa
     vaDiscountPct: Number(line.vaDiscountPct || line.vaDisPct || 0),
     vaAfterDiscount: Number(line.vaAfterDiscount || 0),
     dmdAmount: Number(line.dmdAmount || 0),
+    dmdWgt: Number(line.dmdWgt || line.diamondWeight || line.dmdCarat || 0),
+    dmdCaratType: line.dmdCaratType || line.diamondType || line.ct || "Cnt",
+    dmdPcs: Number(line.dmdPcs || line.diamondPieces || line.pcs || 0),
     discount: Number(line.discount || 0),
     taxPct: Number(line.taxPct || 3),
     tax: Number(line.tax || 0),
@@ -1853,6 +1869,16 @@ function normalizeDmdWholesaleLine(line = {}, options = {}) {
     stnSPrice: Number(line.stnSPrice || 0),
     purMc: Number(line.purMc || 0),
     salesMc: Number(line.salesMc || 0)
+    ,dmdType: line.dmdType || line.diamondType || line.ct || "Cnt"
+    ,dmdPcs: Number(line.dmdPcs || line.diamondPieces || line.pcs || 0)
+    ,dmdSalesRate: Number(line.dmdSalesRate || line.salesDiamondRate || 0)
+    ,dmdSalesAmount: Number(line.dmdSalesAmount || line.diamondSalesAmount || 0)
+    ,colorType: line.colorType || ""
+    ,colorScale: line.colorScale || ""
+    ,dmdShape: line.dmdShape || line.shape || ""
+    ,dmdCut: line.dmdCut || line.cut || ""
+    ,dmdClarity: line.dmdClarity || line.clarity || ""
+    ,dmdSieve: line.dmdSieve || line.sieveSize || ""
   };
   return calculateDmdWholesaleLine(normalized, options);
 }
@@ -3984,6 +4010,7 @@ function sidebar() {
                 ${item.hasSubmenu ? `<span class="report-root-arrow">›</span>` : ""}
               </button>
             `).join("")}
+            ${diamondReportNavigation("sidebar")}
           </div>
         </div>
         ${nav.slice(1).map((item) => `<button class="nav ${active === item ? "active" : ""}" data-nav="${item}">${icon(item)}<span>${item}</span></button>`).join("")}
@@ -4036,7 +4063,19 @@ function reportsTopDropdown() {
             ${item.hasSubmenu ? `<span class="top-report-arrow">›</span>` : ""}
           </button>
         `).join("")}
+        ${diamondReportNavigation("top")}
       </div>
+    </div>
+  `;
+}
+
+function diamondReportNavigation(placement = "sidebar") {
+  const options = REPORT_ROOT_MENU_ITEMS.find((item) => item.label === "Diamond")?.children || [];
+  const open = selectedReport === "Diamond" || options.some((item) => item.target === selectedReport);
+  if (!open) return "";
+  return `
+    <div class="diamond-report-cascade ${placement}" aria-label="Diamond reports">
+      ${options.map((item) => `<button class="${selectedReport === item.target ? "active" : ""}" data-report-item="${escapeHtml(item.target)}"><span class="classic-menu-chevron">»</span><span>${escapeHtml(item.label)}</span></button>`).join("")}
     </div>
   `;
 }
@@ -10651,6 +10690,8 @@ function financialReportView(name) {
   if (name === "Bank Book") return bankBookReportScreen();
   if (name === "Ledger") return ledgerReportScreen();
   if (name === "Voucher Reports") return voucherReportsScreen();
+  if (name === "Trial Balance") return trialBalanceReportScreen();
+  if (name === "Opening Balance") return openingBalanceReportScreen();
   return `<section class="financial-report-view">${financialReportToolbar()}<div class="financial-report-view-card"><div class="financial-report-view-heading"><span class="financial-report-icon">${financialReportGlyph(name)}</span><div><p class="eyebrow">Financial report</p><h2>${escapeHtml(name)}</h2><p>${financialReportDescription(name)}</p></div></div><div class="financial-report-coming"><strong>Report workspace ready</strong><p>This screen uses the shared financial-report controls. Its accounting-specific columns will be implemented when we enter this report.</p></div></div></section>`;
 }
 
@@ -11071,8 +11112,84 @@ function ledgerStatementScreen() {
   return `<section class="financial-report-view ledger-statement-report">${financialReportToolbar()}<button class="financial-report-back" data-action="ledger-change-account">← Change account</button><div class="financial-report-paper ${financialReportOptions.a4 ? "a4" : ""}" style="--financial-zoom:${financialReportOptions.zoom}"><header><h3>***MT GOLD LAND***</h3><h4>M.T.PLAZA, OOTY ROAD</h4><h2>${escapeHtml(selectedLedgerAccount)} - Ledger Statement From ${financialReportOptions.from} To ${financialReportOptions.to}</h2></header><div class="cash-book-page-status">Page ${page + 1} of ${pages}</div><div class="cash-book-grid-wrap"><table class="cash-book-grid"><thead><tr><th>SL</th><th>Date</th><th>Vou.No</th><th>Particular</th><th>Debit Amt</th><th>Credit Amt</th><th>Balance</th><th>Cr/Dr</th></tr></thead><tbody>${visible.length ? visible.map((r, i) => `<tr><td>${page * financialReportOptions.pageSize + i + 1}</td><td>${r.date}</td><td>${escapeHtml(r.vouNo)}</td><td>${escapeHtml(r.particular)}</td><td class="num">${numberValue(r.debit, 3)}</td><td class="num">${numberValue(r.credit, 3)}</td><td class="num">${numberValue(Math.abs(r.balance), 3)}</td><td>${r.balance < 0 ? "Cr" : "Dr"}</td></tr>`).join("") : `<tr class="empty"><td colspan="8">No records</td></tr>`}</tbody>${financialReportOptions.shown ? `<tfoot><tr><td colspan="3"></td><td>Total</td><td class="num">${numberValue(report.totalDebit, 3)}</td><td class="num">${numberValue(report.totalCredit, 3)}</td><td class="num">${numberValue(Math.abs(report.closing), 3)}</td><td>${report.closing < 0 ? "Cr" : "Dr"}</td></tr></tfoot>` : ""}</table></div></div></section>`;
 }
 
+function trialBalanceReportData() {
+  const accounts = accountListReportData(false).rows;
+  const to = toDateInputValue(financialReportOptions.to);
+  const weightByAccount = new Map();
+  dayBookPostingRows().filter((row) => row.sortDate <= to).forEach((row) => {
+    const key = String(row.account || row.particular || "").trim().toLowerCase();
+    weightByAccount.set(key, (weightByAccount.get(key) || 0) + Number(row.drWeight || 0) - Number(row.crWeight || 0));
+  });
+  const rows = accounts.map((account) => {
+    const meta = accountMeta(account.name);
+    const amountBalance = Number(account.closing || 0);
+    const recordedWeight = Number(weightByAccount.get(account.name.toLowerCase()) || 0);
+    const weightBalance = trialBalance22Ct ? recordedWeight * 24 / 22 : recordedWeight;
+    const generalGroup = account.group || "Other Accounts";
+    const subSchedule = meta.subSchedule || generalGroup;
+    return {
+      id: account.id || meta.id,
+      description: account.name,
+      group: trialBalanceView === "SubSchedule" ? subSchedule : generalGroup,
+      debit: amountBalance > 0 ? amountBalance : 0,
+      credit: amountBalance < 0 ? Math.abs(amountBalance) : 0,
+      drWeight: weightBalance > 0 ? weightBalance : 0,
+      crWeight: weightBalance < 0 ? Math.abs(weightBalance) : 0
+    };
+  }).filter((row) => Math.abs(row.debit) > .0005 || Math.abs(row.credit) > .0005 || Math.abs(row.drWeight) > .0005 || Math.abs(row.crWeight) > .0005)
+    .sort((a, b) => a.group.localeCompare(b.group) || a.description.localeCompare(b.description));
+  const groups = new Map();
+  rows.forEach((row) => { if (!groups.has(row.group)) groups.set(row.group, []); groups.get(row.group).push(row); });
+  const displayRows = [];
+  groups.forEach((groupRows, group) => {
+    displayRows.push({ kind: "group", description: group });
+    displayRows.push(...groupRows.map((row) => ({ ...row, kind: "account" })));
+    displayRows.push({ kind: "subtotal", description: `${group} Total`, debit: sumField(groupRows, "debit"), credit: sumField(groupRows, "credit"), drWeight: sumField(groupRows, "drWeight"), crWeight: sumField(groupRows, "crWeight") });
+  });
+  return { rows, displayRows, totalDebit: sumField(rows, "debit"), totalCredit: sumField(rows, "credit"), totalDrWeight: sumField(rows, "drWeight"), totalCrWeight: sumField(rows, "crWeight") };
+}
+
+function trialBalanceReportScreen() {
+  const report = trialBalanceReportData();
+  const pages = Math.max(1, Math.ceil(report.displayRows.length / financialReportOptions.pageSize));
+  const page = Math.min(financialReportOptions.page, pages - 1);
+  const visible = financialReportOptions.shown ? report.displayRows.slice(page * financialReportOptions.pageSize, (page + 1) * financialReportOptions.pageSize) : [];
+  const showAmount = trialBalanceMeasure !== "Weight", showWeight = trialBalanceMeasure !== "Amount";
+  const cells = (row) => `${showAmount ? `<td class="num">${row.debit ? numberValue(row.debit, 3) : ""}</td>` : ""}${showWeight ? `<td class="num">${row.drWeight ? numberValue(row.drWeight, 3) : ""}</td>` : ""}${showAmount ? `<td class="num">${row.credit ? numberValue(row.credit, 3) : ""}</td>` : ""}${showWeight ? `<td class="num">${row.crWeight ? numberValue(row.crWeight, 3) : ""}</td>` : ""}`;
+  const colspan = 2 + (showAmount ? 2 : 0) + (showWeight ? 2 : 0);
+  return `<section class="financial-report-view trial-balance-report">${financialReportToolbar()}<div class="trial-balance-controls"><label><span>View</span><select data-trial-balance-view><option ${trialBalanceView === "General" ? "selected" : ""}>General</option><option ${trialBalanceView === "SubSchedule" ? "selected" : ""}>SubSchedule</option></select></label><fieldset><legend>Display</legend>${["Amount", "Weight", "Both"].map((item) => `<label><input type="radio" name="trialBalanceMeasure" value="${item}" data-trial-balance-measure ${trialBalanceMeasure === item ? "checked" : ""}/> ${item}</label>`).join("")}</fieldset><label class="trial-balance-22ct"><input type="checkbox" data-trial-balance-22ct ${trialBalance22Ct ? "checked" : ""}/> 22 Ct weights</label></div><div class="financial-report-paper ${financialReportOptions.a4 ? "a4" : ""}" style="--financial-zoom:${financialReportOptions.zoom}"><header><h3>***MT GOLD LAND***</h3><h4>M.T.PLAZA, OOTY ROAD</h4><h2>Trial Balance To ${financialReportOptions.to}</h2><p>${trialBalanceView} · ${trialBalanceMeasure}${trialBalance22Ct ? " · 22 Ct weight basis" : ""}</p></header><div class="cash-book-page-status">Page ${page + 1} of ${pages}</div><div class="trial-balance-grid-wrap"><table class="trial-balance-grid"><thead><tr><th>ID</th><th>Description</th>${showAmount ? "<th>Debit</th>" : ""}${showWeight ? "<th>Dr Weight</th>" : ""}${showAmount ? "<th>Credit</th>" : ""}${showWeight ? "<th>Cr Weight</th>" : ""}</tr></thead><tbody>${visible.length ? visible.map((row) => row.kind === "group" ? `<tr class="group"><td></td><td colspan="${colspan - 1}">${escapeHtml(row.description)}</td></tr>` : `<tr class="${row.kind}"><td>${row.kind === "account" ? escapeHtml(row.id) : ""}</td><td>${escapeHtml(row.description)}</td>${cells(row)}</tr>`).join("") : `<tr><td colspan="${colspan}">No records</td></tr>`}</tbody>${financialReportOptions.shown ? `<tfoot><tr><td></td><td>Total</td>${cells(report)}</tr></tfoot>` : ""}</table></div></div></section>`;
+}
+
+function openingBalanceSource(account) {
+  const key = account.name.toLowerCase();
+  const master = (state.accountMasters || []).find((r) => String(r.accountName || "").toLowerCase() === key);
+  if (master) return { subSchedule: master.subSchedule || accountListGroup(account), openingDate: master.opDate || master.openingDate || financialYearOpeningDate() };
+  const party = (state.parties || []).find((r) => String(r.name || "").toLowerCase() === key);
+  if (party) return { subSchedule: party.subSchedule || (party.type === "Customer" ? "Sundry Debtors" : party.type === "Supplier" ? "Sundry Creditors" : party.type || accountListGroup(account)), openingDate: party.opDate || party.openingDate || party.joinDate || financialYearOpeningDate() };
+  const staff = (state.staffs || []).find((r) => String(r.name || "").toLowerCase() === key);
+  if (staff) return { subSchedule: staff.subSchedule || "Employees", openingDate: staff.opDate || staff.openingDate || staff.joinDate || financialYearOpeningDate() };
+  const scheme = (state.schemes || []).find((r) => String(r.member || "").toLowerCase() === key);
+  if (scheme) return { subSchedule: scheme.subSchedule || "Scheme Accounts", openingDate: scheme.opDate || scheme.openingDate || scheme.joinDate || financialYearOpeningDate() };
+  return { subSchedule: accountListGroup(account), openingDate: financialYearOpeningDate() };
+}
+
+function openingBalanceReportData() {
+  const to = toDateInputValue(financialReportOptions.to);
+  const rows = ledgerAccountCandidates().map((account) => {
+    const source = openingBalanceSource(account), balance = Number(account.opening || 0), openingDate = formatDisplayDate(source.openingDate);
+    return { id: account.id, accountHead: account.name, subSchedule: source.subSchedule, debit: balance > 0 ? balance : 0, credit: balance < 0 ? Math.abs(balance) : 0, openingDate, sortDate: toDateInputValue(openingDate), indicator: balance < 0 ? "Cr" : "Dr" };
+  }).filter((row) => (row.debit > .0005 || row.credit > .0005) && (!row.sortDate || row.sortDate <= to))
+    .sort((a, b) => a.subSchedule.localeCompare(b.subSchedule) || a.accountHead.localeCompare(b.accountHead));
+  return { rows, totalDebit: sumField(rows, "debit"), totalCredit: sumField(rows, "credit") };
+}
+
+function openingBalanceReportScreen() {
+  const report = openingBalanceReportData(), pages = Math.max(1, Math.ceil(report.rows.length / financialReportOptions.pageSize)), page = Math.min(financialReportOptions.page, pages - 1), visible = financialReportOptions.shown ? report.rows.slice(page * financialReportOptions.pageSize, (page + 1) * financialReportOptions.pageSize) : [];
+  return `<section class="financial-report-view opening-balance-report">${financialReportToolbar()}<div class="financial-report-paper ${financialReportOptions.a4 ? "a4" : ""}" style="--financial-zoom:${financialReportOptions.zoom}"><header><h3>***MT GOLD LAND***</h3><h4>M.T.PLAZA, OOTY ROAD</h4><h2>Opening Balance Report</h2><p>Opening entries effective through ${financialReportOptions.to}</p></header><div class="cash-book-page-status">Page ${page + 1} of ${pages}</div><div class="opening-balance-grid-wrap"><table class="opening-balance-grid"><thead><tr><th>ID</th><th>Account Head</th><th>Sub Schedule</th><th>Debit</th><th>Credit</th><th>Opening Date</th><th>Debit/Credit</th></tr></thead><tbody>${visible.length ? visible.map((row) => `<tr><td>${escapeHtml(row.id)}</td><td>${escapeHtml(row.accountHead)}</td><td>${escapeHtml(row.subSchedule)}</td><td class="num">${numberValue(row.debit, 3)}</td><td class="num">${numberValue(row.credit, 3)}</td><td>${row.openingDate}</td><td><span class="balance-indicator ${row.indicator.toLowerCase()}">${row.indicator}</span></td></tr>`).join("") : `<tr><td colspan="7">No opening balances effective through the selected date</td></tr>`}</tbody>${financialReportOptions.shown ? `<tfoot><tr><td colspan="3">Total</td><td class="num">${numberValue(report.totalDebit, 3)}</td><td class="num">${numberValue(report.totalCredit, 3)}</td><td></td><td></td></tr></tfoot>` : ""}</table></div></div></section>`;
+}
+
 function handleFinancialReportAction(action) {
-  const report = selectedVoucherReport === "Chart Of Accounts" ? chartOfAccountsReportData() : selectedVoucherReport === "Journal Register" ? journalRegisterReportData() : selectedVoucherReport === "Receipts / Payments" ? receiptsPaymentsReportConfig() : selectedVoucherReport === "Account List" ? accountListReportData() : selectedVoucherReport === "Day Book" ? dayBookReportData() : selectedVoucherReport === "Day Account Transactions" ? dayAccountReportConfig() : selectedFinancialReport === "Bank Book" ? bankBookReportData() : selectedFinancialReport === "Ledger" && selectedLedgerAccount ? ledgerReportData() : cashBookReportData(), pages = Math.max(1, Math.ceil(report.rows.length / financialReportOptions.pageSize));
+  const report = selectedVoucherReport === "Chart Of Accounts" ? chartOfAccountsReportData() : selectedVoucherReport === "Journal Register" ? journalRegisterReportData() : selectedVoucherReport === "Receipts / Payments" ? receiptsPaymentsReportConfig() : selectedVoucherReport === "Account List" ? accountListReportData() : selectedVoucherReport === "Day Book" ? dayBookReportData() : selectedVoucherReport === "Day Account Transactions" ? dayAccountReportConfig() : selectedFinancialReport === "Opening Balance" ? openingBalanceReportData() : selectedFinancialReport === "Trial Balance" ? { rows: trialBalanceReportData().displayRows } : selectedFinancialReport === "Bank Book" ? bankBookReportData() : selectedFinancialReport === "Ledger" && selectedLedgerAccount ? ledgerReportData() : cashBookReportData(), pages = Math.max(1, Math.ceil(report.rows.length / financialReportOptions.pageSize));
   if (action === "financial-show") financialReportOptions = { ...financialReportOptions, shown: true, dateOpen: false, page: 0 };
   if (action === "financial-view-hide") financialReportOptions = { ...financialReportOptions, shown: !financialReportOptions.shown };
   if (action === "financial-date") financialReportOptions = { ...financialReportOptions, dateOpen: !financialReportOptions.dateOpen };
@@ -11097,6 +11214,8 @@ function handleFinancialReportAction(action) {
 }
 
 function financialExportRows() {
+  if (selectedFinancialReport === "Opening Balance") { const report = openingBalanceReportData(); return [["ID", "Account Head", "Sub Schedule", "Debit", "Credit", "Opening Date", "Debit/Credit"], ...report.rows.map((r) => [r.id, r.accountHead, r.subSchedule, r.debit, r.credit, r.openingDate, r.indicator]), ["", "", "Total", report.totalDebit, report.totalCredit, "", ""]]; }
+  if (selectedFinancialReport === "Trial Balance") { const report = trialBalanceReportData(); return [["Group", "ID", "Description", "Debit", "Dr Weight", "Credit", "Cr Weight"], ...report.rows.map((r) => [r.group, r.id, r.description, r.debit, r.drWeight, r.credit, r.crWeight]), ["", "", "Total", report.totalDebit, report.totalDrWeight, report.totalCredit, report.totalCrWeight]]; }
   if (selectedVoucherReport === "Journal Register") { const report = journalRegisterReportData(); return [["Date", "Type", "Voucher No", "AccID", "Account Name", "Account Type", "Debit", "Credit", "Balance", "Remark", "Narration"], ...report.rows.map((r) => [r.date, r.voucherType, r.invoiceNo, r.accountId, r.accountName, r.accountType, r.debit, r.credit, r.balance, r.remark, r.narration])]; }
   if (selectedVoucherReport === "Chart Of Accounts") { const report = chartOfAccountsReportData(); return [["Final Account", "Schedule", "Sub-schedule", "AccID", "Name", "Debit", "Credit", "Balance", "Dr/Cr"], ...report.rows.map((r) => [r.finalAccount, r.schedule, r.subSchedule, r.id, r.name, r.debit, r.credit, Math.abs(r.balance), r.balance < 0 ? "Cr" : "Dr"])]; }
   if (selectedVoucherReport === "Receipts / Payments") { const config = receiptsPaymentsReportConfig(); return [config.columns, ...config.rows]; }
@@ -11120,7 +11239,7 @@ function openFinancialSaveAs() {
   document.querySelector("[data-financial-save-form]")?.addEventListener("submit", (event) => { event.preventDefault(); const data = new FormData(event.currentTarget), format = data.get("format"), filename = String(data.get("filename") || "financial-report"); closeModal(); if (format === "xlsx") exportFinancialReportXlsx(filename); else if (format === "csv") exportFinancialReportCsv(filename); else openFinancialPrintPreview(); });
 }
 
-function exportFinancialReportCsv(filename = selectedVoucherReport === "Chart Of Accounts" ? "chart-of-accounts" : selectedVoucherReport === "Journal Register" ? "journal-register" : selectedVoucherReport === "Receipts / Payments" ? receiptPaymentView.replace(/\s*&\s*|\s+/g, "-").toLowerCase() : selectedVoucherReport === "Account List" ? "account-list" : selectedVoucherReport === "Day Account Transactions" ? dayAccountView.replace(/\s+/g, "-").toLowerCase() : selectedVoucherReport === "Day Book" ? "day-book" : selectedFinancialReport === "Ledger" ? `ledger-${selectedLedgerAccount.replace(/\s+/g, "-").toLowerCase()}` : selectedFinancialReport === "Bank Book" ? "bank-book" : "cash-book") {
+function exportFinancialReportCsv(filename = selectedVoucherReport === "Chart Of Accounts" ? "chart-of-accounts" : selectedVoucherReport === "Journal Register" ? "journal-register" : selectedVoucherReport === "Receipts / Payments" ? receiptPaymentView.replace(/\s*&\s*|\s+/g, "-").toLowerCase() : selectedVoucherReport === "Account List" ? "account-list" : selectedVoucherReport === "Day Account Transactions" ? dayAccountView.replace(/\s+/g, "-").toLowerCase() : selectedVoucherReport === "Day Book" ? "day-book" : selectedFinancialReport === "Opening Balance" ? "opening-balance" : selectedFinancialReport === "Trial Balance" ? `trial-balance-${trialBalanceView.toLowerCase()}` : selectedFinancialReport === "Ledger" ? `ledger-${selectedLedgerAccount.replace(/\s+/g, "-").toLowerCase()}` : selectedFinancialReport === "Bank Book" ? "bank-book" : "cash-book") {
   const csv = financialExportRows().map((row) => row.map((v) => `"${String(v ?? "").replaceAll('"', '""')}"`).join(",")).join("\r\n");
   downloadBlob(new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" }), `${filename}.csv`);
 }
@@ -11130,7 +11249,7 @@ function downloadBlob(blob, filename) {
   link.href = url; link.download = filename; document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-function exportFinancialReportXlsx(filename = selectedVoucherReport === "Chart Of Accounts" ? "chart-of-accounts" : selectedVoucherReport === "Journal Register" ? "journal-register" : selectedVoucherReport === "Receipts / Payments" ? receiptPaymentView.replace(/\s*&\s*|\s+/g, "-").toLowerCase() : selectedVoucherReport === "Account List" ? "account-list" : selectedVoucherReport === "Day Account Transactions" ? dayAccountView.replace(/\s+/g, "-").toLowerCase() : selectedVoucherReport === "Day Book" ? "day-book" : selectedFinancialReport === "Ledger" ? `ledger-${selectedLedgerAccount.replace(/\s+/g, "-").toLowerCase()}` : selectedFinancialReport === "Bank Book" ? "bank-book" : "cash-book") {
+function exportFinancialReportXlsx(filename = selectedVoucherReport === "Chart Of Accounts" ? "chart-of-accounts" : selectedVoucherReport === "Journal Register" ? "journal-register" : selectedVoucherReport === "Receipts / Payments" ? receiptPaymentView.replace(/\s*&\s*|\s+/g, "-").toLowerCase() : selectedVoucherReport === "Account List" ? "account-list" : selectedVoucherReport === "Day Account Transactions" ? dayAccountView.replace(/\s+/g, "-").toLowerCase() : selectedVoucherReport === "Day Book" ? "day-book" : selectedFinancialReport === "Opening Balance" ? "opening-balance" : selectedFinancialReport === "Trial Balance" ? `trial-balance-${trialBalanceView.toLowerCase()}` : selectedFinancialReport === "Ledger" ? `ledger-${selectedLedgerAccount.replace(/\s+/g, "-").toLowerCase()}` : selectedFinancialReport === "Bank Book" ? "bank-book" : "cash-book") {
   const rows = financialExportRows(), encoder = new TextEncoder();
   const esc = (v) => escapeHtml(String(v ?? ""));
   const col = (n) => { let s = ""; for (n++; n; n = Math.floor((n - 1) / 26)) s = String.fromCharCode(65 + (n - 1) % 26) + s; return s; };
@@ -11138,7 +11257,7 @@ function exportFinancialReportXlsx(filename = selectedVoucherReport === "Chart O
   const files = {
     "[Content_Types].xml": `<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`,
     "_rels/.rels": `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`,
-    "xl/workbook.xml": `<?xml version="1.0"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${selectedVoucherReport === "Chart Of Accounts" ? "Chart Of Accounts" : selectedVoucherReport === "Journal Register" ? "Journal Register" : selectedVoucherReport === "Receipts / Payments" ? receiptPaymentView.replace(" & ", "-") : selectedVoucherReport === "Account List" ? "Account List" : selectedVoucherReport === "Day Account Transactions" ? "Day Account" : selectedVoucherReport === "Day Book" ? "Day Book" : selectedFinancialReport === "Ledger" ? "Ledger" : selectedFinancialReport === "Bank Book" ? "Bank Book" : "Cash Book"}" sheetId="1" r:id="rId1"/></sheets></workbook>`,
+    "xl/workbook.xml": `<?xml version="1.0"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${selectedVoucherReport === "Chart Of Accounts" ? "Chart Of Accounts" : selectedVoucherReport === "Journal Register" ? "Journal Register" : selectedVoucherReport === "Receipts / Payments" ? receiptPaymentView.replace(" & ", "-") : selectedVoucherReport === "Account List" ? "Account List" : selectedVoucherReport === "Day Account Transactions" ? "Day Account" : selectedVoucherReport === "Day Book" ? "Day Book" : selectedFinancialReport === "Opening Balance" ? "Opening Balance" : selectedFinancialReport === "Trial Balance" ? "Trial Balance" : selectedFinancialReport === "Ledger" ? "Ledger" : selectedFinancialReport === "Bank Book" ? "Bank Book" : "Cash Book"}" sheetId="1" r:id="rId1"/></sheets></workbook>`,
     "xl/_rels/workbook.xml.rels": `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`,
     "xl/styles.xml": `<?xml version="1.0"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="10"/><name val="Arial"/></font><font><b/><sz val="10"/><name val="Arial"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="3"><xf fontId="0"/><xf fontId="1" applyFont="1"/><xf fontId="0" numFmtId="4" applyNumberFormat="1"/></cellXfs></styleSheet>`,
     "xl/worksheets/sheet1.xml": `<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols><col min="1" max="1" width="7" customWidth="1"/><col min="2" max="3" width="15" customWidth="1"/><col min="4" max="4" width="45" customWidth="1"/><col min="5" max="8" width="16" customWidth="1"/></cols><sheetData>${sheetRows}</sheetData><pageSetup paperSize="9" orientation="landscape" fitToWidth="1"/></worksheet>`
@@ -11220,6 +11339,12 @@ function reportPreview(name) {
     return salesReportScreen(name);
   }
   if (name === "Exchange") return exchangeReportScreen();
+  if (name === "Purchase") return purchaseReportScreen();
+  if (name === "Purchase Return") return purchaseReturnReportScreen();
+  if (name === "Direct Gold Purchase") return directGoldPurchaseReportScreen();
+  if (name === "Direct Gold Purchase Return") return directGoldPurchaseReturnReportScreen();
+  if (name === "Diamond Purchase") return diamondPurchaseReportScreen();
+  if (name === "Diamond Sales") return diamondSalesReportScreen();
   if (STOCK_REPORT_MENU[0].items.includes(name)) {
     return stockReportSubmenuScreen(name);
   }
@@ -11487,6 +11612,1050 @@ function exchangeSalesmanSummaryConfig(bills) {
     numeric("amount", "Amount")
   ];
   return { columns, rows, gridClass: "exchange-salesman-summary-grid", totals: salesTotalsForColumns(rows, columns) };
+}
+
+const PURCHASE_REPORT_OPTIONS = [
+  "Purchase Register",
+  "Item wise",
+  "Salesman Wise",
+  "Salesman Summary",
+  "Purchase Register-All",
+  "Item wise-All",
+  "DMD Bulk Purchase - Summary",
+  "DMD Bulk Purchase - Details"
+];
+
+function purchaseReportScreen() {
+  const config = purchaseReportConfig();
+  return `
+    <div class="classic-report-layout focused-classic-report">
+      <section class="classic-stock-report sales-report purchase-report">
+        ${purchaseReportToolbar()}
+        <header class="classic-report-title sales-report-title purchase-report-title">
+          <h3>***MT GOLD LAND***</h3>
+          <h4>***MT GOLD LAND***</h4>
+          <h2>${escapeHtml(salesReportOptions.purchaseReportOption)}</h2>
+          <span>From ${escapeHtml(displaySalesDate(salesReportOptions.from))}&nbsp;&nbsp; To ${escapeHtml(displaySalesDate(salesReportOptions.to))}</span>
+        </header>
+        ${salesReportOptions.shown ? salesReportTable(config.columns, config.rows, config.gridClass, config.totals) : salesReportBlankState()}
+      </section>
+    </div>
+  `;
+}
+
+function purchaseReportToolbar() {
+  const tools = [
+    ["SHOW", "sales-report-show"], ["PRINT", "print-now"], ["DIRECT PRINT", "print-now"], ["EXCEL", "export-report"], ["SAVE AS", "export-report"], ["DATE", "sales-report-date"],
+    ["FIRST", "noop"], ["PREV", "noop"], ["NEXT", "noop"], ["LAST", "noop"], ["VIEW/HIDE", "noop"], ["ZOOM IN", "noop"], ["DEFAULT", "noop"], ["ZOOM OUT", "noop"], ["CLOSE", "purchase-report-close"]
+  ];
+  return `
+    <div class="classic-report-toolbar sales-report-toolbar purchase-report-toolbar">
+      <div class="classic-tool-buttons">${tools.map(([label, action]) => `<button class="classic-tool" data-action="${action}" title="${escapeHtml(label)}"><strong>${toolbarGlyph(label)}</strong><span>${escapeHtml(label)}</span></button>`).join("")}</div>
+      <label class="classic-a4"><input type="checkbox" />A4</label>
+      <select class="purchase-report-select" data-purchase-report-option aria-label="Purchase report type">
+        ${PURCHASE_REPORT_OPTIONS.map((option) => `<option value="${escapeHtml(option)}" ${salesReportOptions.purchaseReportOption === option ? "selected" : ""}>${escapeHtml(option)}</option>`).join("")}
+      </select>
+      ${salesReportOptions.dateOpen ? salesDatePopup() : ""}
+    </div>
+  `;
+}
+
+function purchaseReportConfig() {
+  const option = salesReportOptions.purchaseReportOption;
+  if (option === "DMD Bulk Purchase - Summary") return purchaseDmdBulkConfig(true);
+  if (option === "DMD Bulk Purchase - Details") return purchaseDmdBulkConfig(false);
+  const includeAll = option.endsWith("-All");
+  const bills = purchaseReportSourceRows(includeAll);
+  if (option === "Item wise-All") return purchaseItemWiseAllReportConfig(bills);
+  if (option.startsWith("Item wise")) return purchaseItemWiseReportConfig(bills);
+  if (option === "Salesman Wise") return purchaseSalesmanWiseReportConfig(bills);
+  if (option === "Salesman Summary") return purchaseSalesmanSummaryReportConfig(bills);
+  const columns = includeAll ? purchaseRegisterAllColumns() : purchaseRegisterColumns();
+  return { columns, rows: bills, gridClass: "purchase-register-grid", totals: salesTotalsForColumns(bills, columns) };
+}
+
+function purchaseReportSourceRows(includeAll = false) {
+  const sources = (state.bills || [])
+    .filter((bill) => String(bill.type || "").toLowerCase().includes("purchase"))
+    .map((bill) => ({ record: bill, storage: "bills", view: "Purchase Invoice" }));
+  if (includeAll) {
+    [
+      [state.directPurchases || [], "directPurchases", "Direct Purchase"],
+      [state.diamondPurchases || [], "diamondPurchases", "Diamond Purchase"],
+      [state.dmdStonePurchases || [], "dmdStonePurchases", "DMD Stone Purchase"]
+    ].forEach(([records, storage, view]) => records.forEach((record) => sources.push({ record, storage, view })));
+  }
+  return sources
+    .filter(({ record }) => isDateWithinPeriod(record.date || record.invoiceDate, salesReportOptions.from, salesReportOptions.to))
+    .map(({ record: bill, storage, view }) => purchaseReportBillRow(bill, storage, view));
+}
+
+function purchaseReportBillRow(bill, storage, view) {
+  const sourceLines = (bill.sections?.exchange || []).length ? bill.sections.exchange : (bill.lines || bill.ornamentLines || [bill.line].filter(Boolean));
+  const lines = sourceLines.map((line) => normalizeBillLine(line, line.amount || line.itemTotal || 0, bill, "purchase"));
+  const partyId = bill.customerId || bill.supplierId || bill.partyId || bill.customerCode || "";
+  const party = (state.parties || []).find((item) => item.id === partyId || item.customerId === partyId || item.customerCode === partyId || item.name === bill.customer || item.name === bill.partyName || item.name === bill.supplierName) || {};
+  const netWeight = lines.reduce((sum, line) => sum + Number(line.net || 0), 0);
+  const billAmount = lines.reduce((sum, line) => sum + Number(line.itemTotal || line.amount || 0), 0);
+  const gst = lines.reduce((sum, line) => sum + Number(line.tax || 0), 0);
+  const cessAmount = lines.reduce((sum, line) => sum + Number(line.cessAmount || 0), 0);
+  const addition = Number(bill.totals?.addition || bill.addition || 0);
+  const discount = Number(bill.totals?.flatDiscount || bill.discount || 0);
+  const invoiceTotal = billAmount + addition - discount + gst + cessAmount;
+  return {
+    bill,
+    lines,
+    storage,
+    purchaseView: view,
+    purchaseSource: purchaseReportSourceLabel(bill, view),
+    entryNo: bill.entryNo || bill.invoiceNo || bill.billNo || bill.id,
+    referenceNo: bill.refNo || bill.referenceNo || "",
+    entryDate: displaySalesDate(bill.date || bill.invoiceDate),
+    purchaseMode: bill.paymentMode || (Number(bill.balance || bill.totals?.balance || 0) > 0 ? "Credit" : "Cash"),
+    partyId: partyId || party.customerCode || party.id || "",
+    partyName: bill.customer || bill.partyName || bill.supplierName || party.name || "",
+    partyAddress: bill.customerAddress || bill.address || party.address || party.place || "",
+    netWeight,
+    billAmount,
+    addition,
+    discount,
+    gst,
+    cgst: gst / 2,
+    sgst: gst / 2,
+    cessAmount,
+    invoiceTotal,
+    cashPaid: Number(bill.totals?.cashPaid || bill.totals?.payment || bill.paid || 0),
+    balance: Number(bill.totals?.accountBalance ?? bill.accountBalance ?? bill.balance ?? 0),
+    salesman: bill.staffName || bill.preparedBy || "Not Set",
+    sourceBillId: bill.id || "",
+    sourceEntryNo: bill.entryNo || bill.invoiceNo || "",
+    sourceBillNo: bill.billNo || bill.invoiceNo || "",
+    sourceSection: "exchange",
+    drillTarget: "purchase",
+    drillStorage: storage,
+    drillView: view
+  };
+}
+
+function purchaseReportSourceLabel(bill, view) {
+  if (view === "Direct Purchase") return "Direct";
+  if (view === "Diamond Purchase") return "Diamond";
+  if (view === "DMD Stone Purchase") return "DMD Bulk";
+  const text = `${bill.purchaseMode || ""} ${bill.type || ""}`.toLowerCase();
+  if (text.includes("exchange")) return "Exchange Sales";
+  if (text.includes("direct")) return "Direct";
+  return "Purchase";
+}
+
+function purchaseRegisterColumns() {
+  const money = (key, label, decimals = 3) => ({ key, label, numeric: true, total: true, format: (value) => numberValue(value, decimals) });
+  return [
+    { key: "entryNo", label: "EntryNo" }, { key: "referenceNo", label: "RefNo" }, { key: "entryDate", label: "EDate" },
+    { key: "purchaseMode", label: "PurMode" }, { key: "partyId", label: "PartyID" }, { key: "partyName", label: "PartyName" },
+    { key: "partyAddress", label: "PartyAddress" }, money("netWeight", "NetWeight"), money("billAmount", "BillAmount"),
+    money("addition", "Addition"), money("discount", "Discount"), money("gst", "GST"), money("cgst", "CGST", 6),
+    money("sgst", "SGST", 6), money("cessAmount", "CessAmt"), money("invoiceTotal", "InvoiceTotal"),
+    money("cashPaid", "CashPaid"), money("balance", "Balance")
+  ];
+}
+
+function purchaseRegisterAllColumns() {
+  const columns = purchaseRegisterColumns().filter((column) => column.key !== "netWeight");
+  return [{ key: "purchaseSource", label: "Purchase_Mode" }, ...columns];
+}
+
+function purchaseItemWiseReportConfig(bills) {
+  const rows = bills.flatMap((bill) => bill.lines.map((line) => ({
+    ...bill,
+    itemName: line.itemName || "",
+    description: line.description || line.itemDescription || "",
+    nos: Number(line.qty || 0),
+    grossWeight: Number(line.gross || 0),
+    weightLess: Number(line.weightLess || line.lessWeight || 0),
+    mudLess: Number(line.mudLess || 0),
+    rate: Number(line.rate || 0),
+    stoneCharge: Number(line.stoneCharge || 0),
+    touchPercentage: Number(line.touchPct || line.touch || 0),
+    touchLess: Number(line.touchLess || 0),
+    stoneWeight: Number(line.stone || 0),
+    netWeight: Number(line.net || 0),
+    amount: Number(line.itemTotal || line.amount || 0)
+  })));
+  const number = (key, label, decimals = 3) => ({ key, label, numeric: true, total: true, format: (value) => numberValue(value, decimals) });
+  const columns = [
+    { key: "entryNo", label: "EntryNo" },
+    { key: "entryDate", label: "EDate" },
+    { key: "itemName", label: "ItemName" },
+    { key: "description", label: "Description" },
+    { key: "partyName", label: "PartyName" },
+    number("nos", "Nos", 0),
+    number("grossWeight", "GrossWeight"),
+    number("weightLess", "WeightLess"),
+    number("mudLess", "MudLess"),
+    number("rate", "Rate"),
+    number("stoneCharge", "StoneCharge"),
+    number("touchPercentage", "TouchPerc", 2),
+    number("touchLess", "TouchLess", 2),
+    number("stoneWeight", "StoneWeight"),
+    number("netWeight", "NetWeight"),
+    number("amount", "Amount")
+  ];
+  return { columns, rows, gridClass: "purchase-item-wise-grid", totals: salesTotalsForColumns(rows, columns) };
+}
+
+function purchaseItemWiseAllReportConfig(bills) {
+  const config = purchaseItemWiseReportConfig(bills);
+  const rows = config.rows.map((row) => ({
+    ...row,
+    salesNo: row.bill?.salesNo || row.bill?.salesBillNo || row.bill?.linkedSalesNo || row.bill?.salesEntryNo || ""
+  }));
+  const detailColumns = config.columns.filter((column) => !["entryNo", "entryDate"].includes(column.key));
+  const columns = [
+    { key: "purchaseSource", label: "Purchase_Mode" },
+    { key: "salesman", label: "Salesman" },
+    { key: "entryNo", label: "EntryNo" },
+    { key: "salesNo", label: "SalesNo" },
+    { key: "entryDate", label: "EDate" },
+    ...detailColumns
+  ];
+  return { columns, rows, gridClass: "purchase-item-wise-all-grid", totals: salesTotalsForColumns(rows, columns) };
+}
+
+function purchaseSalesmanWiseReportConfig(bills) {
+  const base = purchaseItemWiseReportConfig(bills);
+  base.columns = [{ key: "salesman", label: "SalesMan" }, ...base.columns];
+  base.rows.sort((left, right) => `${left.salesman}|${left.entryNo}`.localeCompare(`${right.salesman}|${right.entryNo}`));
+  base.gridClass = "purchase-salesman-wise-grid";
+  base.totals = salesTotalsForColumns(base.rows, base.columns);
+  return base;
+}
+
+function purchaseSalesmanSummaryReportConfig(bills) {
+  const detail = purchaseSalesmanWiseReportConfig(bills);
+  const grouped = new Map();
+  detail.rows.forEach((row) => {
+    if (!grouped.has(row.salesman)) grouped.set(row.salesman, {
+      salesman: row.salesman,
+      quantity: 0,
+      grossWeight: 0,
+      stoneWeight: 0,
+      mudLess: 0,
+      touchLess: 0,
+      weightLess: 0,
+      netWeight: 0,
+      amount: 0
+    });
+    const target = grouped.get(row.salesman);
+    target.quantity += Number(row.nos || 0);
+    target.grossWeight += Number(row.grossWeight || 0);
+    target.stoneWeight += Number(row.stoneWeight || 0);
+    target.mudLess += Number(row.mudLess || 0);
+    target.touchLess += Number(row.touchLess || 0);
+    target.weightLess += Number(row.weightLess || 0);
+    target.netWeight += Number(row.netWeight || 0);
+    target.amount += Number(row.amount || 0);
+  });
+  const rows = [...grouped.values()].sort((left, right) => left.salesman.localeCompare(right.salesman));
+  const number = (key, label, decimals = 3) => ({ key, label, numeric: true, total: true, format: (value) => numberValue(value, decimals) });
+  const columns = [
+    { key: "salesman", label: "SalesMan" },
+    number("quantity", "QTY", 0),
+    number("grossWeight", "GrossWt"),
+    number("stoneWeight", "StoneWt"),
+    number("mudLess", "Mudless"),
+    number("touchLess", "TouchLess"),
+    number("weightLess", "WeightLess"),
+    number("netWeight", "NetWt"),
+    number("amount", "Amount")
+  ];
+  return { columns, rows, gridClass: "purchase-salesman-summary-grid", totals: salesTotalsForColumns(rows, columns) };
+}
+
+function purchaseDmdBulkConfig(summary) {
+  const records = [...(state.diamondPurchases || []), ...(state.dmdStonePurchases || [])].filter((record) => isDateWithinPeriod(record.date || record.invoiceDate, salesReportOptions.from, salesReportOptions.to));
+  const details = records.flatMap((record) => (record.lines || record.ornamentLines || []).map((line) => ({ entryNo: record.entryNo || record.invoiceNo || record.id, date: displaySalesDate(record.date || record.invoiceDate), supplier: record.supplierName || record.partyName || "", itemName: line.itemName || line.colorType || "Diamond", carat: Number(line.caratCent || line.carat || 0), pieces: Number(line.pcs || line.qty || 0), purchaseRate: Number(line.purchaseRate || line.rate || 0), amount: Number(line.amount || line.itemTotal || 0) })));
+  const number = (key, label, decimals = 3) => ({ key, label, numeric: true, total: true, format: (value) => numberValue(value, decimals) });
+  if (!summary) {
+    const columns = [{ key: "entryNo", label: "EntryNo" }, { key: "date", label: "EDate" }, { key: "supplier", label: "Supplier" }, { key: "itemName", label: "ItemName" }, number("carat", "Carat"), number("pieces", "Pieces", 0), number("purchaseRate", "PurchaseRate"), number("amount", "Amount")];
+    return { columns, rows: details, gridClass: "purchase-dmd-details-grid", totals: salesTotalsForColumns(details, columns) };
+  }
+  const grouped = new Map();
+  details.forEach((row) => { if (!grouped.has(row.supplier)) grouped.set(row.supplier, { supplier: row.supplier, entries: 0, carat: 0, pieces: 0, amount: 0 }); const target = grouped.get(row.supplier); target.entries += 1; target.carat += row.carat; target.pieces += row.pieces; target.amount += row.amount; });
+  const rows = [...grouped.values()];
+  const columns = [{ key: "supplier", label: "Supplier" }, number("entries", "Entries", 0), number("carat", "Carat"), number("pieces", "Pieces", 0), number("amount", "Amount")];
+  return { columns, rows, gridClass: "purchase-dmd-summary-grid", totals: salesTotalsForColumns(rows, columns) };
+}
+
+const DIRECT_GOLD_PURCHASE_REPORT_OPTIONS = ["Purchase Register", "Item wise", "Salesman Wise", "Salesman Summary"];
+
+function directGoldPurchaseReportScreen() {
+  const config = directGoldPurchaseReportConfig();
+  return `
+    <div class="classic-report-layout focused-classic-report">
+      <section class="classic-stock-report sales-report direct-gold-purchase-report">
+        ${directGoldPurchaseReportToolbar()}
+        <header class="classic-report-title sales-report-title direct-gold-purchase-report-title">
+          <h3>***MT GOLD LAND***</h3>
+          <h4>***MT GOLD LAND***</h4>
+          <h2>Direct Gold Purchase ${escapeHtml(salesReportOptions.directGoldPurchaseReportOption)}</h2>
+          <span>From ${escapeHtml(displaySalesDate(salesReportOptions.from))}&nbsp;&nbsp; To ${escapeHtml(displaySalesDate(salesReportOptions.to))}</span>
+        </header>
+        ${salesReportOptions.shown ? salesReportTable(config.columns, config.rows, config.gridClass, config.totals) : salesReportBlankState()}
+      </section>
+    </div>
+  `;
+}
+
+function directGoldPurchaseReportToolbar() {
+  const tools = [
+    ["SHOW", "sales-report-show"], ["PRINT", "print-now"], ["DIRECT PRINT", "print-now"], ["EXCEL", "export-report"], ["SAVE AS", "export-report"], ["DATE", "sales-report-date"],
+    ["FIRST", "noop"], ["PREV", "noop"], ["NEXT", "noop"], ["LAST", "noop"], ["VIEW/HIDE", "noop"], ["ZOOM IN", "noop"], ["DEFAULT", "noop"], ["ZOOM OUT", "noop"], ["CLOSE", "direct-gold-purchase-report-close"]
+  ];
+  return `
+    <div class="classic-report-toolbar sales-report-toolbar direct-gold-purchase-report-toolbar">
+      <div class="classic-tool-buttons">${tools.map(([label, action]) => `<button class="classic-tool" data-action="${action}" title="${escapeHtml(label)}"><strong>${toolbarGlyph(label)}</strong><span>${escapeHtml(label)}</span></button>`).join("")}</div>
+      <label class="classic-a4"><input type="checkbox" />A4</label>
+      <select class="direct-gold-purchase-report-select" data-direct-gold-purchase-report-option aria-label="Direct Gold Purchase report type">
+        ${DIRECT_GOLD_PURCHASE_REPORT_OPTIONS.map((option) => `<option value="${option}" ${salesReportOptions.directGoldPurchaseReportOption === option ? "selected" : ""}>${option}</option>`).join("")}
+      </select>
+      ${salesReportOptions.dateOpen ? salesDatePopup() : ""}
+    </div>
+  `;
+}
+
+function directGoldPurchaseReportConfig() {
+  const bills = (state.directPurchases || [])
+    .filter((record) => isDateWithinPeriod(record.date || record.invoiceDate, salesReportOptions.from, salesReportOptions.to))
+    .map((record) => directGoldPurchaseReportBillRow(record))
+    .filter((row) => row.lines.length || row.billAmount || row.invoiceTotal);
+  const option = salesReportOptions.directGoldPurchaseReportOption;
+  if (option === "Item wise") return directGoldPurchaseItemWiseConfig(bills);
+  if (option === "Salesman Wise") return directGoldPurchaseSalesmanWiseConfig(bills);
+  if (option === "Salesman Summary") return directGoldPurchaseSalesmanSummaryConfig(bills);
+  const columns = directGoldPurchaseRegisterColumns();
+  return { columns, rows: bills, gridClass: "direct-gold-purchase-register-grid", totals: salesTotalsForColumns(bills, columns) };
+}
+
+function directGoldPurchaseItemWiseConfig(bills) {
+  const rows = bills.flatMap((bill) => bill.lines.map((line, index) => {
+    const grossWeight = Number(line.gross || 0);
+    const stoneWeight = Number(line.stone || 0);
+    return {
+      ...bill,
+      entryNo: bill.entryNo || bill.bill?.entryNo || bill.bill?.invoiceNo || `DP-${index + 1}`,
+      entryDate: bill.entryDate || displaySalesDate(bill.bill?.date || bill.bill?.invoiceDate),
+      itemName: line.itemName || line.item || line.itemId || "DIRECT GOLD",
+      itemId: line.item || line.itemId || itemIdForSalesItem(line.itemName || "DIRECT GOLD") || "DG",
+      nos: Number(line.qty || line.nos || 0),
+      grossWeight,
+      rate: Number(line.rate || line.purchaseRate || 0),
+      stoneCharge: Number(line.stoneCharge || line.stoneAmount || 0),
+      stoneWeight,
+      netWeight: Number(line.net ?? Math.max(0, grossWeight - stoneWeight)),
+      amount: Number(line.itemTotal || line.amount || 0)
+    };
+  }));
+  const number = (key, label, decimals = 3) => ({ key, label, numeric: true, total: true, format: (value) => numberValue(value, decimals) });
+  const columns = [
+    { key: "entryNo", label: "EntryNo" },
+    { key: "entryDate", label: "EDate" },
+    { key: "itemName", label: "ItemName" },
+    number("nos", "Nos", 0),
+    number("grossWeight", "GrossWeight"),
+    number("rate", "Rate"),
+    number("stoneCharge", "StoneCharge"),
+    number("stoneWeight", "StoneWeight"),
+    number("netWeight", "NetWeight"),
+    number("amount", "Amount")
+  ];
+  return { columns, rows, gridClass: "direct-gold-purchase-item-grid", totals: salesTotalsForColumns(rows, columns) };
+}
+
+function directGoldPurchaseSalesmanWiseConfig(bills) {
+  const detail = directGoldPurchaseItemWiseConfig(bills);
+  const rows = detail.rows
+    .map((row) => ({ ...row, salesman: row.salesman || row.bill?.staffName || row.bill?.preparedBy || "UNASSIGNED" }))
+    .sort((left, right) => `${left.salesman}|${left.entryNo}`.localeCompare(`${right.salesman}|${right.entryNo}`));
+  const number = (key, label, decimals = 3) => ({ key, label, numeric: true, total: true, format: (value) => numberValue(value, decimals) });
+  const columns = [
+    { key: "salesman", label: "SalesMan" },
+    { key: "entryNo", label: "EntryNo" },
+    { key: "entryDate", label: "tDate" },
+    { key: "itemId", label: "IID" },
+    { key: "itemName", label: "Item_Name" },
+    number("nos", "QTY", 0),
+    number("grossWeight", "GrossWt"),
+    number("stoneWeight", "StoneWt"),
+    number("netWeight", "NetWt"),
+    number("rate", "Rate"),
+    number("amount", "Amount")
+  ];
+  return { columns, rows, gridClass: "direct-gold-purchase-salesman-grid", totals: salesTotalsForColumns(rows, columns) };
+}
+
+function directGoldPurchaseSalesmanSummaryConfig(bills) {
+  const detail = directGoldPurchaseSalesmanWiseConfig(bills);
+  const grouped = new Map();
+  detail.rows.forEach((row) => {
+    if (!grouped.has(row.salesman)) grouped.set(row.salesman, {
+      salesman: row.salesman,
+      quantity: 0,
+      grossWeight: 0,
+      stoneWeight: 0,
+      netWeight: 0,
+      amount: 0,
+      sourceBillId: row.sourceBillId,
+      sourceEntryNo: row.sourceEntryNo,
+      sourceBillNo: row.sourceBillNo,
+      sourceSection: row.sourceSection,
+      drillStorage: row.drillStorage || "directPurchases",
+      drillView: row.drillView || "Direct Purchase",
+      drillTarget: row.drillTarget || "purchase"
+    });
+    const target = grouped.get(row.salesman);
+    target.quantity += Number(row.nos || 0);
+    target.grossWeight += Number(row.grossWeight || 0);
+    target.stoneWeight += Number(row.stoneWeight || 0);
+    target.netWeight += Number(row.netWeight || 0);
+    target.amount += Number(row.amount || 0);
+  });
+  const rows = [...grouped.values()].sort((left, right) => left.salesman.localeCompare(right.salesman));
+  const number = (key, label, decimals = 3) => ({ key, label, numeric: true, total: true, format: (value) => numberValue(value, decimals) });
+  const columns = [
+    { key: "salesman", label: "SalesMan" },
+    number("quantity", "QTY", 0),
+    number("grossWeight", "GrossWt"),
+    number("stoneWeight", "StoneWt"),
+    number("netWeight", "NetWt"),
+    number("amount", "Amount")
+  ];
+  return { columns, rows, gridClass: "direct-gold-purchase-salesman-summary-grid", totals: salesTotalsForColumns(rows, columns) };
+}
+
+function directGoldPurchaseReportBillRow(bill) {
+  const row = purchaseReportBillRow(bill, "directPurchases", "Direct Purchase");
+  const party = (state.parties || []).find((item) => item.id === row.partyId || item.customerId === row.partyId || item.customerCode === row.partyId || item.name === row.partyName) || {};
+  return {
+    ...row,
+    purchaseMode: bill.purchaseModeCode ?? bill.modeCode ?? bill.purMode ?? row.purchaseMode,
+    gstNumber: bill.gstin || bill.gstNo || party.gstin || party.panGst || ""
+  };
+}
+
+function directGoldPurchaseRegisterColumns() {
+  const money = (key, label, decimals = 3) => ({ key, label, numeric: true, total: true, format: (value) => numberValue(value, decimals) });
+  return [
+    { key: "entryNo", label: "EntryNo" }, { key: "referenceNo", label: "RefNo" }, { key: "entryDate", label: "EDate" },
+    { key: "purchaseMode", label: "PurMode" }, { key: "partyId", label: "PartyID" }, { key: "partyName", label: "PartyName" },
+    { key: "partyAddress", label: "PartyAddress" }, { key: "gstNumber", label: "GSTNo" }, money("billAmount", "BillAmount"),
+    money("addition", "Addition"), money("discount", "Discount"), money("gst", "GST", 2), money("cgst", "CGST", 6),
+    money("sgst", "SGST", 6), money("cessAmount", "CessAmt"), money("invoiceTotal", "InvoiceTotal"),
+    money("cashPaid", "CashPaid"), money("balance", "Balance")
+  ];
+}
+
+const DIRECT_GOLD_PURCHASE_RETURN_REPORT_OPTIONS = ["Purchase Return Register", "Item wise", "Salesman Wise", "Salesman Summary"];
+
+function directGoldPurchaseReturnReportScreen() {
+  const config = directGoldPurchaseReturnReportConfig();
+  return `
+    <div class="classic-report-layout focused-classic-report">
+      <section class="classic-stock-report sales-report direct-gold-purchase-return-report">
+        ${directGoldPurchaseReturnReportToolbar()}
+        <header class="classic-report-title sales-report-title direct-gold-purchase-return-report-title">
+          <h3>***MT GOLD LAND***</h3>
+          <h4>***MT GOLD LAND***</h4>
+          <h2>Direct Gold Purchase Return ${escapeHtml(salesReportOptions.directGoldPurchaseReturnReportOption)}</h2>
+          <span>From ${escapeHtml(displaySalesDate(salesReportOptions.from))}&nbsp;&nbsp; To ${escapeHtml(displaySalesDate(salesReportOptions.to))}</span>
+        </header>
+        ${salesReportOptions.shown ? salesReportTable(config.columns, config.rows, config.gridClass, config.totals) : salesReportBlankState()}
+      </section>
+    </div>
+  `;
+}
+
+function directGoldPurchaseReturnReportToolbar() {
+  const tools = [
+    ["SHOW", "sales-report-show"], ["PRINT", "print-now"], ["DIRECT PRINT", "print-now"], ["EXCEL", "export-report"], ["SAVE AS", "export-report"], ["DATE", "sales-report-date"],
+    ["FIRST", "noop"], ["PREV", "noop"], ["NEXT", "noop"], ["LAST", "noop"], ["VIEW/HIDE", "noop"], ["ZOOM IN", "noop"], ["DEFAULT", "noop"], ["ZOOM OUT", "noop"], ["CLOSE", "direct-gold-purchase-return-report-close"]
+  ];
+  return `
+    <div class="classic-report-toolbar sales-report-toolbar direct-gold-purchase-return-report-toolbar">
+      <div class="classic-tool-buttons">${tools.map(([label, action]) => `<button class="classic-tool" data-action="${action}" title="${escapeHtml(label)}"><strong>${toolbarGlyph(label)}</strong><span>${escapeHtml(label)}</span></button>`).join("")}</div>
+      <label class="classic-a4"><input type="checkbox" />A4</label>
+      <select class="direct-gold-purchase-return-report-select" data-direct-gold-purchase-return-report-option aria-label="Direct Gold Purchase Return report type">
+        ${DIRECT_GOLD_PURCHASE_RETURN_REPORT_OPTIONS.map((option) => `<option value="${option}" ${salesReportOptions.directGoldPurchaseReturnReportOption === option ? "selected" : ""}>${option}</option>`).join("")}
+      </select>
+      ${salesReportOptions.dateOpen ? salesDatePopup() : ""}
+    </div>
+  `;
+}
+
+function directGoldPurchaseReturnReportConfig() {
+  const bills = (state.directPurchaseReturns || [])
+    .filter((record) => isDateWithinPeriod(record.date || record.invoiceDate, salesReportOptions.from, salesReportOptions.to))
+    .map((record) => purchaseReportBillRow(record, "directPurchaseReturns", "Direct Purchase Return"))
+    .filter((row) => row.lines.length || row.billAmount || row.invoiceTotal);
+  const option = salesReportOptions.directGoldPurchaseReturnReportOption;
+  if (option === "Item wise") return directGoldPurchaseReturnItemWiseConfig(bills);
+  if (option === "Salesman Wise") return directGoldPurchaseReturnSalesmanWiseConfig(bills);
+  if (option === "Salesman Summary") return directGoldPurchaseReturnSalesmanSummaryConfig(bills);
+  const columns = directGoldPurchaseReturnRegisterColumns();
+  return { columns, rows: bills, gridClass: "direct-gold-purchase-return-register-grid", totals: salesTotalsForColumns(bills, columns) };
+}
+
+function directGoldPurchaseReturnRegisterColumns() {
+  const money = (key, label, decimals = 3) => ({ key, label, numeric: true, total: true, format: (value) => numberValue(value, decimals) });
+  return [
+    { key: "entryNo", label: "EntryNo" }, { key: "referenceNo", label: "RefNo" }, { key: "entryDate", label: "EDate" },
+    { key: "purchaseMode", label: "PurMode" }, { key: "partyId", label: "PartyID" }, { key: "partyName", label: "PartyName" },
+    { key: "partyAddress", label: "PartyAddress" }, money("billAmount", "BillAmount"), money("addition", "Addition"),
+    money("discount", "Discount"), money("gst", "GST", 2), money("cgst", "CGST", 6), money("sgst", "SGST", 6),
+    money("cessAmount", "CessAmt"), money("invoiceTotal", "InvoiceTotal"), money("cashPaid", "CashPaid"), money("balance", "Balance")
+  ];
+}
+
+function directGoldPurchaseReturnItemWiseConfig(bills) {
+  const config = directGoldPurchaseItemWiseConfig(bills);
+  const rows = config.rows.map((row) => ({
+    ...row,
+    drillStorage: "directPurchaseReturns",
+    drillView: "Direct Purchase Return",
+    drillTarget: "purchase"
+  }));
+  return {
+    ...config,
+    rows,
+    gridClass: "direct-gold-purchase-return-item-grid",
+    totals: salesTotalsForColumns(rows, config.columns)
+  };
+}
+
+function directGoldPurchaseReturnSalesmanWiseConfig(bills) {
+  const detail = directGoldPurchaseReturnItemWiseConfig(bills);
+  const rows = detail.rows
+    .map((row) => ({ ...row, salesman: row.salesman || row.bill?.staffName || row.bill?.preparedBy || "UNASSIGNED" }))
+    .sort((left, right) => `${left.salesman}|${left.entryNo}`.localeCompare(`${right.salesman}|${right.entryNo}`));
+  const number = (key, label, decimals = 3) => ({ key, label, numeric: true, total: true, format: (value) => numberValue(value, decimals) });
+  const columns = [
+    { key: "salesman", label: "SalesMan" },
+    { key: "entryNo", label: "EntryNo" },
+    { key: "entryDate", label: "tDate" },
+    { key: "itemId", label: "IID" },
+    { key: "itemName", label: "Item_Name" },
+    number("nos", "QTY", 0),
+    number("grossWeight", "GrossWt"),
+    number("stoneWeight", "StoneWt"),
+    number("netWeight", "NetWt"),
+    number("rate", "Rate", 0),
+    number("amount", "Amount", 0)
+  ];
+  return { columns, rows, gridClass: "direct-gold-purchase-return-salesman-grid", totals: salesTotalsForColumns(rows, columns) };
+}
+
+function directGoldPurchaseReturnSalesmanSummaryConfig(bills) {
+  const detail = directGoldPurchaseReturnSalesmanWiseConfig(bills);
+  const grouped = new Map();
+  detail.rows.forEach((row) => {
+    if (!grouped.has(row.salesman)) grouped.set(row.salesman, {
+      salesman: row.salesman,
+      quantity: 0,
+      grossWeight: 0,
+      stoneWeight: 0,
+      netWeight: 0,
+      amount: 0,
+      sourceBillId: row.sourceBillId,
+      sourceEntryNo: row.sourceEntryNo,
+      sourceBillNo: row.sourceBillNo,
+      sourceSection: row.sourceSection,
+      drillStorage: "directPurchaseReturns",
+      drillView: "Direct Purchase Return",
+      drillTarget: "purchase"
+    });
+    const target = grouped.get(row.salesman);
+    target.quantity += Number(row.nos || 0);
+    target.grossWeight += Number(row.grossWeight || 0);
+    target.stoneWeight += Number(row.stoneWeight || 0);
+    target.netWeight += Number(row.netWeight || 0);
+    target.amount += Number(row.amount || 0);
+  });
+  const rows = [...grouped.values()].sort((left, right) => left.salesman.localeCompare(right.salesman));
+  const number = (key, label, decimals = 3) => ({ key, label, numeric: true, total: true, format: (value) => numberValue(value, decimals) });
+  const columns = [
+    { key: "salesman", label: "SalesMan" },
+    number("quantity", "QTY", 0),
+    number("grossWeight", "GrossWt"),
+    number("stoneWeight", "StoneWt"),
+    number("netWeight", "NetWt"),
+    number("amount", "Amount")
+  ];
+  return { columns, rows, gridClass: "direct-gold-purchase-return-salesman-summary-grid", totals: salesTotalsForColumns(rows, columns) };
+}
+
+const PURCHASE_RETURN_REPORT_OPTIONS = ["Purchase Return Register", "Purchase Return Report"];
+
+function diamondSalesReportScreen() {
+  const config = diamondSalesReportConfig();
+  return `<div class="classic-report-layout focused-classic-report"><section class="classic-stock-report sales-report diamond-sales-report">${diamondSalesReportToolbar()}<header class="classic-report-title sales-report-title"><h3>***MT GOLD LAND***</h3><h4>M.T.PLAZA,OOTY ROAD</h4><h2>Diamond Sales Report From ${escapeHtml(displaySalesDate(salesReportOptions.from))} To ${escapeHtml(displaySalesDate(salesReportOptions.to))}</h2></header>${salesReportOptions.shown ? salesReportTable(config.columns, config.rows, config.gridClass, config.totals) : salesReportBlankState()}</section></div>`;
+}
+
+function diamondSalesReportToolbar() {
+  const tools = [["SHOW", "sales-report-show"], ["PRINT", "print-now"], ["DIRECT PRINT", "print-now"], ["EXCEL", "export-report"], ["SAVE AS", "export-report"], ["DATE", "sales-report-date"], ["FIRST", "noop"], ["PREV", "noop"], ["NEXT", "noop"], ["LAST", "noop"], ["VIEW/HIDE", "noop"], ["ZOOM IN", "noop"], ["DEFAULT", "noop"], ["ZOOM OUT", "noop"], ["CLOSE", "diamond-sales-report-close"]];
+  return `<div class="classic-report-toolbar sales-report-toolbar diamond-sales-report-toolbar"><div class="classic-tool-buttons">${tools.map(([label, action]) => `<button class="classic-tool" data-action="${action}" title="${escapeHtml(label)}"><strong>${toolbarGlyph(label)}</strong><span>${escapeHtml(label)}</span></button>`).join("")}</div><label class="classic-a4"><input type="checkbox" />A4</label><div class="diamond-sales-mode"><label><input type="radio" name="diamond-sales-mode" value="detailed" data-diamond-sales-mode ${salesReportOptions.diamondSalesMode === "detailed" ? "checked" : ""}/> Detailed</label><label><input type="radio" name="diamond-sales-mode" value="summary" data-diamond-sales-mode ${salesReportOptions.diamondSalesMode === "summary" ? "checked" : ""}/> Summary</label></div>${salesReportOptions.dateOpen ? salesDatePopup() : ""}</div>`;
+}
+
+function diamondSalesDetailRows() {
+  return salesReportSourceRows("Sales").filter((row) => row.category === "Diamond" || /diamond|talia/i.test(`${row.itemName} ${row.description}`)).map((row) => {
+    const clean = normalizeBillLine(row.bill?.sections?.sales?.find((line) => (line.id || line.barcode) === (row.bill?.sections?.sales?.[row.sl - 1]?.id || row.barcode)) || row.bill?.sections?.sales?.[row.sl - 1] || {}, 0, row.bill, "sales");
+    const taxable = Number(row.taxable || Math.max(0, row.amount - row.tax));
+    return {
+      ...row, branchEntryNo: row.branchEntryNo, salesman: row.staffName || "", itemDescription: row.description || "", quantity: row.qty,
+      entryDate: row.date,
+      grossWeight: row.gross, stoneWeight: row.stone, netWeight: row.net, stoneCharge: row.stoneCharge, vaPercent: row.va,
+      mcPerGram: row.mcPerGm, makingCharge: row.mc, taxAmount: row.tax, cessAmount: row.cess, discountAmount: row.discount,
+      additionalAmount: Number(clean.addition || 0), diamondAmount: row.dmdAmount, taxable, lineAmount: row.amount,
+      diamondCarat: Number(clean.dmdWgt || 0), diamondCaratType: clean.dmdCaratType || "Cnt", diamondPieces: Number(clean.dmdPcs || 0), diamondLineAmount: Number(clean.dmdAmount || row.dmdAmount || 0),
+      drillTarget: "sales", drillStorage: "bills", drillView: "Sales Invoice"
+    };
+  });
+}
+
+function diamondSalesReportConfig() {
+  const details = diamondSalesDetailRows();
+  const number = (key, label, decimals = 2) => ({ key, label, numeric: true, total: true, format: (value) => numberValue(value, decimals) });
+  if (salesReportOptions.diamondSalesMode === "summary") {
+    const rows = [...details.reduce((grouped, row) => {
+      const key = row.sourceBillId || row.entryNo;
+      if (!grouped.has(key)) grouped.set(key, { ...row, quantity: 0, grossWeight: 0, stoneWeight: 0, netWeight: 0, diamondCarat: 0, diamondAmount: 0, taxable: 0, lineAmount: 0 });
+      const target = grouped.get(key); ["quantity", "grossWeight", "stoneWeight", "netWeight", "diamondCarat", "diamondAmount", "taxable", "lineAmount"].forEach((field) => { target[field] += Number(row[field] || 0); });
+      return grouped;
+    }, new Map()).values()];
+    const columns = [{ key: "entryNo", label: "Eno" }, { key: "entryDate", label: "Date" }, { key: "salesman", label: "SmanName" }, { key: "customer", label: "Customer" }, number("quantity", "Qty", 0), number("grossWeight", "Gross_Weight", 3), number("stoneWeight", "stone_Weight", 3), number("netWeight", "Net_Weight", 3), number("diamondCarat", "DmdCarat", 3), number("diamondAmount", "Diamond"), number("taxable", "Taxable"), number("lineAmount", "Amount")];
+    return { columns, rows, gridClass: "diamond-sales-summary-grid", totals: salesTotalsForColumns(rows, columns) };
+  }
+  const columns = [
+    { key: "entryNo", label: "Eno" }, { key: "branchEntryNo", label: "BRANCHEno" }, { key: "date", label: "Date" }, { key: "salesman", label: "SmanName" },
+    { key: "itemId", label: "itemId" }, { key: "itemName", label: "item_Name" }, { key: "itemDescription", label: "item_desc" }, { key: "barcode", label: "barcode" },
+    number("quantity", "qty", 0), number("grossWeight", "Gross_Weight", 3), number("stoneWeight", "stone_Weight", 3), number("netWeight", "Net_Weight", 3),
+    number("stoneCharge", "Stone_Charge"), number("vaPercent", "Va_Perc"), number("mcPerGram", "mcPerGrm"), number("makingCharge", "MC"), number("rate", "Rate"),
+    number("taxAmount", "TaxAmt"), number("cessAmount", "CessAmt"), number("discountAmount", "Discount"), number("additionalAmount", "Additional"),
+    number("diamondAmount", "Diamond"), number("taxable", "Taxable"), number("lineAmount", "Amount"), number("diamondCarat", "DmdCarat", 3),
+    { key: "diamondCaratType", label: "dmdCarat" }, number("diamondPieces", "dmdPcs", 0), number("diamondLineAmount", "dmdAmt")
+  ];
+  return { columns, rows: details, gridClass: "diamond-sales-detail-grid", totals: salesTotalsForColumns(details, columns) };
+}
+
+const DIAMOND_PURCHASE_REPORT_OPTIONS = [
+  "Purchase Register", "Purchase Report", "Diamond Report", "SR/OP/LP Report", "SR/OP/LP Report Summary",
+  "SR/OP/LP Diamond Report", "SR/OP/LP Diamond Report Summary", "Summary Report"
+];
+
+function diamondPurchaseReportScreen() {
+  const config = diamondPurchaseReportConfig();
+  return `
+    <div class="classic-report-layout focused-classic-report">
+      <section class="classic-stock-report sales-report diamond-purchase-report">
+        ${diamondPurchaseReportToolbar()}
+        <header class="classic-report-title sales-report-title diamond-purchase-report-title">
+          <h3>***MT GOLD LAND***</h3><h4>***MT GOLD LAND***</h4>
+          <h2>${escapeHtml(salesReportOptions.diamondPurchaseReportOption)}&nbsp;&nbsp; [From ${escapeHtml(displaySalesDate(salesReportOptions.from))}&nbsp;&nbsp; To ${escapeHtml(displaySalesDate(salesReportOptions.to))} ]</h2>
+        </header>
+        ${salesReportOptions.shown ? salesReportTable(config.columns, config.rows, config.gridClass, config.totals) : salesReportBlankState()}
+      </section>
+    </div>
+  `;
+}
+
+function diamondPurchaseReportToolbar() {
+  const tools = [
+    ["SHOW", "sales-report-show"], ["PRINT", "print-now"], ["DIRECT PRINT", "print-now"], ["EXCEL", "export-report"], ["SAVE AS", "export-report"], ["DATE", "sales-report-date"],
+    ["FIRST", "noop"], ["PREV", "noop"], ["NEXT", "noop"], ["LAST", "noop"], ["VIEW/HIDE", "noop"], ["ZOOM IN", "noop"], ["DEFAULT", "noop"], ["ZOOM OUT", "noop"], ["CLOSE", "diamond-purchase-report-close"]
+  ];
+  return `<div class="classic-report-toolbar sales-report-toolbar diamond-purchase-report-toolbar"><div class="classic-tool-buttons">${tools.map(([label, action]) => `<button class="classic-tool" data-action="${action}" title="${escapeHtml(label)}"><strong>${toolbarGlyph(label)}</strong><span>${escapeHtml(label)}</span></button>`).join("")}</div><label class="classic-a4"><input type="checkbox" />A4</label><select class="diamond-purchase-report-select" data-diamond-purchase-report-option aria-label="Diamond Purchase report type">${DIAMOND_PURCHASE_REPORT_OPTIONS.map((option) => `<option value="${option}" ${salesReportOptions.diamondPurchaseReportOption === option ? "selected" : ""}>${option}</option>`).join("")}</select>${salesReportOptions.dateOpen ? salesDatePopup() : ""}</div>`;
+}
+
+function diamondPurchaseRegisterRow(bill) {
+  const ornamentLines = bill.ornamentLines || [];
+  const diamondLines = bill.diamondLines || [];
+  const ornamentTotal = ornamentLines.reduce((sum, line) => sum + Number(line.salesAmt || line.amount || 0), 0);
+  const embeddedDiamond = ornamentLines.reduce((sum, line) => sum + Number(line.diamondAmount || 0), 0);
+  const looseDiamond = diamondLines.reduce((sum, line) => sum + Number(line.amount || Number(line.caratCent || 0) * Number(line.purchaseRate || 0)), 0);
+  const diamondAmount = embeddedDiamond + looseDiamond;
+  const billAmount = Math.max(0, ornamentTotal - embeddedDiamond);
+  const addition = Number(bill.addition || 0), discount = Number(bill.discount || 0);
+  const taxable = Math.max(0, billAmount + diamondAmount + addition - discount);
+  const tax = taxable * (Number(bill.gstPct || 0) / 100);
+  const invoiceTotal = taxable + tax;
+  const cashPaid = Number(bill.cashPayment || 0);
+  return {
+    bill, entryNo: bill.entryNo || bill.id, referenceNo: bill.refNo || "", entryDate: displaySalesDate(bill.date), purchaseMode: bill.paymentMode || "Credit",
+    invoiceNo: bill.invoiceNo || "", invoiceDate: displaySalesDate(bill.invoiceDate || bill.date), partyName: bill.supplierSmith || bill.partyName || "",
+    billAmount, addition, discount, tax, diamondAmount, invoiceTotal, cashPaid, billBalance: invoiceTotal - cashPaid,
+    sourceBillId: bill.id || "", sourceEntryNo: bill.entryNo || "", sourceBillNo: bill.invoiceNo || "", sourceSection: "diamond",
+    drillTarget: "purchase", drillStorage: "diamondPurchases", drillView: "Diamond Purchase"
+  };
+}
+
+function diamondPurchaseReportConfig() {
+  const rows = (state.diamondPurchases || []).filter((bill) => isDateWithinPeriod(bill.date || bill.invoiceDate, salesReportOptions.from, salesReportOptions.to)).map(diamondPurchaseRegisterRow);
+  if (salesReportOptions.diamondPurchaseReportOption === "Purchase Report") return diamondPurchaseDetailReportConfig(rows);
+  if (salesReportOptions.diamondPurchaseReportOption === "Diamond Report") return diamondPurchaseDiamondReportConfig(rows);
+  if (salesReportOptions.diamondPurchaseReportOption === "SR/OP/LP Report") return diamondSrOpLpReportConfig(false, false);
+  if (salesReportOptions.diamondPurchaseReportOption === "SR/OP/LP Report Summary") return diamondSrOpLpReportConfig(true, false);
+  if (salesReportOptions.diamondPurchaseReportOption === "SR/OP/LP Diamond Report") return diamondSrOpLpReportConfig(false, true);
+  if (salesReportOptions.diamondPurchaseReportOption === "SR/OP/LP Diamond Report Summary") return diamondSrOpLpReportConfig(true, true);
+  if (salesReportOptions.diamondPurchaseReportOption === "Summary Report") return diamondPurchaseSummaryReportConfig(rows);
+  const columns = diamondPurchaseRegisterColumns();
+  return { columns, rows, gridClass: "diamond-purchase-register-grid", totals: salesTotalsForColumns(rows, columns) };
+}
+
+function diamondSrOpLpDetailRows() {
+  return (state.dmdWholesales || [])
+    .filter((bill) => isDateWithinPeriod(bill.date || bill.invoiceDate, salesReportOptions.from, salesReportOptions.to))
+    .flatMap((bill) => (bill.ornamentLines || []).map((line, index) => {
+      const diamond = (bill.diamondLines || []).find((item) => item.barcode && item.barcode === line.barcode) || (bill.diamondLines || [])[index] || {};
+      const grossWeight = Number(line.gross || 0), stoneWeight = Number(line.stone || 0), netWeight = Number(line.netWeight ?? Math.max(0, grossWeight - stoneWeight));
+      const qty = Number(line.nos || 0), goldRate = Number(line.goldRate || 0), goldBasis = line.salesType === "Nos" ? qty : netWeight;
+      const stonePrice = Number(line.stonePrice || 0), va = Number(line.va || 0), purchaseMc = Number(line.purMc || 0);
+      const diamondWeight = Number(diamond.caratCent || line.dmdWgt || 0), caratCentRate = Number(diamond.purchaseRate || line.stnSPrice || 0);
+      const diamondAmount = Number(diamond.amount || diamondWeight * caratCentRate);
+      const base = goldBasis * goldRate + (goldBasis * goldRate * va / 100) + stoneWeight * stonePrice + purchaseMc + diamondAmount;
+      const gstAmount = base * (Number(bill.gstPct || 0) / 100), total = base + gstAmount;
+      const employee = (state.staffs || []).find((staff) => staff.name === bill.preparedBy) || {};
+      const salesDiamondAmount = Number(line.dmdSalesAmount || diamond.sellingAmount || diamondWeight * Number(diamond.sellingRate || line.dmdSalesRate || 0));
+      return {
+        bill, entryType: bill.entryType || "DMDLP", entryNo: bill.entryNo || bill.id, entryDate: displaySalesDate(bill.date || bill.invoiceDate),
+        partyName: bill.partyName || bill.customer || "", employeeId: bill.employeeId || employee.id || employee.code || "", employeeName: bill.preparedBy || employee.name || "",
+        itemId: line.itemId || "", itemName: line.itemName || "", description: line.itemDescription || "", barcode: line.barcode || "", qty,
+        grossWeight, stoneWeight, netWeight, stonePrice, va, goldRate, purchaseMc, diamondWeight, caratCentRate, diamondAmount, gstAmount, total,
+        saleStonePrice: Number(line.saleStonePrice || line.salesStonePrice || 0), salesMc: Number(line.salesMc || 0), diamondSalesAmount: salesDiamondAmount,
+        diamondType: diamond.ct || line.dmdType || "Cnt", diamondPieces: Number(diamond.pcs || line.dmdPcs || 0),
+        colorType: diamond.colorType || line.colorType || "", colorScale: diamond.colorScale || line.colorScale || "", dmdShape: diamond.shape || line.dmdShape || "",
+        dmdCut: diamond.cut || line.dmdCut || "", dmdClarity: diamond.clarity || line.dmdClarity || "", dmdSieve: diamond.sieveSize || line.dmdSieve || "",
+        sourceBillId: bill.id || "", sourceEntryNo: bill.entryNo || "", sourceBillNo: bill.invoiceNo || "", sourceSection: "dmd-wholesale",
+        drillTarget: "sales", drillStorage: "dmdWholesales", drillView: "DMD Sales WholeSales"
+      };
+    }));
+}
+
+function diamondSrOpLpReportConfig(summary = false, diamondView = false) {
+  const detailRows = diamondSrOpLpDetailRows();
+  const rows = summary ? [...detailRows.reduce((grouped, row) => {
+    if (!grouped.has(row.sourceBillId || row.entryNo)) grouped.set(row.sourceBillId || row.entryNo, { ...row });
+    else {
+      const target = grouped.get(row.sourceBillId || row.entryNo);
+      ["qty", "grossWeight", "stoneWeight", "netWeight", "stonePrice", "va", "purchaseMc", "diamondWeight", "caratCentRate", "diamondAmount", "gstAmount", "total", "saleStonePrice", "salesMc", "diamondSalesAmount", "diamondPieces"].forEach((key) => { target[key] += Number(row[key] || 0); });
+    }
+    return grouped;
+  }, new Map()).values()] : detailRows;
+  const number = (key, label, decimals = 3) => ({ key, label, numeric: true, total: true, format: (value) => numberValue(value, decimals) });
+  let columns;
+  if (diamondView) columns = [
+    { key: "entryType", label: "EntryType" }, { key: "partyName", label: "partyName" }, { key: "entryNo", label: "EntryNo" }, { key: "entryDate", label: "Date" },
+    { key: "employeeId", label: "empid" }, { key: "employeeName", label: "EmpName" },
+    ...(!summary ? [{ key: "itemId", label: "ItemID" }, { key: "itemName", label: "Item_Name" }, { key: "barcode", label: "Barcode" }] : []),
+    number("qty", "Qty", 0), number("grossWeight", "Gross"), number("stoneWeight", "Stone"), number("netWeight", "Net"), number("stonePrice", "Stone_Price", 2),
+    number("purchaseMc", "PurchaseMC", 2), number("diamondWeight", "DMDCarat"), ...(!summary ? [{ key: "diamondType", label: "Type" }] : []), number("diamondPieces", "DMD_Pcs", 0),
+    ...(!summary ? [number("goldRate", "GoldRate", 2)] : []), number("diamondAmount", "SaleAmount", 2), number("salesMc", "SaleMc", 2),
+    number("diamondAmount", "PRate", 2), number("diamondSalesAmount", "SRate", 2),
+    ...(!summary ? [{ key: "colorType", label: "ColorType" }, { key: "colorScale", label: "ColorScale" }, { key: "dmdShape", label: "DMDShape" }, { key: "dmdCut", label: "DMDcut" }, { key: "dmdClarity", label: "DMDClarity" }, { key: "dmdSieve", label: "DMDSieve" }] : [])
+  ]; else columns = [
+    { key: "entryType", label: "EntryType" }, { key: "entryNo", label: "EntryNo" }, { key: "entryDate", label: "Date" },
+    ...(summary ? [{ key: "partyName", label: "PartyName" }] : []), { key: "employeeId", label: "empid" }, { key: "employeeName", label: "EmpName" },
+    ...(!summary ? [{ key: "itemId", label: "ItemId" }, { key: "itemName", label: "Item_Name" }, { key: "description", label: "Description" }, { key: "barcode", label: "Barcode" }] : []),
+    number("qty", "Qty", 0), number("grossWeight", "GrossWeight"), number("stoneWeight", "StoneWeight"), number("netWeight", "NetWeight"), number("stonePrice", "StonePrice"), number("va", "VA", 2),
+    ...(!summary ? [number("goldRate", "GoldRate"), number("purchaseMc", "PurchaseMC")] : []), number("diamondWeight", "DmdWeight"), number("caratCentRate", "Crt_CntRate"),
+    number("diamondAmount", "DmdAmount"), number("gstAmount", "GstAmount"), number("total", "Total"), number("saleStonePrice", "SaleStonePrice"), number("salesMc", "SalesMC"), number("diamondSalesAmount", "DmdSalesAmount")
+  ];
+  return { columns, rows, gridClass: diamondView ? "diamond-sr-diamond-grid" : "diamond-sr-report-grid", totals: salesTotalsForColumns(rows, columns) };
+}
+
+function diamondPurchaseSummaryReportConfig(registerRows) {
+  const rows = registerRows.map((row) => {
+    const bill = row.bill, ornamentLines = bill.ornamentLines || [];
+    const gross = ornamentLines.reduce((sum, line) => sum + Number(line.gross || 0), 0), stone = ornamentLines.reduce((sum, line) => sum + Number(line.stone || 0), 0);
+    const net = ornamentLines.reduce((sum, line) => sum + Number(line.netWeight ?? Math.max(0, Number(line.gross || 0) - Number(line.stone || 0))), 0);
+    const diamondLines = bill.diamondLines || [];
+    // Diamond detail rows describe the same stones referenced by ornament lines.
+    // Prefer their authoritative carat/cent total and only fall back to the
+    // ornament-level value, otherwise the summary can count the stones twice.
+    const caratCent = diamondLines.length
+      ? diamondLines.reduce((sum, line) => sum + Number(line.caratCent || 0), 0)
+      : ornamentLines.reduce((sum, line) => sum + Number(line.dmdWgt || 0), 0);
+    return { ...row, type: "DMD Purchase", branchEntryNo: row.entryNo, gross, stone, net, caratCent, tcsAmount: Number(bill.tcsPct || 0) * (row.billAmount + row.diamondAmount + row.addition - row.discount) / 100, tdsAmount: Number(bill.tdsPct || 0) * (row.billAmount + row.diamondAmount + row.addition - row.discount) / 100, hallmarking: Number(bill.hallmarking || 0), certification: Number(bill.certification || 0), gstHcAmount: Number(bill.gstHcAmount || 0) };
+  });
+  const number = (key, label, decimals = 3) => ({ key, label, numeric: true, total: true, format: (value) => numberValue(value, decimals) });
+  const columns = [
+    { key: "type", label: "Type" }, { key: "branchEntryNo", label: "branchEno" }, { key: "entryDate", label: "entryDate" }, { key: "purchaseMode", label: "pMode" },
+    { key: "invoiceNo", label: "invNo" }, { key: "invoiceDate", label: "invDate" }, { key: "partyName", label: "partyName" },
+    number("gross", "Gross"), number("stone", "Stone"), number("net", "Net"), number("caratCent", "Crt/Cnt"), number("diamondAmount", "DmdAmount"),
+    number("billAmount", "billAmt"), number("addition", "addition"), number("discount", "discount"), number("tax", "gst"), number("tcsAmount", "Tcs_Amt"), number("tdsAmount", "Tds_Amt"),
+    number("hallmarking", "HallMarking"), number("certification", "Certification"), number("gstHcAmount", "GST_HC_Amt"), number("invoiceTotal", "invTotal")
+  ];
+  return { columns, rows, gridClass: "diamond-purchase-summary-grid", totals: salesTotalsForColumns(rows, columns) };
+}
+
+function diamondPurchaseDiamondReportConfig(bills) {
+  const purchaseDetail = diamondPurchaseDetailReportConfig(bills);
+  const rows = purchaseDetail.rows.map((row) => {
+    const line = (row.bill?.ornamentLines || []).find((item) => item.barcode === row.barcode) || {};
+    const descriptionPieces = String(row.description || "").match(/(\d+)\s*pcs/i);
+    const dmdPieces = Number(line.dmdPcs || line.pcs || descriptionPieces?.[1] || 0);
+    const salesDiamondAmount = Number(line.dmdSalesAmount || (row.diamondWeight * Number(line.dmdSalesRate || row.caratCentRate || 0)));
+    return {
+      ...row,
+      partyName: row.partyName || row.bill?.supplierSmith || row.bill?.partyName || "",
+      dmdCarat: row.diamondWeight,
+      dmdType: line.dmdType || line.ct || "Cnt",
+      dmdPieces,
+      saleAmount: row.diamondAmount,
+      saleMc: row.salesMc,
+      purchaseRate: row.diamondAmount,
+      salesRate: salesDiamondAmount,
+      colorType: line.colorType || "",
+      colorScale: line.colorScale || "",
+      dmdShape: line.dmdShape || line.shape || "",
+      dmdCut: line.dmdCut || line.cut || "",
+      dmdClarity: line.dmdClarity || line.clarity || "",
+      dmdSieve: line.dmdSieve || line.sieveSize || ""
+    };
+  });
+  const number = (key, label, decimals = 3) => ({ key, label, numeric: true, total: true, format: (value) => numberValue(value, decimals) });
+  const columns = [
+    { key: "partyName", label: "partyName" }, { key: "entryNo", label: "EntryNo" }, { key: "entryDate", label: "Date" },
+    { key: "itemId", label: "ItemID" }, { key: "itemName", label: "Item_Name" }, { key: "barcode", label: "Barcode" },
+    number("qty", "Qty", 0), number("grossWeight", "Gross"), number("stoneWeight", "Stone"), number("netWeight", "Net"),
+    number("stonePrice", "Stone_Price", 2), number("purchaseMc", "PurchaseMC", 2), number("dmdCarat", "DMDCarat"),
+    { key: "dmdType", label: "Type" }, number("dmdPieces", "DMD_Pcs", 0), number("goldRate", "GoldRate", 2),
+    number("saleAmount", "SaleAmount", 2), number("saleMc", "SaleMc", 2), number("purchaseRate", "PRate", 2), number("salesRate", "SRate", 2),
+    { key: "colorType", label: "ColorType" }, { key: "colorScale", label: "ColorScale" }, { key: "dmdShape", label: "DMDShape" },
+    { key: "dmdCut", label: "DMDcut" }, { key: "dmdClarity", label: "DMDClarity" }, { key: "dmdSieve", label: "DMDSieve" }
+  ];
+  return { columns, rows, gridClass: "diamond-purchase-diamond-grid", totals: salesTotalsForColumns(rows, columns) };
+}
+
+function diamondPurchaseDetailReportConfig(bills) {
+  const rows = bills.flatMap((parent) => (parent.bill.ornamentLines || []).map((line) => {
+    const grossWeight = Number(line.gross || 0), stoneWeight = Number(line.stone || 0);
+    const netWeight = Number(line.netWeight ?? Math.max(0, grossWeight - stoneWeight));
+    const stonePrice = Number(line.stonePrice || 0), va = Number(line.va || 0), goldRate = Number(line.goldRate || 0);
+    const purchaseMc = Number(line.purMc || line.purchaseMc || 0), diamondWeight = Number(line.dmdWgt || 0);
+    const caratCentRate = Number(line.stnSPrice || line.caratCentRate || 0);
+    const diamondAmount = Number(line.diamondAmount || diamondWeight * caratCentRate);
+    const goldAmount = (line.salesType === "Nos" ? Number(line.nos || 0) : netWeight) * goldRate;
+    const stoneAmount = stoneWeight * stonePrice;
+    const baseAmount = goldAmount + goldAmount * (va / 100) + stoneAmount + purchaseMc + diamondAmount;
+    const gstAmount = baseAmount * (Number(parent.bill.gstPct || 0) / 100);
+    const total = baseAmount + gstAmount;
+    const saleStonePrice = Number(line.saleStonePrice || line.salesStonePrice || 0);
+    const salesMc = Number(line.salesMc || 0);
+    const diamondSalesAmount = Number(line.dmdSalesAmount || diamondWeight * Number(line.dmdSalesRate || line.salesDiamondRate || 0));
+    return {
+      ...parent,
+      itemId: line.itemId || "", itemName: line.itemName || "", description: line.itemDescription || "", barcode: line.barcode || "",
+      qty: Number(line.nos || 0), grossWeight, stoneWeight, netWeight, stonePrice, va, goldRate, purchaseMc,
+      diamondWeight, caratCentRate, diamondAmount, gstAmount, total, saleStonePrice, salesMc, diamondSalesAmount
+    };
+  }));
+  const number = (key, label, decimals = 3) => ({ key, label, numeric: true, total: true, format: (value) => numberValue(value, decimals) });
+  const columns = [
+    { key: "entryNo", label: "EntryNo" }, { key: "entryDate", label: "Date" }, { key: "itemId", label: "ItemId" },
+    { key: "itemName", label: "Item_Name" }, { key: "description", label: "Description" }, { key: "barcode", label: "Barcode" },
+    number("qty", "Qty", 0), number("grossWeight", "GrossWeight"), number("stoneWeight", "StoneWeight"), number("netWeight", "NetWeight"),
+    number("stonePrice", "StonePrice"), number("va", "VA%", 2), number("goldRate", "GoldRate"), number("purchaseMc", "PurchaseMC"),
+    number("diamondWeight", "DmdWeight"), number("caratCentRate", "Crt/CntRate"), number("diamondAmount", "DmdAmount"),
+    number("gstAmount", "GstAmount"), number("total", "Total"), number("saleStonePrice", "SaleStonePrice"),
+    number("salesMc", "SalesMC"), number("diamondSalesAmount", "DmdSalesAmount")
+  ];
+  return { columns, rows, gridClass: "diamond-purchase-detail-grid", totals: salesTotalsForColumns(rows, columns) };
+}
+
+function diamondPurchaseRegisterColumns() {
+  const money = (key, label) => ({ key, label, numeric: true, total: true, format: (value) => numberValue(value, 3) });
+  return [
+    { key: "entryNo", label: "EntryNo" }, { key: "referenceNo", label: "RefNo" }, { key: "entryDate", label: "Entry_Date" },
+    { key: "purchaseMode", label: "Purchase_Mode" }, { key: "invoiceNo", label: "InvNo" }, { key: "invoiceDate", label: "InvDate" },
+    { key: "partyName", label: "Party_Name" }, money("billAmount", "Bill_Amt"), money("addition", "Addition"), money("discount", "Discount"),
+    money("tax", "Tax"), money("diamondAmount", "DmdAmt"), money("invoiceTotal", "InvTotal"), money("cashPaid", "Cash_Paid"), money("billBalance", "Bill_Balance")
+  ];
+}
+
+function purchaseReturnReportScreen() {
+  const config = purchaseReturnReportConfig();
+  return `
+    <div class="classic-report-layout focused-classic-report">
+      <section class="classic-stock-report sales-report purchase-return-report">
+        ${purchaseReturnReportToolbar()}
+        <header class="classic-report-title sales-report-title purchase-return-report-title">
+          <h3>***MT GOLD LAND***</h3>
+          <h4>***MT GOLD LAND***</h4>
+          <h2>${escapeHtml(salesReportOptions.purchaseReturnReportOption)}</h2>
+          <span>From ${escapeHtml(displaySalesDate(salesReportOptions.from))}&nbsp;&nbsp; To ${escapeHtml(displaySalesDate(salesReportOptions.to))}</span>
+        </header>
+        ${salesReportOptions.shown ? salesReportTable(config.columns, config.rows, config.gridClass, config.totals) : salesReportBlankState()}
+      </section>
+    </div>
+  `;
+}
+
+function purchaseReturnReportToolbar() {
+  const tools = [
+    ["SHOW", "sales-report-show"], ["PRINT", "print-now"], ["DIRECT PRINT", "print-now"], ["EXCEL", "export-report"], ["SAVE AS", "export-report"], ["DATE", "sales-report-date"],
+    ["FIRST", "noop"], ["PREV", "noop"], ["NEXT", "noop"], ["LAST", "noop"], ["VIEW/HIDE", "noop"], ["ZOOM IN", "noop"], ["DEFAULT", "noop"], ["ZOOM OUT", "noop"], ["CLOSE", "purchase-return-report-close"]
+  ];
+  return `
+    <div class="classic-report-toolbar sales-report-toolbar purchase-return-report-toolbar">
+      <div class="classic-tool-buttons">${tools.map(([label, action]) => `<button class="classic-tool" data-action="${action}" title="${escapeHtml(label)}"><strong>${toolbarGlyph(label)}</strong><span>${escapeHtml(label)}</span></button>`).join("")}</div>
+      <label class="classic-a4"><input type="checkbox" />A4</label>
+      <select class="purchase-return-report-select" data-purchase-return-report-option aria-label="Purchase Return report type">
+        ${PURCHASE_RETURN_REPORT_OPTIONS.map((option) => `<option value="${option}" ${salesReportOptions.purchaseReturnReportOption === option ? "selected" : ""}>${option}</option>`).join("")}
+      </select>
+      ${salesReportOptions.dateOpen ? salesDatePopup() : ""}
+    </div>
+  `;
+}
+
+function purchaseReturnReportConfig() {
+  const bills = purchaseReturnReportSourceRows();
+  if (salesReportOptions.purchaseReturnReportOption === "Purchase Return Report") return purchaseReturnDetailConfig(bills);
+  const columns = purchaseReturnRegisterColumns();
+  return { columns, rows: bills, gridClass: "purchase-return-register-grid", totals: salesTotalsForColumns(bills, columns) };
+}
+
+function purchaseReturnReportSourceRows() {
+  const sources = [];
+  (state.bills || []).filter((bill) => {
+    const type = String(bill.type || "").toLowerCase();
+    return type.includes("purchase") && type.includes("return");
+  }).forEach((record) => sources.push({ record, storage: "bills", view: "Purchase Return" }));
+  (state.directPurchaseReturns || []).forEach((record) => sources.push({ record, storage: "directPurchaseReturns", view: "Direct Purchase Return" }));
+  (state.diamondPurchaseReturns || []).forEach((record) => sources.push({ record, storage: "diamondPurchaseReturns", view: "Diamond Purchase Return" }));
+  return sources
+    .filter(({ record }) => isDateWithinPeriod(record.date || record.invoiceDate, salesReportOptions.from, salesReportOptions.to))
+    .map(({ record, storage, view }) => purchaseReturnReportBillRow(record, storage, view))
+    .filter((row) => row.lines.length || row.billAmount || row.invoiceTotal);
+}
+
+function purchaseReturnReportBillRow(bill, storage, view) {
+  const sourceLines = (bill.sections?.exchange || []).length ? bill.sections.exchange : (bill.lines || bill.ornamentLines || bill.diamondLines || [bill.line].filter(Boolean));
+  const lines = sourceLines.map((line) => normalizeBillLine(line, line.amount || line.itemTotal || 0, bill, "purchase-return"));
+  const partyId = bill.customerId || bill.supplierId || bill.partyId || bill.customerCode || "";
+  const party = (state.parties || []).find((item) => item.id === partyId || item.customerId === partyId || item.customerCode === partyId || item.name === bill.customer || item.name === bill.partyName || item.name === bill.supplierName) || {};
+  const billAmount = lines.reduce((sum, line) => sum + Number(line.itemTotal || line.amount || 0), 0) || Number(bill.billAmount || bill.total || 0);
+  const gst = lines.reduce((sum, line) => sum + Number(line.tax || 0), 0) || Number(bill.gst || bill.taxAmount || 0);
+  const addition = Number(bill.totals?.addition || bill.addition || 0);
+  const discount = Number(bill.totals?.flatDiscount || bill.discount || 0);
+  const invoiceTotal = billAmount + addition - discount + gst;
+  const entryMode = bill.paymentMode || bill.entryMode || "Cash";
+  const explicitCash = bill.totals?.cashPaid ?? bill.totals?.payment ?? bill.paid;
+  const cashPaid = Number(explicitCash ?? (String(entryMode).toLowerCase() === "cash" ? invoiceTotal : 0));
+  const explicitBalance = bill.totals?.accountBalance ?? bill.accountBalance ?? bill.balance;
+  const balance = Number(explicitBalance ?? Math.max(0, invoiceTotal - cashPaid));
+  return {
+    bill,
+    lines,
+    billNo: bill.billNo || bill.entryNo || bill.invoiceNo || bill.id,
+    branchEntryNo: bill.entryNo || bill.returnEntryNo || bill.billNo || "",
+    referenceNo: bill.refNo || bill.referenceNo || "",
+    entryDate: displaySalesDate(bill.date || bill.invoiceDate),
+    entryMode,
+    partyId: partyId || party.customerCode || party.id || "",
+    ledgerName: bill.ledgerName || bill.cashAccount || bill.accountName || "Cash in Hand",
+    partyName: bill.customer || bill.partyName || bill.supplierName || party.name || "",
+    partyAddress: bill.customerAddress || bill.address || party.address || party.place || "",
+    billAmount,
+    addition,
+    discount,
+    gst,
+    cgst: gst / 2,
+    sgst: gst / 2,
+    invoiceTotal,
+    cashPaid,
+    balance,
+    sourceBillId: bill.id || "",
+    sourceEntryNo: bill.entryNo || bill.returnEntryNo || bill.invoiceNo || "",
+    sourceBillNo: bill.billNo || bill.invoiceNo || "",
+    sourceSection: "exchange",
+    drillTarget: "purchase",
+    drillStorage: storage,
+    drillView: view
+  };
+}
+
+function purchaseReturnRegisterColumns() {
+  const money = (key, label, decimals = 2) => ({ key, label, numeric: true, total: true, format: (value) => numberValue(value, decimals) });
+  return [
+    { key: "billNo", label: "BillNo" }, { key: "branchEntryNo", label: "BranchENo" }, { key: "referenceNo", label: "RefNo" },
+    { key: "entryDate", label: "EDate" }, { key: "entryMode", label: "EMode" }, { key: "partyId", label: "PartyID" },
+    { key: "ledgerName", label: "LedgerName" }, { key: "partyName", label: "PartyName" }, { key: "partyAddress", label: "PartyAddress" },
+    money("billAmount", "BillAmount"), money("addition", "Addition"), money("discount", "Discount"), money("gst", "GST"),
+    money("cgst", "CGST"), money("sgst", "SGST"), money("invoiceTotal", "InvoiceTotal"), money("cashPaid", "CashPaid"), money("balance", "Balance")
+  ];
+}
+
+function purchaseReturnDetailConfig(bills) {
+  const rows = bills.flatMap((bill) => bill.lines.map((line) => {
+    const grossWeight = Number(line.gross || 0);
+    const stoneWeight = Number(line.stone || 0);
+    const mudLess = Number(line.mudLess || 0);
+    const lossPercentage = Number(line.lessPct || line.weightLessPct || 0);
+    const weightLess = Number(line.weightLess || line.lessWeight || 0);
+    const touchLess = Number(line.touchLess || 0);
+    const calculatedNet = Math.max(0, grossWeight - stoneWeight - mudLess - weightLess - touchLess);
+    return {
+      ...bill,
+      itemId: line.item || line.itemId || "",
+      itemName: line.itemName || "",
+      itemDescription: line.description || line.itemDescription || "",
+      itemType: line.itemType || line.goldType || itemCategoryForName(line.itemName) || "",
+      quantity: Number(line.qty || 0),
+      grossWeight,
+      stoneWeight,
+      mudLess,
+      lossPercentage,
+      weightLess,
+      touchPercentage: Number(line.touchPct || line.touch || 0),
+      touchLess,
+      netWeight: Number(line.net ?? calculatedNet),
+      stoneAmount: Number(line.stoneAmount || line.stoneCharge || 0),
+      rate: Number(line.rate || 0),
+      amount: Number(line.itemTotal || line.amount || 0),
+      category: line.category || "",
+      itemDiscount: Number(line.discount || line.itemDiscount || 0),
+      itemAddition: Number(line.addition || line.itemAddition || 0)
+    };
+  }));
+  const number = (key, label, decimals = 3) => ({ key, label, numeric: true, format: (value) => numberValue(value, decimals) });
+  const columns = [
+    { key: "billNo", label: "BillNo" },
+    { key: "branchEntryNo", label: "BranchENo" },
+    { key: "referenceNo", label: "RefNo" },
+    { key: "entryDate", label: "EDate" },
+    { key: "partyId", label: "PartyID" },
+    { key: "ledgerName", label: "LedgerName" },
+    { key: "partyName", label: "PartyName" },
+    { key: "partyAddress", label: "PartyAddress" },
+    { key: "itemId", label: "ItemID" },
+    { key: "itemName", label: "ItemName" },
+    { key: "itemDescription", label: "ItemDescription" },
+    { key: "itemType", label: "ItemType" },
+    number("quantity", "Qty", 0),
+    number("grossWeight", "GrossWeight"),
+    number("stoneWeight", "StoneWeight"),
+    number("mudLess", "MudLess"),
+    number("lossPercentage", "WeightLess", 2),
+    number("weightLess", "WeightLess"),
+    number("touchPercentage", "TouchPerc", 2),
+    number("touchLess", "TouchLess"),
+    number("netWeight", "NetWeight"),
+    number("stoneAmount", "StoneAmount"),
+    number("rate", "Rate"),
+    number("amount", "Amount"),
+    { key: "category", label: "Category" },
+    number("itemDiscount", "ItemDiscount"),
+    number("itemAddition", "ItemAddition")
+  ];
+  return { columns, rows, gridClass: "purchase-return-detail-grid", totals: {} };
 }
 
 function salesReturnReportToolbar() {
@@ -11942,12 +13111,16 @@ function salesReportDrillAttrs(row = {}) {
   if (!billId && !entryNo && !billNo) return "";
   const section = row.sourceSection || "";
   const target = row.drillTarget || "";
+  const storage = row.drillStorage || "";
+  const view = row.drillView || "";
   return [
     billId ? `data-report-bill-id="${escapeHtml(billId)}"` : "",
     entryNo ? `data-report-entry-no="${escapeHtml(entryNo)}"` : "",
     billNo ? `data-report-bill-no="${escapeHtml(billNo)}"` : "",
     section ? `data-report-section="${escapeHtml(section)}"` : "",
-    target ? `data-report-target="${escapeHtml(target)}"` : ""
+    target ? `data-report-target="${escapeHtml(target)}"` : "",
+    storage ? `data-report-storage="${escapeHtml(storage)}"` : "",
+    view ? `data-report-view="${escapeHtml(view)}"` : ""
   ].filter(Boolean).join(" ");
 }
 
@@ -13732,6 +14905,56 @@ function exportExchangeReportCsv() {
   const data = config.rows.map((row) => config.columns.map((column) => column.format ? column.format(row[column.key], row) : row[column.key] ?? ""));
   const totals = config.columns.map((column) => column.total ? (column.format ? column.format(config.totals[column.key], config.totals) : config.totals[column.key]) : "");
   downloadCsv(`exchange-${salesReportOptions.exchangeReportOption.toLowerCase().replaceAll(" ", "-")}.csv`, [["MT GOLD LAND"], [salesReportOptions.exchangeReportOption], [], headers, ...data, totals]);
+}
+
+function exportPurchaseReportCsv() {
+  const config = purchaseReportConfig();
+  const headers = config.columns.map((column) => column.label);
+  const data = config.rows.map((row) => config.columns.map((column) => column.format ? column.format(row[column.key], row) : row[column.key] ?? ""));
+  const totals = config.columns.map((column) => column.total ? (column.format ? column.format(config.totals[column.key], config.totals) : config.totals[column.key]) : "");
+  const filename = `purchase-${salesReportOptions.purchaseReportOption.toLowerCase().replaceAll(" ", "-")}.csv`;
+  downloadCsv(filename, [["MT GOLD LAND"], [salesReportOptions.purchaseReportOption], [`From ${displaySalesDate(salesReportOptions.from)} To ${displaySalesDate(salesReportOptions.to)}`], [], headers, ...data, totals]);
+}
+
+function exportPurchaseReturnReportCsv() {
+  const config = purchaseReturnReportConfig();
+  const headers = config.columns.map((column) => column.label);
+  const data = config.rows.map((row) => config.columns.map((column) => column.format ? column.format(row[column.key], row) : row[column.key] ?? ""));
+  const totals = config.columns.map((column) => column.total ? (column.format ? column.format(config.totals[column.key], config.totals) : config.totals[column.key]) : "");
+  const filename = `purchase-return-${salesReportOptions.purchaseReturnReportOption.toLowerCase().replaceAll(" ", "-")}.csv`;
+  downloadCsv(filename, [["MT GOLD LAND"], [salesReportOptions.purchaseReturnReportOption], [`From ${displaySalesDate(salesReportOptions.from)} To ${displaySalesDate(salesReportOptions.to)}`], [], headers, ...data, totals]);
+}
+
+function exportDirectGoldPurchaseReportCsv() {
+  const config = directGoldPurchaseReportConfig();
+  const headers = config.columns.map((column) => column.label);
+  const data = config.rows.map((row) => config.columns.map((column) => column.format ? column.format(row[column.key], row) : row[column.key] ?? ""));
+  const totals = config.columns.map((column) => column.total ? (column.format ? column.format(config.totals[column.key], config.totals) : config.totals[column.key]) : "");
+  downloadCsv(`direct-gold-purchase-${salesReportOptions.directGoldPurchaseReportOption.toLowerCase().replaceAll(" ", "-")}.csv`, [["MT GOLD LAND"], [`Direct Gold Purchase ${salesReportOptions.directGoldPurchaseReportOption}`], [`From ${displaySalesDate(salesReportOptions.from)} To ${displaySalesDate(salesReportOptions.to)}`], [], headers, ...data, totals]);
+}
+
+function exportDirectGoldPurchaseReturnReportCsv() {
+  const config = directGoldPurchaseReturnReportConfig();
+  const headers = config.columns.map((column) => column.label);
+  const data = config.rows.map((row) => config.columns.map((column) => column.format ? column.format(row[column.key], row) : row[column.key] ?? ""));
+  const totals = config.columns.map((column) => column.total ? (column.format ? column.format(config.totals[column.key], config.totals) : config.totals[column.key]) : "");
+  downloadCsv(`direct-gold-purchase-return-${salesReportOptions.directGoldPurchaseReturnReportOption.toLowerCase().replaceAll(" ", "-")}.csv`, [["MT GOLD LAND"], [`Direct Gold Purchase Return ${salesReportOptions.directGoldPurchaseReturnReportOption}`], [`From ${displaySalesDate(salesReportOptions.from)} To ${displaySalesDate(salesReportOptions.to)}`], [], headers, ...data, totals]);
+}
+
+function exportDiamondPurchaseReportCsv() {
+  const config = diamondPurchaseReportConfig();
+  const headers = config.columns.map((column) => column.label);
+  const data = config.rows.map((row) => config.columns.map((column) => column.format ? column.format(row[column.key], row) : row[column.key] ?? ""));
+  const totals = config.columns.map((column) => column.total ? (column.format ? column.format(config.totals[column.key], config.totals) : config.totals[column.key]) : "");
+  downloadCsv(`diamond-purchase-${salesReportOptions.diamondPurchaseReportOption.toLowerCase().replaceAll(" ", "-").replaceAll("/", "-")}.csv`, [["MT GOLD LAND"], [salesReportOptions.diamondPurchaseReportOption], [`From ${displaySalesDate(salesReportOptions.from)} To ${displaySalesDate(salesReportOptions.to)}`], [], headers, ...data, totals]);
+}
+
+function exportDiamondSalesReportCsv() {
+  const config = diamondSalesReportConfig();
+  const headers = config.columns.map((column) => column.label);
+  const data = config.rows.map((row) => config.columns.map((column) => column.format ? column.format(row[column.key], row) : row[column.key] ?? ""));
+  const totals = config.columns.map((column) => column.total ? (column.format ? column.format(config.totals[column.key], config.totals) : config.totals[column.key]) : "");
+  downloadCsv(`diamond-sales-${salesReportOptions.diamondSalesMode}.csv`, [["MT GOLD LAND"], [`Diamond Sales ${salesReportOptions.diamondSalesMode}`], [`From ${displaySalesDate(salesReportOptions.from)} To ${displaySalesDate(salesReportOptions.to)}`], [], headers, ...data, totals]);
 }
 
 function toolbarGlyph(label) {
@@ -16949,10 +18172,18 @@ function openMenuTarget(target) {
 
 function selectReport(name) {
   active = "Reports";
-  selectedReport = name || "Day Summary";
+  // Diamond is a navigation parent, not a standalone report. Land on its
+  // first implemented child instead of falling through to the placeholder.
+  selectedReport = name === "Diamond" ? "Diamond Purchase" : (name || "Day Summary");
   if (selectedReport === "Sales Profit") salesReportOptions = { ...salesReportOptions, shown: true, profitGroup: salesReportOptions.profitGroup || "item" };
   if (selectedReport === "Sales Return") salesReportOptions = { ...salesReportOptions, shown: true, returnReportOption: salesReportOptions.returnReportOption || "Sales Return Report" };
   if (selectedReport === "Exchange") salesReportOptions = { ...salesReportOptions, shown: true, exchangeReportOption: salesReportOptions.exchangeReportOption || "Register" };
+  if (selectedReport === "Purchase") salesReportOptions = { ...salesReportOptions, shown: true, purchaseReportOption: salesReportOptions.purchaseReportOption || "Purchase Register" };
+  if (selectedReport === "Purchase Return") salesReportOptions = { ...salesReportOptions, shown: true, purchaseReturnReportOption: salesReportOptions.purchaseReturnReportOption || "Purchase Return Register" };
+  if (selectedReport === "Direct Gold Purchase") salesReportOptions = { ...salesReportOptions, shown: true, directGoldPurchaseReportOption: salesReportOptions.directGoldPurchaseReportOption || "Purchase Register" };
+  if (selectedReport === "Direct Gold Purchase Return") salesReportOptions = { ...salesReportOptions, shown: true, directGoldPurchaseReturnReportOption: salesReportOptions.directGoldPurchaseReturnReportOption || "Purchase Return Register" };
+  if (selectedReport === "Diamond Purchase") salesReportOptions = { ...salesReportOptions, shown: true, diamondPurchaseReportOption: salesReportOptions.diamondPurchaseReportOption || "Purchase Register" };
+  if (selectedReport === "Diamond Sales") salesReportOptions = { ...salesReportOptions, shown: true, diamondSalesMode: salesReportOptions.diamondSalesMode || "detailed" };
   recentReportItems = [selectedReport, ...recentReportItems.filter((item) => item !== selectedReport)].slice(0, 5);
 }
 
@@ -16962,7 +18193,10 @@ function openReportBillDetail(row) {
   const billNo = row.dataset.reportBillNo || "";
   const section = row.dataset.reportSection || "";
   const target = row.dataset.reportTarget || "";
-  const bill = (state.bills || []).find((item) => {
+  const storage = row.dataset.reportStorage || "bills";
+  const view = row.dataset.reportView || "Purchase Invoice";
+  const collection = state[storage] || state.bills || [];
+  const bill = collection.find((item) => {
     return (billId && item.id === billId)
       || (entryNo && item.entryNo === entryNo)
       || (billNo && item.billNo === billNo)
@@ -16972,18 +18206,19 @@ function openReportBillDetail(row) {
     toast("Detailed bill not found for this report row.");
     return;
   }
-  state.bills = [bill, ...(state.bills || []).filter((item) => item !== bill)];
+  if (storage === "bills") state.bills = [bill, ...(state.bills || []).filter((item) => item !== bill)];
+  else state[storage] = [bill, ...collection.filter((item) => item !== bill)];
   if (target === "purchase") {
     active = "Purchase";
     expandedNavGroups.add("Purchase");
-    purchaseView = "Purchase Invoice";
+    purchaseView = view;
     render();
     toast(`Opened Purchase Invoice ${bill.entryNo || bill.billNo || bill.id}.`);
     return;
   }
   active = "Sales";
   expandedNavGroups.add("Sales");
-  salesView = section === "return" || ((bill.sections?.return || []).length && !(bill.sections?.sales || []).length) ? "Sales Return" : "Sales Invoice";
+  salesView = view && view !== "Purchase Invoice" ? view : section === "return" || ((bill.sections?.return || []).length && !(bill.sections?.sales || []).length) ? "Sales Return" : "Sales Invoice";
   render();
   toast(`Opened ${salesView} ${bill.entryNo || bill.billNo || bill.id}.`);
 }
@@ -17120,6 +18355,9 @@ function bindEvents() {
   document.querySelector("[data-chart-account-search]")?.addEventListener("input", (event) => { chartAccountOptions = { ...chartAccountOptions, search: event.currentTarget.value }; financialReportOptions = { ...financialReportOptions, page: 0 }; renderAndFocus("[data-chart-account-search]"); });
   document.querySelector("[data-chart-final-account]")?.addEventListener("change", (event) => { chartAccountOptions = { ...chartAccountOptions, finalAccount: event.currentTarget.value }; financialReportOptions = { ...financialReportOptions, page: 0 }; render(); });
   document.querySelector("[data-chart-hide-zero]")?.addEventListener("change", (event) => { chartAccountOptions = { ...chartAccountOptions, hideZero: event.currentTarget.checked }; financialReportOptions = { ...financialReportOptions, page: 0 }; render(); });
+  document.querySelector("[data-trial-balance-view]")?.addEventListener("change", (event) => { trialBalanceView = event.currentTarget.value; financialReportOptions = { ...financialReportOptions, page: 0, shown: true }; render(); });
+  document.querySelectorAll("[data-trial-balance-measure]").forEach((input) => input.addEventListener("change", (event) => { trialBalanceMeasure = event.currentTarget.value; financialReportOptions = { ...financialReportOptions, page: 0 }; render(); }));
+  document.querySelector("[data-trial-balance-22ct]")?.addEventListener("change", (event) => { trialBalance22Ct = event.currentTarget.checked; financialReportOptions = { ...financialReportOptions, page: 0 }; render(); });
   document.querySelectorAll("[data-financial-report-home]").forEach((button) => {
     button.addEventListener("click", () => { selectedFinancialReport = ""; renderScreen(); });
   });
@@ -17173,6 +18411,33 @@ function bindEvents() {
     salesReportOptions = { ...salesReportOptions, exchangeReportOption: event.currentTarget.value, shown: true };
     render();
   });
+
+  document.querySelector("[data-purchase-report-option]")?.addEventListener("change", (event) => {
+    salesReportOptions = { ...salesReportOptions, purchaseReportOption: event.currentTarget.value, shown: true };
+    render();
+  });
+
+  document.querySelector("[data-purchase-return-report-option]")?.addEventListener("change", (event) => {
+    salesReportOptions = { ...salesReportOptions, purchaseReturnReportOption: event.currentTarget.value, shown: true };
+    render();
+  });
+
+  document.querySelector("[data-direct-gold-purchase-report-option]")?.addEventListener("change", (event) => {
+    salesReportOptions = { ...salesReportOptions, directGoldPurchaseReportOption: event.currentTarget.value, shown: true };
+    render();
+  });
+  document.querySelector("[data-direct-gold-purchase-return-report-option]")?.addEventListener("change", (event) => {
+    salesReportOptions = { ...salesReportOptions, directGoldPurchaseReturnReportOption: event.currentTarget.value, shown: true };
+    render();
+  });
+  document.querySelector("[data-diamond-purchase-report-option]")?.addEventListener("change", (event) => {
+    salesReportOptions = { ...salesReportOptions, diamondPurchaseReportOption: event.currentTarget.value, shown: true };
+    render();
+  });
+  document.querySelectorAll("[data-diamond-sales-mode]").forEach((input) => input.addEventListener("change", (event) => {
+    salesReportOptions = { ...salesReportOptions, diamondSalesMode: event.currentTarget.value, shown: true };
+    render();
+  }));
 
   document.querySelectorAll("[data-sales-profit-option]").forEach((input) => {
     input.addEventListener("change", () => {
@@ -22448,6 +23713,36 @@ function handleAction(action, source) {
       toast(`Exchange ${salesReportOptions.exchangeReportOption} exported for Excel.`);
       return;
     }
+    if (selectedReport === "Purchase") {
+      exportPurchaseReportCsv();
+      toast(`${salesReportOptions.purchaseReportOption} exported for Excel.`);
+      return;
+    }
+    if (selectedReport === "Purchase Return") {
+      exportPurchaseReturnReportCsv();
+      toast(`${salesReportOptions.purchaseReturnReportOption} exported for Excel.`);
+      return;
+    }
+    if (selectedReport === "Direct Gold Purchase") {
+      exportDirectGoldPurchaseReportCsv();
+      toast(`Direct Gold Purchase ${salesReportOptions.directGoldPurchaseReportOption} exported for Excel.`);
+      return;
+    }
+    if (selectedReport === "Direct Gold Purchase Return") {
+      exportDirectGoldPurchaseReturnReportCsv();
+      toast(`Direct Gold Purchase Return ${salesReportOptions.directGoldPurchaseReturnReportOption} exported for Excel.`);
+      return;
+    }
+    if (selectedReport === "Diamond Purchase") {
+      exportDiamondPurchaseReportCsv();
+      toast(`Diamond Purchase ${salesReportOptions.diamondPurchaseReportOption} exported for Excel.`);
+      return;
+    }
+    if (selectedReport === "Diamond Sales") {
+      exportDiamondSalesReportCsv();
+      toast(`Diamond Sales ${salesReportOptions.diamondSalesMode} report exported for Excel.`);
+      return;
+    }
     if (selectedReport === "Reconciliation Crosstab") {
       exportReconciliationCrosstabCsv();
       toast("Reconciliation Crosstab exported for Excel.");
@@ -22487,6 +23782,30 @@ function handleAction(action, source) {
   }
   if (action === "exchange-report-close") {
     selectedReport = "Sales";
+    render();
+  }
+  if (action === "purchase-report-close") {
+    selectedReport = "Sales";
+    render();
+  }
+  if (action === "purchase-return-report-close") {
+    selectedReport = "Purchase";
+    render();
+  }
+  if (action === "direct-gold-purchase-report-close") {
+    selectedReport = "Purchase";
+    render();
+  }
+  if (action === "direct-gold-purchase-return-report-close") {
+    selectedReport = "Purchase";
+    render();
+  }
+  if (action === "diamond-purchase-report-close") {
+    selectedReport = "Diamond";
+    render();
+  }
+  if (action === "diamond-sales-report-close") {
+    selectedReport = "Diamond";
     render();
   }
   if (["profit-first", "profit-prev", "profit-next", "profit-last"].includes(action)) {
