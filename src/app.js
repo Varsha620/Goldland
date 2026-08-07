@@ -4,7 +4,9 @@ const PURCHASE_ITEMS = ["Purchase Invoice", "Purchase Return", "Diamond Purchase
 const WORK_ORDER_ITEMS = ["Smith", "Jeweller", "Refining", "Sample", "Polishing", "Service / Job", "Complimentary Item"];
 const ACCOUNT_ITEMS = ["Account Ledger", "Cash Receipt", "Cash Payment", "Bank Deposit", "Bank Withdrawal", "Journal Voucher", "PDC Transactions", "Direct Entry", "Expense Entry", "Bill Wise Collection", "Bill Wise Payment", "Discount in Credit Note", "Discount in Debit Note", "Custom Voucher"];
 const MANAGEMENT_ITEMS = ["Customers", "Suppliers", "Smiths", "Refiners", "Employees", "Item Category", "Miscellaneous", "Item Creation", "Account Creation"];
-const EXPANDABLE_NAVS = new Set(["Sales", "Purchase", "Stock", "Work Orders", "Accounts", "Management", "Financial Reports", "Reports"]);
+const SCHEME_ITEMS = ["Scheme Master", "Scheme Members", "Scheme Collection", "Scheme Refund/Close", "Scheme Collection Report", "Scheme Member Ledger"];
+const SCHEME_REPORT_ITEMS = ["Scheme Members List", "Scheme Collection Report", "Scheme Members Balance", "New Schemes By Agent-By Date", "Collection Paid/Unpaid"];
+const EXPANDABLE_NAVS = new Set(["Sales", "Purchase", "Stock", "Work Orders", "Accounts", "Management", "Financial Reports", "Reports", "Schemes"]);
 const FINANCIAL_REPORT_ITEMS = [
   "Cash Book", "Bank Book", "Ledger", "Voucher Reports", "Trial Balance",
   "Trading Account", "Trading & Profit and Loss", "Profit or Loss Account",
@@ -78,11 +80,29 @@ const REPORT_ROOT_MENU_ITEMS = [
     { label: "Sales", target: "Diamond Sales" }
   ] },
   { label: "Stock Adjustment" },
-  { label: "Transfers", hasSubmenu: true },
+  { label: "Transfers", hasSubmenu: true, children: [
+    { label: "Smith", target: "Smith Transfer", children: ["Smith Transfer", "Smith Ledger", "Smith Ledger Detailed", "Smith Reconciliation"] },
+    { label: "Jeweller", target: "Jeweller Transfer", children: ["Jeweller Transfer", "Ledger", "Ledger Detailed", "Reconciliation"] },
+    { label: "Refiner", target: "Refiner Transfer" },
+    { label: "Item Transfer", target: "Item Transfer Report" }
+  ] },
   { label: "Sample Issue/Return" },
-  { label: "Sales Order", hasSubmenu: true },
-  { label: "Gold Deposit", hasSubmenu: true },
-  { label: "Today's Dues", hasSubmenu: true },
+  { label: "Sales Order", target: "Sales Order Report", hasSubmenu: true, children: [
+    { label: "Sales Order", target: "Sales Order Report" },
+    { label: "Additional Order Advance", target: "Additional Order Advance Report" },
+    { label: "Order Advance Refund", target: "Order Advance Refund Report" },
+    { label: "Advance Booking", target: "Advance Booking Report" }
+  ] },
+  { label: "Gold Deposit", target: "Gold Deposit Ledger", hasSubmenu: true, children: [
+    { label: "Ledger", target: "Gold Deposit Ledger" },
+    { label: "Summary", target: "Gold Deposit Summary" },
+    { label: "Transactions", target: "Gold Deposit Transactions" }
+  ] },
+  { label: "Today's Dues", target: "Order Due", hasSubmenu: true, children: [
+    { label: "Order Due", target: "Order Due" },
+    { label: "Collection Due", target: "Collection Due" },
+    { label: "Payment Due", target: "Payment Due" }
+  ] },
   { label: "Barcode Entry" },
   { label: "Day end Report", hasSubmenu: true },
   { label: "Tax Reports" },
@@ -207,7 +227,8 @@ const REPORT_MENU_GROUPS = [
   { title: "Sales", items: ["Sales", "Sales Profit", "Sales Return", "Exchange", "Sales Order"] },
   { title: "Purchase", items: ["Purchase", "Purchase Return", "Direct Gold Purchase", "Direct Gold Purchase Return"] },
   { title: "Diamond", items: ["Diamond", "Diamond Purchase", "Diamond Purchase Return", "Diamond Sales"] },
-  { title: "Transfers", items: ["Transfers"] },
+  { title: "Stock Adjustments", items: ["Stock Adjustment"] },
+  { title: "Transfers", items: ["Transfers", "Smith Transfer", "Smith Ledger", "Smith Ledger Detailed", "Smith Reconciliation", "Jeweller Transfer", "Refiner Transfer", "Item Transfer Report"] },
   { title: "Barcode", items: ["Barcode Entry", "Barcode/HUID Stock Report"] },
   { title: "Tax", items: ["Tax Reports", "GST Invoice Export"] },
   { title: "Bills", items: ["Bills Reports", "Bills Payables", "Today's Dues"] },
@@ -216,7 +237,7 @@ const REPORT_MENU_GROUPS = [
   { title: "Day End", items: ["Day end Report", "Day Summary", "Audit Trail", "Rate History", "Scheme Member Ledger"] }
 ];
 const PINNED_REPORTS = ["Day Summary", "Stock", "Sales", "Bills Reports", "Tax Reports", "Day end Report"];
-const DEMO_DATA_VERSION = 1;
+const DEMO_DATA_VERSION = 2;
 
 const seed = {
   user: { name: "Goldland Staff" },
@@ -483,6 +504,13 @@ const seed = {
   ],
   serviceJobs: [],
   serviceClosures: [],
+  schemeMasters: [
+    { schemeId: "MT", schemeName: "MT SUVARNA", periodFrom: "2023-08-01", periodTo: "2023-08-01", amount: 0, noOfEmi: 0, emiAmount: 0, minEmi: 0, maxEmi: 0, schemeHead: "Scheme Acc", schemeCash: "Cash in Hand", collectionDay: 0, active: true, disableAfterPeriod: false },
+    { schemeId: "DMT", schemeName: "DREAM DIAMOND", periodFrom: "2025-04-30", periodTo: "2025-12-31", amount: 9000, noOfEmi: 9, emiAmount: 1000, minEmi: 0, maxEmi: 0, schemeHead: "Scheme Cash", schemeCash: "Cash in Hand", collectionDay: 0, active: true, disableAfterPeriod: false }
+  ],
+  itemTransfers: [],
+  schemeCollections: [],
+  schemeClosures: [],
   schemes: [
     { memberId: "H1910", member: "Anaida", address: "Uppamoochikkal", place: "Valikad", mobile: "8281900323", scheme: "MT Suvarna", book: "MT24430", qty: 0, joinDate: "01/09/2025", endDate: "01/09/2026", due: 500, opAmount: 1119146, opWeight: 0.269, opDate: "01/09/2025", collection: 500, balance: 1125146 },
     { memberId: "H1909", member: "Muhammed Basheer", address: "Poomthuruth", place: "Bho", mobile: "", scheme: "MT Suvarna", book: "MT2034", qty: 0, joinDate: "01/09/2025", endDate: "01/09/2026", due: 5000, opAmount: 115146, opWeight: 0, opDate: "01/09/2025", collection: 5000, balance: 120146 },
@@ -536,6 +564,17 @@ let stockView = "Stock Register";
 let workOrderView = "Smith";
 let smithWorkView = "Smith";
 let accountView = "Account Ledger";
+let schemeView = "Scheme Members";
+let selectedSchemeMasterId = "MT";
+let schemeMasterSearch = "";
+let selectedSchemeMemberId = "H1910";
+let schemeMemberSearch = "";
+let schemeCollectionDraft = null;
+let schemeClosureDraft = null;
+let schemeCollectionReportView = "Scheme Members List";
+let schemeReportOptions = { page: 0, pageSize: 50, zoom: 1, dateOpen: false, from: "2025-01-01", to: "2026-08-06", scheme: "", agent: "", paidStatus: "" };
+let schemeLedgerOptions = { from: new Date().toISOString().slice(0, 10), to: new Date().toISOString().slice(0, 10), costCenter: "cost1", accountHead: "", schemeId: "" };
+let selectedSchemeLedgerMemberId = "";
 let billingView = "Sales";
 let orderAdvanceDraft = defaultOrderAdvanceDraft("advance");
 let orderAdvanceRefundDraft = defaultOrderAdvanceDraft("refund");
@@ -544,6 +583,7 @@ let cashWeightSmithDraft = null;
 let jewellerWorkDraft = null;
 let cashWeightJewellerDraft = null;
 let stockAdjustmentDraft = null;
+let itemTransferDraft = null;
 let openingStockDraft = null;
 let goldDepositDraft = null;
 let goldWithdrawalDraft = null;
@@ -581,6 +621,21 @@ let customVoucherDraft = null;
 let customVoucherEntryDraft = null;
 let customVoucherConfirmDelete = true;
 let selectedReport = "";
+let selectedSmithLedgerParty = "";
+let smithLedgerOptions = { from: "06/08/2026", to: "06/08/2026", costCenter: "cost1", search: "", detailed: false };
+let selectedJewellerLedgerParty = "";
+let jewellerLedgerOptions = { from: "06/08/2026", to: "06/08/2026", costCenter: "cost1", search: "", detailed: false };
+let selectedJewellerDetailedLedgerParty = "";
+let jewellerDetailedLedgerOptions = { from: "06/08/2026", to: "06/08/2026", costCenter: "cost1", search: "", detailed: false };
+let selectedSmithDetailedLedgerParty = "";
+let selectedGoldDepositLedgerParty = "";
+let goldDepositLedgerPickerSelection = "";
+let goldDepositLedgerOptions = { from: "06/08/2026", to: "06/08/2026", costCenter: "cost1", search: "", dateOpen: false };
+let goldDepositTransactionFilter = "All";
+let orderDueOptions = { date: "06/08/2026", showAtStartup: true, dateOpen: false };
+let collectionDueOptions = { date: "06/08/2026", showAtStartup: true, withZero: false, dateOpen: false };
+let paymentDueOptions = { date: "06/08/2026", showAtStartup: true, dateOpen: false };
+let smithDetailedLedgerOptions = { from: "06/08/2026", to: "06/08/2026", costCenter: "cost1", search: "", detailed: false };
 let selectedFinancialReport = "";
 let financialReportOptions = { from: "04/08/2026", to: "04/08/2026", shown: true, dateOpen: false, page: 0, pageSize: 18, zoom: 1, a4: true };
 let selectedLedgerAccount = "";
@@ -616,6 +671,13 @@ let salesReportOptions = {
   directGoldPurchaseReturnReportOption: "Purchase Return Register"
   ,diamondPurchaseReportOption: "Purchase Register"
   ,diamondSalesMode: "detailed"
+  ,smithTransferParty: ""
+  ,smithReconciliationOption: "Reconciliation"
+  ,jewellerReconciliationOption: "Reconciliation"
+  ,jewellerTransferFilter: "All"
+  ,salesOrderStatus: "All"
+  ,salesOrderFormat: "Register"
+  ,itemTransferFormat: "1"
 };
 let classicColumnMenu = null;
 let classicColumnFilters = {};
@@ -692,7 +754,11 @@ function loadState() {
     parties: (parsed.parties || seed.parties).map(normalizeParty),
     staffs: (parsed.staffs || seed.staffs).map(normalizeStaff),
     workLogs: (parsed.workLogs || seed.workLogs).map(normalizeWorkLog),
+    itemTransfers: (parsed.itemTransfers || seed.itemTransfers || []).map(normalizeItemTransfer),
     schemes: (parsed.schemes || seed.schemes).map(normalizeScheme),
+    schemeMasters: (parsed.schemeMasters || seed.schemeMasters).map(normalizeSchemeMaster),
+    schemeCollections: (parsed.schemeCollections || seed.schemeCollections).map(normalizeSchemeCollection),
+    schemeClosures: (parsed.schemeClosures || seed.schemeClosures).map(normalizeSchemeClosure),
     accounts: (parsed.accounts || seed.accounts).map(normalizeAccount),
     accountMasters: (parsed.accountMasters || seed.accountMasters).map(normalizeAccountMaster),
     itemMasters: (parsed.itemMasters || seed.itemMasters).map(normalizeItemMaster),
@@ -779,6 +845,8 @@ function ensureDemoData(current) {
       { id: "DEMO-SMITH-L2", barcode: "HUID-7K81", itemName: "Baby Ring", mode: "OUT", qty: 3, gross: 6.45, stone: 0.18, touch: 91.6, wastage: 0.3, smWeight: 6.27, mcGram: 650, rate: 9075 }
     ]
   }], normalizeSmithWorkOrder);
+
+  addMissing("itemTransfers", [{ id: "DEMO-ITEM-TRANSFER-001", entryNo: "261", date: "16/06/2026", refNo: "243", salesman: "AJITH", smCode: "AH", time: "02:11:38 PM", stockLocation: "Main Stock", remark: "243", lines: [{ id: "DEMO-IT-L1", barcode: "L001387", itemId: "L", itemName: "LOCKET", mode: "OUT", qty: 0, gross: 0.010, stone: 0, barcodeWeight: 0 }, { id: "DEMO-IT-L2", barcode: "", itemId: "L", itemName: "LOCKET", mode: "IN", qty: 0, gross: 0.010, stone: 0, barcodeWeight: 0 }] }], normalizeItemTransfer);
 
   addMissing("jewellerWorkOrders", [{
     id: "DEMO-JEWELLER-001",
@@ -1547,7 +1615,7 @@ function normalizeBillLine(line, fallbackAmount = 0, bill = {}, sectionKey = "sa
     dmdCaratType: line.dmdCaratType || line.diamondType || line.ct || "Cnt",
     dmdPcs: Number(line.dmdPcs || line.diamondPieces || line.pcs || 0),
     discount: Number(line.discount || 0),
-    taxPct: Number(line.taxPct || 3),
+    taxPct: Number(line.taxPct ?? (["order", "exchange", "purchase"].includes(sectionKey) ? 0 : 3)),
     tax: Number(line.tax || 0),
     cessPct: Number(line.cessPct || 0),
     cessAmount: Number(line.cessAmount || 0),
@@ -2788,6 +2856,21 @@ function sampleFinancials(record = {}) {
   };
 }
 
+function normalizeItemTransferLine(line = {}) {
+  const gross = Number(line.gross || line.weight || 0), stone = Number(line.stone || 0);
+  return { id: line.id || crypto.randomUUID(), barcode: line.barcode || "", itemId: line.itemId || line.itemID || "", itemName: line.itemName || line.item || "", mode: line.mode === "IN" ? "IN" : "OUT", qty: Number(line.qty || line.nos || 0), gross, stone, net: Number(line.net ?? Math.max(0, gross - stone)), barcodeWeight: Number(line.barcodeWeight || line.bcodeWeight || 0) };
+}
+
+function normalizeItemTransfer(record = {}) {
+  const salesman = record.salesman || record.staffName || "";
+  return { id: record.id || crypto.randomUUID(), entryNo: String(record.entryNo || "1"), date: record.date || new Date().toLocaleDateString("en-GB"), refNo: record.refNo || record.remark || "", remark: record.remark || record.refNo || "", salesman, smCode: record.smCode || record.salesmanCode || staffCodeForName(salesman) || "", time: record.time || nowTime(), stockLocation: record.stockLocation || "Main Stock", lines: (record.lines || []).map(normalizeItemTransferLine) };
+}
+
+function itemTransferTotals(record = {}) {
+  const lines = (record.lines || []).map(normalizeItemTransferLine), incoming = lines.filter((line) => line.mode === "IN"), outgoing = lines.filter((line) => line.mode === "OUT");
+  return { inQty: sumField(incoming, "qty"), inGross: sumField(incoming, "gross"), inStone: sumField(incoming, "stone"), outQty: sumField(outgoing, "qty"), outGross: sumField(outgoing, "gross"), outStone: sumField(outgoing, "stone") };
+}
+
 function defaultPolishingLine() {
   return normalizePolishingLine({
     qty: 1,
@@ -3707,11 +3790,21 @@ function supplierPartyByName(name = "") {
 }
 
 function normalizeScheme(item) {
-  return {
+  const normalized = {
     memberId: item.memberId || "",
+    member: item.member || item.memberName || "",
     address: item.address || "",
     place: item.place || "",
+    city: item.city || "",
+    area: item.area || "",
     mobile: item.mobile || "",
+    nomineeName: item.nomineeName || "",
+    relationMobile: item.relationMobile || "",
+    relation: item.relation || "",
+    idProof: item.idProof || "",
+    collectionAgent: item.collectionAgent || "",
+    active: item.active !== false,
+    photo: item.photo || "",
     qty: Number(item.qty || 0),
     joinDate: item.joinDate || "",
     endDate: item.endDate || "",
@@ -3721,6 +3814,17 @@ function normalizeScheme(item) {
     collection: Number(item.collection || item.due || 0),
     ...item
   };
+  normalized.schemeLines = (item.schemeLines?.length ? item.schemeLines : [{
+    scheme: normalized.scheme || "MT SUVARNA", book: normalized.book || "", qty: normalized.qty || 1,
+    joinDate: normalized.joinDate || "", endDate: normalized.endDate || "", opAmount: normalized.opAmount || 0,
+    opWeight: normalized.opWeight || 0, opDate: normalized.opDate || normalized.joinDate || "", agent: normalized.collectionAgent || ""
+  }]).map((line) => ({ ...line, qty: Number(line.qty || 0), opAmount: Number(line.opAmount || 0), opWeight: Number(line.opWeight || 0) }));
+  normalized.investedAmount = Number(item.investedAmount ?? item.balance ?? item.opAmount ?? 0);
+  normalized.accumulatedWeight = Number(item.accumulatedWeight ?? item.opWeight ?? 0);
+  normalized.averageRate = Number(item.averageRate ?? (normalized.accumulatedWeight > 0 ? normalized.investedAmount / normalized.accumulatedWeight : 0));
+  normalized.ledgerOpeningAmount = Number(item.ledgerOpeningAmount ?? normalized.investedAmount);
+  normalized.ledgerOpeningWeight = Number(item.ledgerOpeningWeight ?? normalized.accumulatedWeight);
+  return normalized;
 }
 
 function normalizeAccount(item) {
@@ -3886,6 +3990,53 @@ function render({ animateScreen = false, contentScrollTop = null } = {}) {
   bindEvents();
 }
 
+function normalizeSchemeMaster(item = {}) {
+  return {
+    schemeId: String(item.schemeId || "").trim().toUpperCase(),
+    schemeName: String(item.schemeName || "").trim(),
+    periodFrom: item.periodFrom || "",
+    periodTo: item.periodTo || "",
+    amount: Number(item.amount || 0),
+    noOfEmi: Number(item.noOfEmi || 0),
+    emiAmount: Number(item.emiAmount || 0),
+    minEmi: Number(item.minEmi || 0),
+    maxEmi: Number(item.maxEmi || 0),
+    schemeHead: item.schemeHead || "Scheme Cash",
+    schemeCash: item.schemeCash || "Cash in Hand",
+    collectionDay: Number(item.collectionDay || 0),
+    active: item.active !== false,
+    disableAfterPeriod: Boolean(item.disableAfterPeriod)
+  };
+}
+
+function normalizeSchemeCollectionLine(line = {}) {
+  const amount = Number(line.amount || 0), goldRate = Number(line.goldRate || 0);
+  return { id: line.id || crypto.randomUUID(), headId: line.headId || "", book: line.book || "", accountHead: line.accountHead || line.memberName || "", schemeId: line.schemeId || "", amount, goldRate, weight: Number(line.weight ?? (goldRate > 0 ? amount / goldRate : 0)), remark: line.remark || line.remarks || "", voucherNo: line.voucherNo || "", opAmount: Number(line.opAmount || 0), opWeight: Number(line.opWeight || 0), closingBalance: Number(line.closingBalance || 0) };
+}
+
+function normalizeSchemeCollection(item = {}) {
+  return { id: item.id || crypto.randomUUID(), voucherNo: item.voucherNo || "", refNo: item.refNo || "", date: item.date || new Date().toISOString().slice(0, 10), time: item.time || new Date().toLocaleTimeString("en-US"), autoVoucher: item.autoVoucher !== false, preparedBy: item.preparedBy || "", sendSms: Boolean(item.sendSms), cashBank: item.cashBank || "Cash in Hand", bankCardType: item.bankCardType || "UPI", costCenter: item.costCenter || "cost1", collectedBy: item.collectedBy || "", goldRate: Number(item.goldRate || 13200), voucherDate: item.voucherDate || item.date || new Date().toISOString().slice(0, 10), narration: item.narration || "", separateVoucher: Boolean(item.separateVoucher), lines: (item.lines || []).map(normalizeSchemeCollectionLine) };
+}
+
+function normalizeSchemeClosureLine(line = {}) {
+  return { id: line.id || crypto.randomUUID(), headId: line.headId || "", book: line.book || "", accountHead: line.accountHead || "", schemeId: line.schemeId || "", amount: Number(line.amount || 0), mode: line.mode || "Close", weight: Number(line.weight || 0), averageRate: Number(line.averageRate || 0), remark: line.remark || "", voucherNo: line.voucherNo || "", voucherDate: line.voucherDate || "" };
+}
+
+function normalizeSchemeClosure(item = {}) {
+  return { id: item.id || crypto.randomUUID(), voucherNo: item.voucherNo || "", refNo: item.refNo || "", date: item.date || new Date().toISOString().slice(0, 10), time: item.time || new Date().toLocaleTimeString("en-US"), preparedBy: item.preparedBy || "", cashBank: item.cashBank || "Cash in Hand", bankCardType: item.bankCardType || "UPI", costCenter: item.costCenter || "cost1", collectedBy: item.collectedBy || "", goldRate: Number(item.goldRate || 13200), averageGoldRate: Number(item.averageGoldRate || 0), narration: item.narration || "", lines: (item.lines || []).map(normalizeSchemeClosureLine) };
+}
+
+function recalculateSchemeMemberInvestment(memberId) {
+  const member = (state.schemes || []).find((item) => item.memberId === memberId); if (!member) return null;
+  const openingAmount = Number(member.ledgerOpeningAmount ?? member.opAmount ?? 0), openingWeight = Number(member.ledgerOpeningWeight ?? member.opWeight ?? 0);
+  let contributions = 0, acquiredWeight = 0, refunds = 0, releasedWeight = 0, closed = false, closeDate = "", closeVoucherNo = "";
+  for (const voucher of state.schemeCollections || []) for (const line of voucher.lines || []) if (line.headId === memberId) { const amount = Number(line.amount || 0), rate = Number(line.goldRate || voucher.goldRate || 0); contributions += amount; acquiredWeight += Number(line.weight ?? (rate > 0 ? amount / rate : 0)); }
+  for (const voucher of state.schemeClosures || []) for (const line of voucher.lines || []) if (line.headId === memberId) { const amount = Number(line.amount || 0), averageRate = Number(line.averageRate || voucher.averageGoldRate || 0); refunds += amount; releasedWeight += Number(line.weight ?? (averageRate > 0 ? amount / averageRate : 0)); if (line.mode === "Close") { closed = true; closeDate = voucher.date; closeVoucherNo = voucher.voucherNo; } }
+  member.collection = contributions; member.investedAmount = Math.max(0, openingAmount + contributions - refunds); member.accumulatedWeight = Math.max(0, openingWeight + acquiredWeight - releasedWeight); member.balance = member.investedAmount; member.averageRate = member.accumulatedWeight > 0 ? member.investedAmount / member.accumulatedWeight : 0;
+  member.refundAmount = refunds; member.closeWeight = releasedWeight; member.closeDate = closeDate; member.closeVoucherNo = closeVoucherNo; member.active = !closed && (member.investedAmount > 0 || refunds === 0); member.schemeStatus = member.active ? "Active" : "Closed";
+  return member;
+}
+
 function renderScreen() {
   const content = document.querySelector(".content");
   const sidebar = document.querySelector(".sidebar");
@@ -3943,7 +4094,6 @@ function appShell() {
 }
 
 function sidebar() {
-  const nav = ["Dashboard", "Schemes"];
   const stockItems = STOCK_ITEMS;
   const workItems = WORK_ORDER_ITEMS;
   const isGroupOpen = (name) => expandedNavGroups.has(name);
@@ -4011,9 +4161,18 @@ function sidebar() {
               </button>
             `).join("")}
             ${diamondReportNavigation("sidebar")}
+            ${transferReportNavigation("sidebar")}
+            ${salesOrderReportNavigation("sidebar")}
+            ${goldDepositReportNavigation("sidebar")}
+            ${todaysDueReportNavigation("sidebar")}
           </div>
         </div>
-        ${nav.slice(1).map((item) => `<button class="nav ${active === item ? "active" : ""}" data-nav="${item}">${icon(item)}<span>${item}</span></button>`).join("")}
+        <div class="nav-group ${isGroupOpen("Schemes") || active === "Schemes" ? "open" : ""}">
+          <button class="nav ${active === "Schemes" ? "active" : ""}" data-nav="Schemes">${icon("Schemes")}<span>Scheme / Chitty</span><span class="chevron">v</span></button>
+          <div class="subnav scheme-subnav">
+            ${SCHEME_ITEMS.map((item, index) => `<button class="subnav-item ${active === "Schemes" && schemeView === item ? "active" : ""} ${index === 2 || index === 4 ? "scheme-menu-divider" : ""}" data-scheme-section="${escapeHtml(item)}"><span>${escapeHtml(item)}</span>${item === "Scheme Collection" ? "<kbd>Ctrl+Shift+S</kbd>" : ""}</button>`).join("")}
+          </div>
+        </div>
       </nav>
       <div class="security-card">
         <span>Access mode</span>
@@ -4029,7 +4188,7 @@ function topbar() {
     .filter((item) => item.type === "Gold")
     .map((item) => `${item.grade} ${money(item.price)}/g`)
     .join(" | ");
-  const title = active === "Management" ? managementView : active === "Sales" ? salesView : active === "Purchase" ? purchaseView : active === "Stock" ? stockView : active === "Work Orders" ? (workOrderView === "Complimentary Item" ? complimentaryView : workOrderView) : active === "Accounts" ? accountView : active === "Financial Reports" ? selectedFinancialReport || "Financial Reports" : active === "Reports" ? selectedReport || "Reports" : active;
+  const title = active === "Management" ? managementView : active === "Sales" ? salesView : active === "Purchase" ? purchaseView : active === "Stock" ? stockView : active === "Work Orders" ? (workOrderView === "Complimentary Item" ? complimentaryView : workOrderView) : active === "Accounts" ? accountView : active === "Schemes" ? schemeView : active === "Financial Reports" ? selectedFinancialReport || "Financial Reports" : active === "Reports" ? selectedReport || "Reports" : active;
 
   return `
     <header class="topbar">
@@ -4064,6 +4223,10 @@ function reportsTopDropdown() {
           </button>
         `).join("")}
         ${diamondReportNavigation("top")}
+        ${transferReportNavigation("top")}
+        ${salesOrderReportNavigation("top")}
+        ${goldDepositReportNavigation("top")}
+        ${todaysDueReportNavigation("top")}
       </div>
     </div>
   `;
@@ -4078,6 +4241,44 @@ function diamondReportNavigation(placement = "sidebar") {
       ${options.map((item) => `<button class="${selectedReport === item.target ? "active" : ""}" data-report-item="${escapeHtml(item.target)}"><span class="classic-menu-chevron">»</span><span>${escapeHtml(item.label)}</span></button>`).join("")}
     </div>
   `;
+}
+
+function salesOrderReportNavigation(placement = "sidebar") {
+  const options = REPORT_ROOT_MENU_ITEMS.find((item) => item.label === "Sales Order")?.children || [];
+  const open = options.some((item) => item.target === selectedReport);
+  if (!open) return "";
+  return `<div class="diamond-report-cascade sales-order-report-cascade ${placement}" aria-label="Sales Order reports">${options.map((item) => `<button class="${selectedReport === item.target ? "active" : ""}" data-report-item="${escapeHtml(item.target)}"><span class="classic-menu-chevron">»</span><span>${escapeHtml(item.label)}</span></button>`).join("")}</div>`;
+}
+
+function goldDepositReportNavigation(placement = "sidebar") {
+  const options = REPORT_ROOT_MENU_ITEMS.find((item) => item.label === "Gold Deposit")?.children || [];
+  const open = options.some((item) => item.target === selectedReport);
+  if (!open) return "";
+  return `<div class="diamond-report-cascade gold-deposit-report-cascade ${placement}" aria-label="Gold Deposit reports">${options.map((item) => `<button class="${selectedReport === item.target ? "active" : ""}" data-report-item="${escapeHtml(item.target)}"><span class="classic-menu-chevron">»</span><span>${escapeHtml(item.label)}</span></button>`).join("")}</div>`;
+}
+
+function todaysDueReportNavigation(placement = "sidebar") {
+  const options = REPORT_ROOT_MENU_ITEMS.find((item) => item.label === "Today's Dues")?.children || [];
+  const open = options.some((item) => item.target === selectedReport);
+  if (!open) return "";
+  return `<div class="diamond-report-cascade todays-due-report-cascade ${placement}" aria-label="Today's Due reports">${options.map((item) => `<button class="${selectedReport === item.target ? "active" : ""}" data-report-item="${escapeHtml(item.target)}"><span class="classic-menu-chevron">»</span><span>${escapeHtml(item.label)}</span></button>`).join("")}</div>`;
+}
+
+function transferReportNavigation(placement = "sidebar") {
+  const options = REPORT_ROOT_MENU_ITEMS.find((item) => item.label === "Transfers")?.children || [];
+  const smith = options.find((item) => item.label === "Smith");
+  const smithChildren = smith?.children || [];
+  const jeweller = options.find((item) => item.label === "Jeweller");
+  const jewellerChildren = jeweller?.children || [];
+  const open = selectedReport === "Transfers" || options.some((item) => item.target === selectedReport) || smithChildren.includes(selectedReport) || jewellerChildren.includes(selectedReport);
+  if (!open) return "";
+  const smithOpen = smithChildren.includes(selectedReport);
+  const jewellerOpen = jewellerChildren.includes(selectedReport);
+  return `<div class="transfer-report-cascade ${placement}" aria-label="Transfer reports">
+    ${jewellerOpen ? `<div class="smith-transfer-report-cascade jeweller-transfer-report-cascade">${jewellerChildren.map((item) => `<button class="${selectedReport === item ? "active" : ""}" data-report-item="${escapeHtml(item)}"><span class="classic-menu-chevron">»</span><span>${escapeHtml(item)}</span></button>`).join("")}</div>` : ""}
+    ${options.map((item) => `<button class="${selectedReport === item.target || (item.label === "Smith" && smithOpen) ? "active" : ""}" data-report-item="${escapeHtml(item.target)}"><span class="classic-menu-chevron">Â»</span><span>${escapeHtml(item.label)}</span>${item.children ? `<b>â€º</b>` : ""}</button>`).join("")}
+    ${smithOpen ? `<div class="smith-transfer-report-cascade">${smithChildren.map((item) => `<button class="${selectedReport === item ? "active" : ""}" data-report-item="${escapeHtml(item)}"><span class="classic-menu-chevron">Â»</span><span>${escapeHtml(item)}</span></button>`).join("")}</div>` : ""}
+  </div>`;
 }
 
 function route() {
@@ -4472,7 +4673,7 @@ function salesOrder() {
         ${toolbarButton("Save", "save-current-bill")}
         ${toolbarButton("Edit", "edit-current-bill")}
         ${toolbarButton("Delete", "void-bill")}
-        ${toolbarButton("Close Order", "close-billing")}
+        ${toolbarButton("Close Order", "finish-sales-order")}
         ${toolbarButton("Previous", "previous-bill")}
         ${toolbarButton("Next", "next-bill")}
         ${toolbarButton("Print", "print-last-bill")}
@@ -5194,6 +5395,8 @@ function transactionGroup(group) {
 function stock() {
   const activeScreen = stockView === "Stock Adjustments"
     ? stockAdjustmentScreen()
+    : stockView === "Item Transfer"
+      ? itemTransferScreen()
     : stockView === OPENING_STOCK_VIEW
       ? openingStockScreen()
       : stockView === "Gold Deposit"
@@ -5576,6 +5779,13 @@ function workOrders() {
       ${table(["Ref No", "Date", "Workflow", "Action", "Party", "Item", "Qty", "Gross", "Issue", "Receive", "Balance", "Status"], state.workLogs.filter((w) => w.workflow === config.workflow || config.workflow === "Service / Job").map((w) => [w.refNo, w.date, w.workflow, w.action, w.party, w.item, w.qty, grams(w.gross), grams(w.issue), grams(w.receive), grams(w.balance), w.status]))}
     </section>
   `;
+}
+
+function itemTransferScreen() {
+  state.itemTransfers ||= [];
+  itemTransferDraft = normalizeItemTransfer(itemTransferDraft || state.itemTransfers[0] || {});
+  const record = itemTransferDraft, totals = itemTransferTotals(record);
+  return `<section class="panel item-transfer-detail-window"><div class="entry-actions body-toolbar">${toolbarButton("Update", "noop")}${toolbarButton("Refresh", "noop")}${toolbarButton("Edit", "noop")}${toolbarButton("Delete", "noop")}${toolbarButton("Previous", "noop")}${toolbarButton("Next", "noop")}${toolbarButton("Close", "close-item-transfer-detail")}</div><div class="item-transfer-detail-header"><label><span>Entry No</span><input readonly value="${escapeHtml(record.entryNo)}" /></label><label><span>S.man</span><input readonly value="${escapeHtml(record.salesman)}" /></label><label><span>Entry Date</span><input readonly value="${escapeHtml(displaySalesDate(record.date))}" /></label><label><span>Time</span><span class="field-pair"><input readonly value="${escapeHtml(record.time)}" /><input readonly value="${escapeHtml(record.stockLocation)}" /></span></label><label class="item-transfer-remark"><span>Remark</span><textarea readonly>${escapeHtml(record.remark)}</textarea></label></div><div class="item-transfer-detail-table-wrap"><table><thead><tr><th>Sl</th><th>Barcode</th><th>Item</th><th>Mode</th><th>Nos</th><th>Weight</th><th>Stone</th><th>B.codeWght</th></tr></thead><tbody>${record.lines.map((line, index) => `<tr class="${index === 0 ? "selected" : ""}"><td>${index + 1}</td><td>${escapeHtml(line.barcode)}</td><td>${escapeHtml(line.itemName)}</td><td>${line.mode}</td><td>${numberValue(line.qty, 0)}</td><td>${numberValue(line.gross, 3)}</td><td>${numberValue(line.stone, 3)}</td><td>${numberValue(line.barcodeWeight, 3)}</td></tr>`).join("")}</tbody></table></div><footer class="item-transfer-detail-totals"><span>Total IN</span><strong>${numberValue(totals.inQty, 0)}</strong><strong>${numberValue(totals.inGross, 3)}</strong><strong>${numberValue(totals.inStone, 3)}</strong><span>Total OUT</span><strong>${numberValue(totals.outQty, 0)}</strong><strong>${numberValue(totals.outGross, 3)}</strong><strong>${numberValue(totals.outStone, 3)}</strong></footer></section>`;
 }
 
 function serviceWorkOrders() {
@@ -8271,11 +8481,22 @@ function accountInlineForm(account) {
 }
 
 function schemes() {
+  if (schemeView === "Scheme Master") return schemeMasterScreen();
+  if (schemeView === "Scheme Members") return schemeMembersScreen();
+  if (schemeView === "Scheme Collection") return schemeCollectionScreen();
+  if (schemeView === "Scheme Refund/Close") return schemeClosureScreen();
+  if (schemeView === "Scheme Collection Report") return schemeCollectionReportsScreen();
+  if (schemeView === "Scheme Member Ledger") return schemeMemberLedgerScreen();
+  if (schemeView !== "Scheme Collection") {
+    return `${moduleSwitcher("Scheme / Chitty", SCHEME_ITEMS, schemeView, "data-scheme-section")}<section class="panel scheme-placeholder"><div class="panel-head"><div><p class="eyebrow">Scheme / Chitty</p><h2>${escapeHtml(schemeView)}</h2></div></div><p class="soft-note">This menu is ready for the ${escapeHtml(schemeView)} screen reference.</p></section>`;
+  }
+  const collectionMode = schemeView === "Scheme Collection";
   return `
+    ${moduleSwitcher("Scheme / Chitty", SCHEME_ITEMS, schemeView, "data-scheme-section")}
     <section class="panel">
       <div class="panel-head">
-        <h2>Scheme / Chitty</h2>
-        <button class="primary" data-action="open-scheme">Add New Collection</button>
+        <div><p class="eyebrow">Scheme / Chitty</p><h2>${collectionMode ? "Scheme Collection" : "Scheme Members"}</h2></div>
+        <button class="primary" data-action="open-scheme">${collectionMode ? "New Collection" : "Add Scheme Member"}</button>
       </div>
       ${table(["Member ID", "Member Name", "Address", "Place", "Mobile", "Scheme", "Book No", "Qty", "Join Date", "End Date", "Op Amount", "Op Weight", "Op Date", "Collection", "Due", "Balance"], state.schemes.map((s) => [s.memberId, s.member, s.address, s.place, s.mobile || "-", s.scheme, s.book, s.qty, s.joinDate, s.endDate, money(s.opAmount), s.opWeight, s.opDate, money(s.collection), money(s.due), money(s.balance)]))}
     </section>
@@ -8299,6 +8520,562 @@ function accounts() {
     ${moduleSwitcher("Accounts", ACCOUNT_ITEMS, accountView, "data-account-section")}
     ${accountBody}
   `;
+}
+
+const SCHEME_CASH_BANKS = ["Cash in Hand", "Canara Bank Edakkara", "Federal Bank Edakkara", "FEDERAL BANK EDAKKARA NEW", "Upi Payment", "Scheme Cash", "NILAMBUR CO-OPERATIVE URBAN BANK"];
+
+function nextSchemeVoucherNo() {
+  const max = Math.max(0, ...(state.schemeCollections || []).map((item) => Number(String(item.voucherNo || "").replace(/\D/g, "")) || 0));
+  return String(max + 1).padStart(5, "0");
+}
+
+function defaultSchemeCollection() {
+  const today = new Date().toISOString().slice(0, 10);
+  return normalizeSchemeCollection({ voucherNo: nextSchemeVoucherNo(), date: today, voucherDate: today, autoVoucher: true, cashBank: "Cash in Hand", costCenter: "cost1", goldRate: 13200 });
+}
+
+function activeSchemeCollection() {
+  return normalizeSchemeCollection(schemeCollectionDraft || defaultSchemeCollection());
+}
+
+function schemeCollectionTotal(record = activeSchemeCollection()) { return (record.lines || []).reduce((sum, line) => sum + Number(line.amount || 0), 0); }
+function schemeCollectionUsesBank(record = activeSchemeCollection()) { return !/cash in hand|scheme cash/i.test(record.cashBank || ""); }
+
+function schemeCollectionScreen() {
+  const record = activeSchemeCollection();
+  const total = schemeCollectionTotal(record);
+  const staff = ["", ...(state.staffs || []).map((item) => item.name)];
+  const members = (state.schemes || []).filter((item) => item.active !== false);
+  const rows = record.lines.map((line, index) => `<div class="scheme-collection-row"><span>${index + 1}</span><button type="button" data-action="remove-scheme-collection-line" data-index="${index}">×</button><span>${escapeHtml(line.headId)}</span><span>${escapeHtml(line.book)}</span><span>${escapeHtml(line.accountHead)}</span><span>${escapeHtml(line.schemeId)}</span><span>${numericValue(line.amount)}</span><span>${escapeHtml(line.remark)}</span><span>${escapeHtml(line.voucherNo)}</span><span>${numericValue(line.opAmount)}</span><span>${numericValue(line.opWeight)}</span><span>${numericValue(line.closingBalance)}</span></div>`).join("");
+  return `${moduleSwitcher("Scheme / Chitty", SCHEME_ITEMS, schemeView, "data-scheme-section")}
+    <section class="panel scheme-collection-window">
+      <div class="classic-billing-toolbar scheme-collection-toolbar" aria-label="Scheme Collection actions">
+        ${toolbarButton("Save", "save-scheme-collection")}${toolbarButton("Refresh", "refresh-scheme-collection")}${toolbarButton("Edit", "edit-scheme-collection")}${toolbarButton("Delete", "delete-scheme-collection")}${toolbarButton("Print", "print-scheme-collection")}${toolbarButton("Import", "import-scheme-collection")}${toolbarButton("DEVICE", "device-scheme-collection")}${toolbarButton("Close", "close-scheme-collection")}${toolbarButton("Save Separate Voucher", "save-separate-scheme-voucher")}
+        <span class="toolbar-spacer"></span><label class="scheme-gold-rate"><span>Gold Rate</span><input form="schemeCollectionForm" name="goldRate" type="number" min="0" step="0.001" value="${numericValue(record.goldRate)}" /></label>
+      </div>
+      <form id="schemeCollectionForm" data-scheme-collection-form>
+        <div class="scheme-collection-header">
+          <div class="scheme-collection-meta">
+            <label><span>Voucher No, Ref No</span><span><input name="voucherNo" value="${escapeHtml(record.voucherNo)}" ${record.autoVoucher ? "readonly" : ""} required /><input name="refNo" value="${escapeHtml(record.refNo)}" /></span></label>
+            <label><span>Date, Time</span><span><input name="date" type="date" value="${schemeDateInput(record.date)}" required /><input name="time" value="${escapeHtml(record.time)}" required /></span></label>
+            <label><span>Prepared By</span><select name="preparedBy" required>${staff.map((value) => `<option ${value === record.preparedBy ? "selected" : ""}>${escapeHtml(value)}</option>`).join("")}</select></label>
+          </div>
+          <div class="scheme-collection-flags"><label><input name="autoVoucher" type="checkbox" ${record.autoVoucher ? "checked" : ""} /> Auto Voucher</label><label class="send-sms"><input name="sendSms" type="checkbox" ${record.sendSms ? "checked" : ""} /> Send SMS</label>${schemeCollectionUsesBank(record) ? `<label class="bank-card-type"><span>Bank Card Type</span><select name="bankCardType" required>${["UPI", "Debit Card", "Credit Card"].map((value) => `<option ${value === record.bankCardType ? "selected" : ""}>${value}</option>`).join("")}</select></label>` : ""}</div>
+          <div class="scheme-collection-cash"><label><span>Cash/Bank</span><select name="cashBank" data-scheme-cash-bank required>${SCHEME_CASH_BANKS.map((value) => `<option ${value === record.cashBank ? "selected" : ""}>${escapeHtml(value)}</option>`).join("")}</select></label><label><span>Cost Center</span><select name="costCenter" required>${miscOptions("costCenters", ["cost1"]).map ? "" : ""}${["cost1", "Main shop"].map((value) => `<option ${value === record.costCenter ? "selected" : ""}>${value}</option>`).join("")}</select></label><label><span>Collected By</span><select name="collectedBy" required>${staff.map((value) => `<option ${value === record.collectedBy ? "selected" : ""}>${escapeHtml(value)}</option>`).join("")}</select></label></div>
+        </div>
+        <div class="scheme-collection-entry">
+          <label><span>Head ID</span><input name="headId" data-scheme-collection-member list="schemeCollectionMembers" /></label>
+          <label><span>Book No.</span><input name="book" readonly /></label>
+          <label><span>Member Name</span><input name="memberName" readonly /></label>
+          <label><span>SchemeID</span><input name="schemeId" readonly /></label>
+          <label><span>Amount</span><input name="amount" type="number" min="0.001" step="0.001" value="0.000" /></label>
+          <label><span>Remarks</span><input name="remark" /></label>
+          <label><span>Voucher No</span><input name="lineVoucherNo" value="${escapeHtml(record.voucherNo)}" readonly /></label>
+          <label><span>Voucher Date</span><input name="voucherDate" type="date" value="${schemeDateInput(record.voucherDate)}" required /></label>
+          <button type="button" data-action="add-scheme-collection-line">＋ Add</button>
+          <datalist id="schemeCollectionMembers">${members.map((item) => `<option value="${escapeHtml(item.memberId)}">${escapeHtml(item.member)} — ${escapeHtml(item.book)}</option>`).join("")}</datalist>
+        </div>
+        <div class="scheme-collection-grid"><div class="scheme-collection-grid-head"><span>Sl</span><span>×</span><span>ID</span><span>BookNo</span><span>Account Head</span><span>SchemeID</span><span>Amount</span><span>Remark</span><span>Voucher No</span><span>Op_Amount</span><span>Op_Weight</span><span>Cl.Bal</span></div><div class="scheme-collection-grid-body">${rows}</div></div>
+        <div class="scheme-collection-totals"><output>${numericValue(total)}</output><strong>${numericValue(total)}</strong></div>
+        <label class="scheme-collection-narration"><span>Narration</span><textarea name="narration">${escapeHtml(record.narration)}</textarea></label>
+      </form><input type="file" data-scheme-collection-import accept=".csv,text/csv" hidden />
+    </section>`;
+}
+
+function captureSchemeCollectionHeader() {
+  const form = document.querySelector("[data-scheme-collection-form]"); if (!form) return activeSchemeCollection();
+  const data = new FormData(form), current = activeSchemeCollection();
+  return normalizeSchemeCollection({ ...current, voucherNo: data.get("voucherNo"), refNo: data.get("refNo"), date: data.get("date"), time: data.get("time"), autoVoucher: data.has("autoVoucher"), preparedBy: data.get("preparedBy"), sendSms: data.has("sendSms"), cashBank: data.get("cashBank"), bankCardType: data.get("bankCardType") || current.bankCardType, costCenter: data.get("costCenter"), collectedBy: data.get("collectedBy"), goldRate: data.get("goldRate"), voucherDate: data.get("voucherDate"), narration: data.get("narration"), lines: current.lines });
+}
+
+function schemeMemberForCollection(form) {
+  const id = form.elements.headId.value.trim().toUpperCase(), book = form.elements.book.value.trim().toUpperCase();
+  return (state.schemes || []).find((item) => item.memberId.toUpperCase() === id || item.book.toUpperCase() === book);
+}
+
+function addSchemeCollectionLine() {
+  const form = document.querySelector("[data-scheme-collection-form]"); if (!form) return;
+  const member = schemeMemberForCollection(form); if (!member) return toast("Select a valid active scheme member.");
+  const amount = Number(form.elements.amount.value || 0); if (amount <= 0) return toast("Enter a collection amount greater than zero.");
+  const record = captureSchemeCollectionHeader();
+  const rate = Number(record.goldRate || 0), weight = rate > 0 ? amount / rate : 0;
+  record.lines.push(normalizeSchemeCollectionLine({ headId: member.memberId, book: member.book, accountHead: member.member, schemeId: (state.schemeMasters || []).find((item) => item.schemeName.toLowerCase() === String(member.scheme).toLowerCase())?.schemeId || (String(member.scheme).toUpperCase().includes("DIAMOND") ? "DMT" : "MT"), amount, goldRate: rate, weight, remark: form.elements.remark.value, voucherNo: record.voucherNo, opAmount: member.investedAmount ?? member.opAmount, opWeight: member.accumulatedWeight ?? member.opWeight, closingBalance: Number(member.investedAmount ?? member.balance ?? 0) + amount }));
+  schemeCollectionDraft = record; render(); toast("Collection line added.");
+}
+
+function saveSchemeCollection(separateVoucher = false) {
+  const form = document.querySelector("[data-scheme-collection-form]"); if (!form || !form.reportValidity()) return;
+  const record = captureSchemeCollectionHeader(); if (!record.lines.length) return toast("Add at least one scheme collection line.");
+  record.separateVoucher = separateVoucher;
+  state.schemeCollections ||= []; const index = state.schemeCollections.findIndex((item) => item.id === record.id);
+  const previous = index >= 0 ? state.schemeCollections[index] : null;
+  const affectedMembers = new Set([...(previous?.lines || []), ...record.lines].map((line) => line.headId));
+  if (index >= 0) state.schemeCollections[index] = record; else state.schemeCollections.unshift(record);
+  affectedMembers.forEach(recalculateSchemeMemberInvestment);
+  schemeCollectionDraft = record; state.audit.unshift(audit(`Saved scheme collection voucher ${record.voucherNo}`)); saveState(); render(); toast(`Scheme collection${separateVoucher ? " and separate voucher" : ""} saved.`);
+}
+
+function deleteSchemeCollection() {
+  const record = activeSchemeCollection(), index = (state.schemeCollections || []).findIndex((item) => item.id === record.id); if (index < 0) return toast("This voucher has not been saved.");
+  if (!window.confirm(`Delete scheme collection voucher ${record.voucherNo}?`)) return;
+  const affectedMembers = new Set(record.lines.map((line) => line.headId));
+  state.schemeCollections.splice(index, 1); affectedMembers.forEach(recalculateSchemeMemberInvestment); schemeCollectionDraft = defaultSchemeCollection(); saveState(); render(); toast("Scheme collection deleted.");
+}
+
+function openSchemeCollectionPicker() {
+  const latestByMember = new Map(); for (const voucher of state.schemeCollections || []) for (const line of voucher.lines || []) if (!latestByMember.has(line.headId)) latestByMember.set(line.headId, { voucher, line });
+  document.body.insertAdjacentHTML("beforeend", `<div class="modal-backdrop scheme-picker-backdrop"><section class="scheme-collection-picker"><header><h2>Scheme Collection</h2><button data-action="close-modal">×</button></header><label>Entry No/Account Head <input data-scheme-picker-search autofocus /></label><div class="scheme-picker-table"><div class="scheme-picker-head"><span>Sl</span><span>Voucher No</span><span>Voucher Date</span><span>Account Head</span><span>SchemeID</span><span>BookNo</span><span>Amount</span></div>${(state.schemes || []).map((member, index) => { const found = latestByMember.get(member.memberId), master = (state.schemeMasters || []).find((item) => item.schemeName.toLowerCase() === String(member.scheme).toLowerCase()); return `<button data-scheme-picker-member="${escapeHtml(member.memberId)}" data-voucher-id="${escapeHtml(found?.voucher.id || "")}"><span>${index + 1}</span><span>${escapeHtml(found?.voucher.voucherNo || "")}</span><span>${escapeHtml(found?.voucher.voucherDate || "")}</span><span>${escapeHtml(member.member)} [${escapeHtml(member.book)}]</span><span>${escapeHtml(master?.schemeId || "MT")}</span><span>${escapeHtml(member.book)}</span><span>${numericValue(found?.line.amount || 0)}</span></button>`; }).join("")}</div></section></div>`);
+  document.querySelector(".scheme-picker-backdrop [data-action='close-modal']")?.addEventListener("click", closeModal);
+  const filter = () => { const q = document.querySelector("[data-scheme-picker-search]").value.toLowerCase(); document.querySelectorAll("[data-scheme-picker-member]").forEach((row) => row.hidden = !row.textContent.toLowerCase().includes(q)); };
+  document.querySelector("[data-scheme-picker-search]")?.addEventListener("input", filter);
+  document.querySelectorAll("[data-scheme-picker-member]").forEach((row) => row.addEventListener("click", () => { const saved = (state.schemeCollections || []).find((item) => item.id === row.dataset.voucherId); schemeCollectionDraft = saved ? normalizeSchemeCollection(saved) : defaultSchemeCollection(); const member = (state.schemes || []).find((item) => item.memberId === row.dataset.schemePickerMember); if (!saved && member) schemeCollectionDraft.lines = []; closeModal(); render(); toast(saved ? "Collection loaded for editing." : `No saved collection for ${member?.member || "member"}.`); }));
+}
+
+function schemeMemberReportRows() {
+  return (state.schemes || []).flatMap((member) => (member.schemeLines?.length ? member.schemeLines : [member]).map((line) => {
+    const master = (state.schemeMasters || []).find((item) => item.schemeName.toLowerCase() === String(line.scheme || member.scheme).toLowerCase());
+    return {
+      bookNumber: line.book || member.book || "", schemeId: master?.schemeId || (String(line.scheme || member.scheme).toUpperCase().includes("DIAMOND") ? "DMT" : "MT"), schemeName: master?.schemeName || line.scheme || member.scheme || "", memberId: member.memberId,
+      memberName: member.member, address: member.address, mobile: member.mobile, place: member.place, city: member.city, area: member.area,
+      openingAmount: Number(line.opAmount ?? member.opAmount ?? 0), openingWeight: Number(line.opWeight ?? member.opWeight ?? 0), joinDate: line.joinDate || member.joinDate || "", endDate: line.endDate || member.endDate || "",
+      agentName: line.agent || member.collectionAgent || "", nomineeName: member.nomineeName || "", relationMobile: member.relationMobile || "", relation: member.relation || "", idProof: member.idProof || "",
+      qty: Number(line.qty ?? member.qty ?? 0), active: member.active !== false ? "Active" : "Inactive", schemeStatus: member.schemeStatus || (member.active !== false ? "Active" : "Closed"),
+      collection: Number(member.collection || 0), investedAmount: Number(member.investedAmount ?? member.balance ?? 0), accumulatedWeight: Number(member.accumulatedWeight ?? member.opWeight ?? 0), averageRate: Number(member.averageRate || 0), balance: Number(member.balance || 0), closeDate: member.closeDate || "", closeVoucherNo: member.closeVoucherNo || "", refundAmount: Number(member.refundAmount || 0), closeWeight: Number(member.closeWeight || 0)
+    };
+  }));
+}
+
+function schemeMembersListReportRows() {
+  return schemeMemberReportRows().filter((row) => !schemeReportOptions.scheme || row.schemeName === schemeReportOptions.scheme);
+}
+
+function schemeReportToolbar() {
+  const tools = [["SHOW", "show-scheme-report"], ["PRINT", "print-scheme-report"], ["EXCEL", "excel-scheme-report"], ["SAVE AS", "save-scheme-report"], ["DATE", "date-scheme-report"], ["FIRST", "first-scheme-report"], ["PREV", "prev-scheme-report"], ["NEXT", "next-scheme-report"], ["LAST", "last-scheme-report"], ["VIEW/HIDE", "toggle-scheme-report"], ["ZOOM IN", "zoom-in-scheme-report"], ["DEFAULT", "default-zoom-scheme-report"], ["ZOOM OUT", "zoom-out-scheme-report"], ["CLOSE", "close-scheme-report"]];
+  const schemeNames = ["", ...(state.schemeMasters || []).map((item) => item.schemeName)];
+  const agents = [...new Set([...(state.miscellaneous?.agents || []).map((item) => item.name), ...(state.staffs || []).map((item) => item.name), ...(state.schemes || []).map((item) => item.collectionAgent).filter(Boolean)])].sort();
+  const agentFilter = schemeCollectionReportView === "New Schemes By Agent-By Date" ? `<select class="scheme-report-agent" data-scheme-report-agent><option value="">All Agents</option>${agents.map((item) => `<option ${item === schemeReportOptions.agent ? "selected" : ""}>${escapeHtml(item)}</option>`).join("")}</select>` : "";
+  const paidFilter = schemeCollectionReportView === "Collection Paid/Unpaid" ? `<select class="scheme-report-paid" data-scheme-report-paid><option value="">All Members</option><option ${schemeReportOptions.paidStatus === "Paid" ? "selected" : ""}>Paid</option><option ${schemeReportOptions.paidStatus === "Unpaid" ? "selected" : ""}>Unpaid</option></select>` : "";
+  return `<div class="scheme-report-toolbar"><div class="scheme-report-tools">${tools.map(([label, action]) => `<button data-action="${action}"><strong>${toolbarGlyph(label)}</strong><span>${label}</span></button>`).join("")}</div><label class="scheme-report-a4"><input type="checkbox" checked />A4</label><input class="scheme-report-search" data-scheme-report-search placeholder="Search report..." /><select class="scheme-report-scheme" data-scheme-report-scheme><option value="">All Schemes</option>${schemeNames.slice(1).map((item) => `<option ${item === schemeReportOptions.scheme ? "selected" : ""}>${escapeHtml(item)}</option>`).join("")}</select>${agentFilter}${paidFilter}<select data-scheme-report-view>${SCHEME_REPORT_ITEMS.map((item) => `<option ${item === schemeCollectionReportView ? "selected" : ""}>${escapeHtml(item)}</option>`).join("")}</select>${schemeReportOptions.dateOpen ? `<div class="scheme-report-date"><label>From<input type="date" data-scheme-report-date="from" value="${schemeReportOptions.from}" /></label><label>To<input type="date" data-scheme-report-date="to" value="${schemeReportOptions.to}" /></label><button data-action="apply-scheme-report-date">Apply</button></div>` : ""}</div>`;
+}
+
+function schemeCollectionReportsScreen() {
+  return `${moduleSwitcher("Scheme / Chitty", SCHEME_ITEMS, schemeView, "data-scheme-section")}<section class="panel scheme-report-window">${schemeReportToolbar()}${schemeCollectionReportBody()}</section>`;
+}
+
+function schemeCollectionReportRows() {
+  const rows = (state.schemeCollections || []).flatMap((voucher) => (voucher.lines || []).map((line) => {
+    const member = (state.schemes || []).find((item) => item.memberId === line.headId) || {};
+    const master = (state.schemeMasters || []).find((item) => item.schemeId === line.schemeId || item.schemeName.toLowerCase() === String(member.scheme || "").toLowerCase()) || {};
+    const goldRate = Number(line.goldRate || voucher.goldRate || 0), amount = Number(line.amount || 0);
+    return { sourceId: voucher.id, mode: "Collection", entryNo: voucher.voucherNo, entryDate: voucher.date, memberId: line.headId, bookNo: line.book, memberName: line.accountHead || member.member, collectedBy: voucher.collectedBy || "", schemeId: line.schemeId || master.schemeId, schemeName: master.schemeName || member.scheme || "", agentName: member.collectionAgent || "", preparedBy: voucher.preparedBy || "", payMode: voucher.cashBank || "", bankType: schemeCollectionUsesBank(voucher) ? voucher.bankCardType : "", amount, goldRate, weight: Number(line.weight || (goldRate > 0 ? amount / goldRate : 0)), remarks: line.remark || voucher.narration || "", voucherNo: line.voucherNo || voucher.voucherNo, voucherDate: voucher.voucherDate || voucher.date };
+  }));
+  if (!rows.length) (state.schemes || []).forEach((member, index) => {
+    const amount = Number(member.collection || 0); if (amount <= 0) return; const master = (state.schemeMasters || []).find((item) => item.schemeName.toLowerCase() === String(member.scheme || "").toLowerCase()) || {}; const goldRate = 13200;
+    const reportDate = schemeDateInput(member.collectionDate || "") || schemeReportOptions.to;
+    rows.push({ sourceId: "", mode: "Collection", entryNo: String(23900 + index), entryDate: reportDate, memberId: member.memberId, bookNo: member.book, memberName: member.member, collectedBy: member.collectionAgent || "", schemeId: master.schemeId || "MT", schemeName: master.schemeName || member.scheme, agentName: member.collectionAgent || "", preparedBy: member.collectionAgent || "", payMode: "Cash in Hand", bankType: "", amount, goldRate, weight: amount / goldRate, remarks: "Opening scheme collection", voucherNo: "", voucherDate: reportDate });
+  });
+  return rows.filter((row) => (!schemeReportOptions.scheme || row.schemeName === schemeReportOptions.scheme) && (!schemeReportOptions.from || row.entryDate >= schemeReportOptions.from) && (!schemeReportOptions.to || row.entryDate <= schemeReportOptions.to));
+}
+
+function schemeTransactionReport() {
+  const allRows = schemeCollectionReportRows(), start = schemeReportOptions.page * schemeReportOptions.pageSize, rows = allRows.slice(start, start + schemeReportOptions.pageSize);
+  const columns = [["Mode", "mode"], ["EntryNo", "entryNo"], ["EntryDate", "entryDate"], ["MemberID", "memberId"], ["BookNo", "bookNo"], ["MemberName", "memberName"], ["CollectedBy", "collectedBy"], ["SchemeID", "schemeId"], ["SchemeName", "schemeName"], ["AgentName", "agentName"], ["PreparedBy", "preparedBy"], ["PayMode", "payMode"], ["BankType", "bankType"], ["Amount", "amount", "number"], ["GoldRate", "goldRate", "number"], ["Weight", "weight", "weight"], ["remarks", "remarks"], ["VoucherNo", "voucherNo"], ["VoucherDate", "voucherDate"]];
+  return `<div class="scheme-report-paper scheme-transaction-report" style="--scheme-report-zoom:${schemeReportOptions.zoom}"><header><h2>***MT GOLD LAND***</h2><p>M.T.PLAZA, OOTY ROAD</p><strong>Scheme Collection Report for the Period From ${formatDisplayDate(schemeReportOptions.from)} To ${formatDisplayDate(schemeReportOptions.to)}</strong></header><div class="scheme-transaction-table"><div class="scheme-transaction-head"><span>#</span>${columns.map(([label]) => `<span>${label}<b>⌄</b></span>`).join("")}</div>${rows.map((row, index) => `<button type="button" data-scheme-collection-report-id="${escapeHtml(row.sourceId)}"><span>${start + index + 1}</span>${columns.map(([, key, type]) => `<span class="${type ? "number" : ""}">${type === "weight" ? numericValue(row[key], 3) : type === "number" ? numericValue(row[key], key === "amount" ? 2 : 0) : escapeHtml(row[key])}</span>`).join("")}</button>`).join("")}</div><footer>Showing ${rows.length ? start + 1 : 0}–${Math.min(start + rows.length, allRows.length)} of ${allRows.length} collection entries</footer></div>`;
+}
+
+function newSchemesByAgentRows() {
+  const members = schemeMemberReportRows().map((row) => ({ ...row, joinIso: schemeDateInput(row.joinDate), agentName: row.agentName || "Unassigned" })).filter((row) => (!schemeReportOptions.from || row.joinIso >= schemeReportOptions.from) && (!schemeReportOptions.to || row.joinIso <= schemeReportOptions.to));
+  const byAgent = new Map(), byAgentScheme = new Map(), byScheme = new Map();
+  for (const row of members) { byAgent.set(row.agentName, (byAgent.get(row.agentName) || 0) + 1); byAgentScheme.set(`${row.agentName}|${row.schemeId}`, (byAgentScheme.get(`${row.agentName}|${row.schemeId}`) || 0) + 1); byScheme.set(row.schemeId, (byScheme.get(row.schemeId) || 0) + 1); }
+  const groups = new Map();
+  for (const row of members) { const key = `${row.joinIso}|${row.agentName}|${row.schemeId}`; if (!groups.has(key)) groups.set(key, { joinDate: row.joinIso, agentName: row.agentName, schemeId: row.schemeId, schemeName: (state.schemeMasters || []).find((item) => item.schemeId === row.schemeId)?.schemeName || "", totalMembers: 0, firstMemberId: row.memberId }); groups.get(key).totalMembers += 1; }
+  const agentSources = [...(state.miscellaneous?.agents || []), ...(state.staffs || [])];
+  return [...groups.values()].map((row) => ({ ...row, agentId: agentSources.find((item) => item.name === row.agentName)?.id || agentSources.find((item) => item.name === row.agentName)?.staffId || "", byAgentTotal: byAgent.get(row.agentName) || 0, byAgentName: byAgentScheme.get(`${row.agentName}|${row.schemeId}`) || 0, totalByScheme: byScheme.get(row.schemeId) || 0, total: members.length })).filter((row) => (!schemeReportOptions.scheme || row.schemeName === schemeReportOptions.scheme) && (!schemeReportOptions.agent || row.agentName === schemeReportOptions.agent)).sort((a, b) => a.joinDate.localeCompare(b.joinDate) || a.agentName.localeCompare(b.agentName));
+}
+
+function newSchemesByAgentReport() {
+  const allRows = newSchemesByAgentRows(), start = schemeReportOptions.page * schemeReportOptions.pageSize, rows = allRows.slice(start, start + schemeReportOptions.pageSize);
+  const columns = [["JoinDate", "joinDate"], ["AgentId", "agentId"], ["AgentName", "agentName"], ["Schemeid", "schemeId"], ["SchemeName", "schemeName"], ["TotalMembers", "totalMembers", true], ["ByAgent_TOTAL", "byAgentTotal", true], ["ByAgentName", "byAgentName", true], ["Total_ByScheme", "totalByScheme", true], ["Total", "total", true]];
+  return `<div class="scheme-report-paper scheme-agent-report" style="--scheme-report-zoom:${schemeReportOptions.zoom}"><header><h2>***MT GOLD LAND***</h2><p>M.T.PLAZA, OOTY ROAD</p><strong>New Schemes By Agent-By Date Upto ${formatDisplayDate(schemeReportOptions.to)}</strong></header><div class="scheme-agent-table"><div class="scheme-agent-head"><span>#</span>${columns.map(([label]) => `<span>${label}<b>⌄</b></span>`).join("")}</div>${rows.map((row, index) => `<button type="button" data-scheme-agent-member="${escapeHtml(row.firstMemberId)}"><span>${start + index + 1}</span>${columns.map(([, key, number]) => `<span class="${number ? "number" : ""}">${key === "joinDate" ? formatDisplayDate(row[key]) : escapeHtml(row[key])}</span>`).join("")}</button>`).join("")}</div><footer>Showing ${rows.length ? start + 1 : 0}–${Math.min(start + rows.length, allRows.length)} of ${allRows.length} grouped enrollments</footer></div>`;
+}
+
+function schemeReportMonths() {
+  const start = new Date(`${schemeReportOptions.from.slice(0, 7)}-01T00:00:00Z`), end = new Date(`${schemeReportOptions.to.slice(0, 7)}-01T00:00:00Z`), months = [];
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return months;
+  for (const date = new Date(start); date <= end && months.length < 60; date.setUTCMonth(date.getUTCMonth() + 1)) months.push(date.toISOString().slice(0, 7));
+  return months;
+}
+
+function collectionPaidUnpaidRows() {
+  const months = schemeReportMonths(), savedAmounts = new Map(), hasSaved = (state.schemeCollections || []).length > 0;
+  const add = (memberId, month, amount) => { if (!months.includes(month)) return; const key = `${memberId}|${month}`; savedAmounts.set(key, (savedAmounts.get(key) || 0) + Number(amount || 0)); };
+  for (const voucher of state.schemeCollections || []) for (const line of voucher.lines || []) add(line.headId, String(voucher.date || voucher.voucherDate).slice(0, 7), line.amount);
+  for (const voucher of state.schemeClosures || []) for (const line of voucher.lines || []) add(line.headId, String(voucher.date || line.voucherDate).slice(0, 7), -Number(line.amount || 0));
+  const lastMonth = months.at(-1) || "";
+  const rows = schemeMemberReportRows().map((member) => {
+    const values = Object.fromEntries(months.map((month) => [month, savedAmounts.get(`${member.memberId}|${month}`) || 0]));
+    if (!hasSaved && Number(member.collection || 0) !== 0 && lastMonth) values[lastMonth] += Number(member.collection || 0);
+    const totalPaid = months.reduce((sum, month) => sum + Number(values[month] || 0), 0), status = totalPaid > 0 ? "Paid" : "Unpaid";
+    return { ...member, memberDisplay: `${member.memberName}[${member.bookNumber}]`, values, totalPaid, status };
+  });
+  return rows.filter((row) => (!schemeReportOptions.scheme || (state.schemeMasters || []).find((item) => item.schemeId === row.schemeId)?.schemeName === schemeReportOptions.scheme) && (!schemeReportOptions.paidStatus || row.status === schemeReportOptions.paidStatus));
+}
+
+function collectionPaidUnpaidReport() {
+  const months = schemeReportMonths(), allRows = collectionPaidUnpaidRows(), start = schemeReportOptions.page * schemeReportOptions.pageSize, rows = allRows.slice(start, start + schemeReportOptions.pageSize);
+  return `<div class="scheme-report-paper scheme-paid-report" style="--scheme-report-zoom:${schemeReportOptions.zoom}"><header><h2>***MT GOLD LAND***</h2><p>M.T.PLAZA, OOTY ROAD</p><strong>Collection Paid/Unpaid Upto ${formatDisplayDate(schemeReportOptions.to)}</strong></header><div class="scheme-paid-table" style="--paid-month-count:${months.length}"><div class="scheme-paid-head"><span>#</span><span>MemberName<b>⌄</b></span><span>BookNo<b>⌄</b></span><span>Mobile<b>⌄</b></span>${months.map((month) => `<span>${month}<b>⌄</b></span>`).join("")}<span>Total<b>⌄</b></span><span>Status<b>⌄</b></span></div>${rows.map((row, index) => `<button type="button" data-scheme-paid-member="${escapeHtml(row.memberId)}"><span>${start + index + 1}</span><span>${escapeHtml(row.memberDisplay)}</span><span>${escapeHtml(row.bookNumber)}</span><span>${escapeHtml(row.mobile)}</span>${months.map((month) => `<span class="number ${row.values[month] < 0 ? "negative" : ""}">${numericValue(row.values[month], 2)}</span>`).join("")}<span class="number">${numericValue(row.totalPaid, 2)}</span><span>${row.status}</span></button>`).join("")}</div><footer>Showing ${rows.length ? start + 1 : 0}–${Math.min(start + rows.length, allRows.length)} of ${allRows.length} members · ${months.length} monthly columns</footer></div>`;
+}
+
+function schemeCollectionReportBody() {
+  if (schemeCollectionReportView === "Scheme Collection Report") return schemeTransactionReport();
+  if (schemeCollectionReportView === "New Schemes By Agent-By Date") return newSchemesByAgentReport();
+  if (schemeCollectionReportView === "Collection Paid/Unpaid") return collectionPaidUnpaidReport();
+  if (schemeCollectionReportView !== "Scheme Members List") return `<section class="scheme-report-placeholder"><p class="eyebrow">Scheme Collection Report</p><h2>${escapeHtml(schemeCollectionReportView)}</h2><p>This submenu is ready for its supplied reference screen.</p></section>`;
+  const allRows = schemeMembersListReportRows(), start = schemeReportOptions.page * schemeReportOptions.pageSize, rows = allRows.slice(start, start + schemeReportOptions.pageSize);
+  const columns = [
+    ["BookNumber", "bookNumber"], ["SchemeId", "schemeId"], ["Memberid", "memberId"], ["MemberName", "memberName"], ["Address", "address"], ["Mobile", "mobile"], ["Place", "place"], ["City", "city"], ["Area", "area"],
+    ["OpeningAmt", "openingAmount", "number"], ["Op_Weight", "openingWeight", "number"], ["joindate", "joinDate"], ["EndDate", "endDate"], ["AgentName", "agentName"], ["NomineeName", "nomineeName"],
+    ["RelationMobile", "relationMobile"], ["Relation", "relation"], ["IDProof", "idProof"], ["Qty", "qty", "number"], ["Active", "active"], ["SchemeStatus", "schemeStatus"], ["Collection", "collection", "number"], ["InvestedAmount", "investedAmount", "number"], ["AccumulatedWeight", "accumulatedWeight", "number"], ["AverageRate", "averageRate", "number"], ["Balance", "balance", "number"],
+    ["CloseDate", "closeDate"], ["CloseVoucherNo", "closeVoucherNo"], ["RefundAmount", "refundAmount", "number"], ["CloseWeight", "closeWeight", "number"]
+  ];
+  return `<div class="scheme-report-paper" style="--scheme-report-zoom:${schemeReportOptions.zoom}"><header><h2>***MT GOLD LAND***</h2><p>M.T.PLAZA, OOTY ROAD</p><strong>Scheme Members List</strong></header><div class="scheme-member-report-table"><div class="scheme-member-report-head"><span>#</span>${columns.map(([label]) => `<span>${label}<b>⌄</b></span>`).join("")}</div>${rows.map((row, index) => `<button type="button" data-scheme-report-member="${escapeHtml(row.memberId)}"><span>${start + index + 1}</span>${columns.map(([, key, type]) => `<span class="${type === "number" ? "number" : ""}">${type === "number" ? numericValue(row[key]) : escapeHtml(row[key])}</span>`).join("")}</button>`).join("")}</div><footer>Showing ${rows.length ? start + 1 : 0}–${Math.min(start + rows.length, allRows.length)} of ${allRows.length} scheme enrollments</footer></div>`;
+}
+
+function exportSchemeMemberReport() {
+  const rows = schemeMembersListReportRows(), keys = ["bookNumber", "schemeId", "schemeName", "memberId", "memberName", "address", "mobile", "place", "city", "area", "openingAmount", "openingWeight", "joinDate", "endDate", "agentName", "nomineeName", "relationMobile", "relation", "idProof", "qty", "active", "schemeStatus", "collection", "investedAmount", "accumulatedWeight", "averageRate", "balance", "closeDate", "closeVoucherNo", "refundAmount", "closeWeight"];
+  const csv = [keys, ...rows.map((row) => keys.map((key) => row[key]))].map((row) => row.map((value) => `"${String(value ?? "").replaceAll('"', '""')}"`).join(",")).join("\n"); const link = document.createElement("a"); link.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" })); link.download = "scheme-members-list.csv"; link.click(); URL.revokeObjectURL(link.href); toast("Scheme members list exported.");
+}
+
+function exportSchemeTransactionReport() {
+  const keys = ["mode", "entryNo", "entryDate", "memberId", "bookNo", "memberName", "collectedBy", "schemeId", "schemeName", "agentName", "preparedBy", "payMode", "bankType", "amount", "goldRate", "weight", "remarks", "voucherNo", "voucherDate"];
+  const csv = [keys, ...schemeCollectionReportRows().map((row) => keys.map((key) => row[key]))].map((row) => row.map((value) => `"${String(value ?? "").replaceAll('"', '""')}"`).join(",")).join("\n"); const link = document.createElement("a"); link.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" })); link.download = "scheme-collection-report.csv"; link.click(); URL.revokeObjectURL(link.href); toast("Scheme collection report exported.");
+}
+
+function exportNewSchemesByAgentReport() {
+  const keys = ["joinDate", "agentId", "agentName", "schemeId", "schemeName", "totalMembers", "byAgentTotal", "byAgentName", "totalByScheme", "total"];
+  const csv = [keys, ...newSchemesByAgentRows().map((row) => keys.map((key) => row[key]))].map((row) => row.map((value) => `"${String(value ?? "").replaceAll('"', '""')}"`).join(",")).join("\n"); const link = document.createElement("a"); link.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" })); link.download = "new-schemes-by-agent-date.csv"; link.click(); URL.revokeObjectURL(link.href); toast("New schemes by agent report exported.");
+}
+
+function exportCollectionPaidUnpaidReport() {
+  const months = schemeReportMonths(), headings = ["MemberName", "BookNo", "Mobile", ...months, "Total", "Status"], rows = collectionPaidUnpaidRows().map((row) => [row.memberDisplay, row.bookNumber, row.mobile, ...months.map((month) => row.values[month]), row.totalPaid, row.status]);
+  const csv = [headings, ...rows].map((row) => row.map((value) => `"${String(value ?? "").replaceAll('"', '""')}"`).join(",")).join("\n"); const link = document.createElement("a"); link.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" })); link.download = "collection-paid-unpaid.csv"; link.click(); URL.revokeObjectURL(link.href); toast("Collection paid/unpaid report exported.");
+}
+
+function activeSchemeReportRowCount() { if (schemeCollectionReportView === "Scheme Collection Report") return schemeCollectionReportRows().length; if (schemeCollectionReportView === "New Schemes By Agent-By Date") return newSchemesByAgentRows().length; if (schemeCollectionReportView === "Collection Paid/Unpaid") return collectionPaidUnpaidRows().length; return schemeMembersListReportRows().length; }
+
+function schemeMemberLedgerEntries(member) {
+  const entries = [];
+  const openingAmount = Number(member.ledgerOpeningAmount ?? member.opAmount ?? 0), openingWeight = Number(member.ledgerOpeningWeight ?? member.opWeight ?? 0);
+  if (openingAmount || openingWeight) entries.push({ id: `opening-${member.memberId}`, date: schemeDateInput(member.opDate || member.joinDate), entryNo: "OPENING", installment: 0, particular: "Opening scheme balance", debit: 0, credit: openingAmount, drWeight: 0, crWeight: openingWeight, goldRate: openingWeight > 0 ? openingAmount / openingWeight : 0, remarks: "Opening balance", mode: "Opening" });
+  for (const voucher of state.schemeCollections || []) for (const line of voucher.lines || []) if (line.headId === member.memberId) {
+    const amount = Number(line.amount || 0), rate = Number(line.goldRate || voucher.goldRate || 0), weight = Number(line.weight || (rate > 0 ? amount / rate : 0));
+    entries.push({ id: line.id, date: schemeDateInput(voucher.date), entryNo: voucher.voucherNo, installment: 0, particular: `Scheme installment – ${voucher.cashBank || "Cash"}`, debit: 0, credit: amount, drWeight: 0, crWeight: weight, goldRate: rate, remarks: line.remark || voucher.narration || "", mode: "Collection", preparedBy: voucher.preparedBy || "", collectedBy: voucher.collectedBy || "", bankType: voucher.bankCardType || "", costCenter: voucher.costCenter || "" });
+  }
+  for (const voucher of state.schemeClosures || []) for (const line of voucher.lines || []) if (line.headId === member.memberId) {
+    entries.push({ id: line.id, date: schemeDateInput(voucher.date), entryNo: voucher.voucherNo, installment: 0, particular: line.mode === "Close" ? "Scheme closed / settled" : "Scheme refund", debit: Number(line.amount || 0), credit: 0, drWeight: Number(line.weight || 0), crWeight: 0, goldRate: Number(line.averageRate || voucher.averageGoldRate || 0), remarks: line.remark || voucher.narration || "", mode: line.mode, preparedBy: voucher.preparedBy || "", collectedBy: voucher.collectedBy || "", bankType: voucher.bankCardType || "", costCenter: voucher.costCenter || "" });
+  }
+  entries.sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.entryNo).localeCompare(String(b.entryNo)));
+  let balance = 0, weightBalance = 0, installment = 0;
+  return entries.map((entry) => { if (entry.mode === "Collection") installment += 1; balance += entry.credit - entry.debit; weightBalance += entry.crWeight - entry.drWeight; return { ...entry, installment: entry.mode === "Collection" ? installment : "", balance, weightBalance, status: member.schemeStatus || (member.active !== false ? "Active" : "Closed") }; });
+}
+
+function filteredSchemeLedgerMembers() {
+  const query = schemeLedgerOptions.accountHead.trim().toLowerCase();
+  return schemeMemberReportRows().filter((row) => (!schemeLedgerOptions.schemeId || row.schemeId === schemeLedgerOptions.schemeId) && (!query || `${row.memberId} ${row.memberName} ${row.bookNumber} ${row.mobile}`.toLowerCase().includes(query)));
+}
+
+function schemeMemberLedgerScreen() {
+  const selected = (state.schemes || []).find((item) => item.memberId === selectedSchemeLedgerMemberId);
+  if (selected) {
+    const master = (state.schemeMasters || []).find((item) => item.schemeName.toLowerCase() === String(selected.scheme).toLowerCase()), allEntries = schemeMemberLedgerEntries(selected), entries = allEntries.filter((entry) => (!schemeLedgerOptions.from || entry.date >= schemeLedgerOptions.from) && (!schemeLedgerOptions.to || entry.date <= schemeLedgerOptions.to));
+    const totals = entries.reduce((sum, row) => ({ debit: sum.debit + row.debit, credit: sum.credit + row.credit, drWeight: sum.drWeight + row.drWeight, crWeight: sum.crWeight + row.crWeight }), { debit: 0, credit: 0, drWeight: 0, crWeight: 0 });
+    return `${moduleSwitcher("Scheme / Chitty", SCHEME_ITEMS, schemeView, "data-scheme-section")}<section class="panel scheme-ledger-window"><div class="scheme-ledger-detail-head"><button type="button" data-action="back-scheme-ledger">← Members</button><div><h2>${escapeHtml(selected.member)} <small>${escapeHtml(selected.memberId)}</small></h2><p>${escapeHtml(master?.schemeName || selected.scheme)} · Book ${escapeHtml(selected.book)} · ${escapeHtml(selected.mobile || "No mobile")}</p></div><div><strong>${escapeHtml(selected.schemeStatus || (selected.active !== false ? "Active" : "Closed"))}</strong><span>Avg. Rate ${numericValue(selected.averageRate || 0, 3)}</span><span>Cash Balance ${numericValue(selected.investedAmount ?? selected.balance ?? 0)}</span><span>Weight Balance ${numericValue(selected.accumulatedWeight ?? 0, 3)}</span></div></div><div class="scheme-ledger-table"><div class="scheme-ledger-row head"><span>#</span><span>Installment</span><span>Entry No</span><span>Date</span><span>Particular</span><span>Debit</span><span>Credit</span><span>DrWeight</span><span>CrWeight</span><span>GoldRate</span><span>Balance</span><span>Weight Balance</span><span>Prepared By</span><span>Collected By</span><span>Pay Mode</span><span>Remarks</span><span>Status</span></div>${entries.map((row, index) => `<div class="scheme-ledger-row"><span>${index + 1}</span><span>${row.installment}</span><span>${escapeHtml(row.entryNo)}</span><span>${formatDisplayDate(row.date)}</span><span>${escapeHtml(row.particular)}</span><span class="number">${numericValue(row.debit)}</span><span class="number">${numericValue(row.credit)}</span><span class="number">${numericValue(row.drWeight, 3)}</span><span class="number">${numericValue(row.crWeight, 3)}</span><span class="number">${numericValue(row.goldRate, 3)}</span><span class="number">${numericValue(row.balance)}</span><span class="number">${numericValue(row.weightBalance, 3)}</span><span>${escapeHtml(row.preparedBy || "")}</span><span>${escapeHtml(row.collectedBy || "")}</span><span>${escapeHtml(row.bankType || "")}</span><span>${escapeHtml(row.remarks)}</span><span>${escapeHtml(row.status)}</span></div>`).join("") || `<p class="soft-note">No ledger entries in this date range.</p>`}</div><footer class="scheme-ledger-totals"><span>Entries: ${entries.length}</span><span>Debit ${numericValue(totals.debit)}</span><span>Credit ${numericValue(totals.credit)}</span><span>DrWeight ${numericValue(totals.drWeight, 3)}</span><span>CrWeight ${numericValue(totals.crWeight, 3)}</span></footer></section>`;
+  }
+  const rows = filteredSchemeLedgerMembers(), schemes = state.schemeMasters || [];
+  return `${moduleSwitcher("Scheme / Chitty", SCHEME_ITEMS, schemeView, "data-scheme-section")}<section class="panel scheme-ledger-window"><div class="scheme-ledger-filters"><label><span>Date From</span><input type="date" data-scheme-ledger-filter="from" value="${schemeLedgerOptions.from}" /></label><button type="button" data-action="scheme-ledger-today">Today</button><label><span>Date To</span><input type="date" data-scheme-ledger-filter="to" value="${schemeLedgerOptions.to}" /></label><button type="button" data-action="scheme-ledger-term">Term</button><label><span>CostCenter</span><select data-scheme-ledger-filter="costCenter"><option>cost1</option><option>Main shop</option></select></label><label class="wide"><span>Account Head</span><input data-scheme-ledger-filter="accountHead" value="${escapeHtml(schemeLedgerOptions.accountHead)}" placeholder="Member ID, name, book or mobile" /></label><label><span>Scheme ID</span><select data-scheme-ledger-filter="schemeId"><option value="">All Schemes</option>${schemes.map((item) => `<option value="${escapeHtml(item.schemeId)}" ${item.schemeId === schemeLedgerOptions.schemeId ? "selected" : ""}>${escapeHtml(item.schemeId)} – ${escapeHtml(item.schemeName)}</option>`).join("")}</select></label></div><p class="scheme-ledger-help">Double-click a member to open the complete installment and settlement ledger.</p><div class="scheme-ledger-members"><div class="scheme-ledger-member-row head"><span></span><span>MemberID</span><span>MemberName</span><span>Mobile</span><span>BookNumber</span><span>SchemeID</span><span>Status</span><span>Cash Balance</span><span>Weight Balance</span></div>${rows.map((row) => `<button type="button" class="scheme-ledger-member-row" data-scheme-ledger-member="${escapeHtml(row.memberId)}"><span>›</span><span>${escapeHtml(row.memberId)}</span><span>${escapeHtml(row.memberName)}</span><span>${escapeHtml(row.mobile)}</span><span>${escapeHtml(row.bookNumber)}</span><span>${escapeHtml(row.schemeId)}</span><span>${escapeHtml(row.schemeStatus)}</span><span class="number">${numericValue(row.investedAmount)}</span><span class="number">${numericValue(row.accumulatedWeight, 3)}</span></button>`).join("")}</div><button class="scheme-ledger-ok" type="button" data-action="close-scheme-ledger">OK</button></section>`;
+}
+
+function nextSchemeClosureVoucherNo() {
+  const max = Math.max(0, ...(state.schemeClosures || []).map((item) => Number(String(item.voucherNo || "").replace(/\D/g, "")) || 0));
+  return String(max + 1).padStart(5, "0");
+}
+
+function defaultSchemeClosure() {
+  const today = new Date().toISOString().slice(0, 10);
+  return normalizeSchemeClosure({ voucherNo: nextSchemeClosureVoucherNo(), date: today, goldRate: 13200, averageGoldRate: 0, cashBank: "Cash in Hand", costCenter: "cost1" });
+}
+
+function activeSchemeClosure() { return normalizeSchemeClosure(schemeClosureDraft || defaultSchemeClosure()); }
+function schemeClosureTotal(record = activeSchemeClosure()) { return (record.lines || []).reduce((sum, line) => sum + Number(line.amount || 0), 0); }
+
+function schemeClosureScreen() {
+  const record = activeSchemeClosure(), total = schemeClosureTotal(record), staff = ["", ...(state.staffs || []).map((item) => item.name)], members = state.schemes || [];
+  const rows = record.lines.map((line, index) => `<div class="scheme-close-row"><span>${index + 1}</span><button type="button" data-action="remove-scheme-close-line" data-index="${index}">×</button><span>${escapeHtml(line.headId)}</span><span>${escapeHtml(line.book)}</span><span>${escapeHtml(line.accountHead)}</span><span>${escapeHtml(line.schemeId)}</span><span>${numericValue(line.amount)}</span><span>${escapeHtml(line.mode)}</span><span>${numericValue(line.weight)}</span><span>${escapeHtml(line.remark)}</span><span>${escapeHtml(line.voucherNo)}</span><span>${escapeHtml(line.voucherDate)}</span></div>`).join("");
+  return `${moduleSwitcher("Scheme / Chitty", SCHEME_ITEMS, schemeView, "data-scheme-section")}
+    <section class="panel scheme-close-window">
+      <div class="classic-billing-toolbar scheme-close-toolbar" aria-label="Scheme Close actions">
+        ${toolbarButton("Save", "save-scheme-close")}${toolbarButton("Refresh", "refresh-scheme-close")}${toolbarButton("Edit", "edit-scheme-close")}${toolbarButton("Delete", "delete-scheme-close")}${toolbarButton("Print", "print-scheme-close")}${toolbarButton("Close", "close-scheme-close")}
+        <span class="toolbar-spacer"></span><label class="scheme-gold-rate"><span>Gold Rate</span><input form="schemeCloseForm" name="goldRate" type="number" min="0" step="0.001" value="${numericValue(record.goldRate)}" required /></label>
+      </div>
+      <form id="schemeCloseForm" data-scheme-close-form>
+        <div class="scheme-close-header">
+          <div class="scheme-collection-meta"><label><span>Voucher No, Ref No</span><span><input name="voucherNo" value="${escapeHtml(record.voucherNo)}" readonly required /><input name="refNo" value="${escapeHtml(record.refNo)}" /></span></label><label><span>Date, Time</span><span><input name="date" type="date" value="${schemeDateInput(record.date)}" required /><input name="time" value="${escapeHtml(record.time)}" required /></span></label><label><span>Prepared By</span><select name="preparedBy" required>${staff.map((value) => `<option ${value === record.preparedBy ? "selected" : ""}>${escapeHtml(value)}</option>`).join("")}</select></label></div>
+          <label class="scheme-average-rate"><span>Avg. Gold Rate</span><input name="averageGoldRate" type="number" min="0" step="0.001" value="${numericValue(record.averageGoldRate)}" required /></label>
+          <div class="scheme-collection-cash"><label><span>Cash/Bank</span><select name="cashBank" data-scheme-close-cash-bank required>${SCHEME_CASH_BANKS.map((value) => `<option ${value === record.cashBank ? "selected" : ""}>${escapeHtml(value)}</option>`).join("")}</select></label><label><span>Cost Center</span><select name="costCenter" required>${["cost1", "Main shop"].map((value) => `<option ${value === record.costCenter ? "selected" : ""}>${value}</option>`).join("")}</select></label><label><span>Collected By</span><select name="collectedBy" required>${staff.map((value) => `<option ${value === record.collectedBy ? "selected" : ""}>${escapeHtml(value)}</option>`).join("")}</select></label>${schemeCollectionUsesBank(record) ? `<label class="scheme-close-bank-card"><span>Bank Card Type</span><select name="bankCardType" required>${["UPI", "Debit Card", "Credit Card"].map((value) => `<option ${value === record.bankCardType ? "selected" : ""}>${value}</option>`).join("")}</select></label>` : ""}</div>
+        </div>
+        <div class="scheme-close-entry">
+          <label><span>Head ID</span><input name="headId" list="schemeCloseMembers" /></label><label><span>Book No.</span><input name="book" readonly /></label><label><span>Member Name</span><input name="memberName" readonly /></label><label><span>SchemeID</span><input name="schemeId" readonly /></label><label><span>Amount</span><input name="amount" type="number" min="0" step="0.001" value="0.000" /></label><label><span>Mode</span><select name="mode"><option>Close</option><option>Refund</option></select></label><label><span>Weight</span><input name="weight" type="number" min="0" step="0.001" value="0.000" /></label><label><span>Remarks</span><input name="remark" /></label><label><span>Voucher No</span><input name="lineVoucherNo" value="${escapeHtml(record.voucherNo)}" readonly /></label><label><span>Voucher Date</span><input name="voucherDate" type="date" value="${schemeDateInput(record.date)}" /></label><button type="button" data-action="add-scheme-close-line">＋ Add</button><datalist id="schemeCloseMembers">${members.map((item) => `<option value="${escapeHtml(item.memberId)}">${escapeHtml(item.member)} — ${escapeHtml(item.book)}</option>`).join("")}</datalist>
+        </div>
+        <div class="scheme-close-grid"><div class="scheme-close-grid-head"><span>Sl</span><span>×</span><span>ID</span><span>BookNo</span><span>Account Head</span><span>SchemeID</span><span>Amount</span><span>Mode</span><span>Weight</span><span>Remark</span><span>Voucher No</span><span>Voucher Date</span></div><div>${rows}</div></div>
+        <div class="scheme-close-total"><output>${numericValue(total)}</output></div><label class="scheme-collection-narration"><span>Narration</span><textarea name="narration">${escapeHtml(record.narration)}</textarea></label>
+      </form>
+    </section>`;
+}
+
+function captureSchemeClosureHeader() {
+  const form = document.querySelector("[data-scheme-close-form]"); if (!form) return activeSchemeClosure(); const data = new FormData(form), current = activeSchemeClosure();
+  return normalizeSchemeClosure({ ...current, voucherNo: data.get("voucherNo"), refNo: data.get("refNo"), date: data.get("date"), time: data.get("time"), preparedBy: data.get("preparedBy"), cashBank: data.get("cashBank"), bankCardType: data.get("bankCardType") || current.bankCardType, costCenter: data.get("costCenter"), collectedBy: data.get("collectedBy"), goldRate: data.get("goldRate"), averageGoldRate: data.get("averageGoldRate"), narration: data.get("narration"), lines: current.lines });
+}
+
+function addSchemeClosureLine() {
+  const form = document.querySelector("[data-scheme-close-form]"); if (!form) return; const id = form.elements.headId.value.trim().toUpperCase(); const member = (state.schemes || []).find((item) => item.memberId.toUpperCase() === id || item.book.toUpperCase() === id); if (!member) return toast("Select a valid scheme member.");
+  const record = captureSchemeClosureHeader(), master = (state.schemeMasters || []).find((item) => item.schemeName.toLowerCase() === String(member.scheme).toLowerCase());
+  const amount = Number(form.elements.amount.value || 0), averageRate = Number(member.averageRate || record.averageGoldRate || 0);
+  const weight = Number(form.elements.weight.value || 0) || (averageRate > 0 ? amount / averageRate : 0);
+  if (amount <= 0) return toast("Enter a refund or close amount greater than zero.");
+  record.averageGoldRate = averageRate;
+  record.lines.push(normalizeSchemeClosureLine({ headId: member.memberId, book: member.book, accountHead: member.member, schemeId: master?.schemeId || (String(member.scheme).toUpperCase().includes("DIAMOND") ? "DMT" : "MT"), amount, mode: form.elements.mode.value, weight, averageRate, remark: form.elements.remark.value, voucherNo: record.voucherNo, voucherDate: form.elements.voucherDate.value })); schemeClosureDraft = record; render(); toast("Scheme close line added.");
+}
+
+function saveSchemeClosure() {
+  const form = document.querySelector("[data-scheme-close-form]"); if (!form || !form.reportValidity()) return; const record = captureSchemeClosureHeader(); if (!record.lines.length) return toast("Add at least one member to close.");
+  state.schemeClosures ||= []; const index = state.schemeClosures.findIndex((item) => item.id === record.id), previous = index >= 0 ? state.schemeClosures[index] : null;
+  const affectedMembers = new Set([...(previous?.lines || []), ...record.lines].map((line) => line.headId));
+  if (index >= 0) state.schemeClosures[index] = record; else state.schemeClosures.unshift(record);
+  affectedMembers.forEach(recalculateSchemeMemberInvestment);
+  schemeClosureDraft = record; state.audit.unshift(audit(`Saved scheme refund/close voucher ${record.voucherNo}`)); saveState(); render(); toast("Scheme refund/close saved successfully.");
+}
+
+function deleteSchemeClosure() {
+  const record = activeSchemeClosure(), index = (state.schemeClosures || []).findIndex((item) => item.id === record.id); if (index < 0) return toast("This close voucher has not been saved."); if (!window.confirm(`Delete scheme close voucher ${record.voucherNo}?`)) return;
+  const affectedMembers = new Set(record.lines.map((line) => line.headId));
+  state.schemeClosures.splice(index, 1); affectedMembers.forEach(recalculateSchemeMemberInvestment); schemeClosureDraft = defaultSchemeClosure(); saveState(); render(); toast("Scheme refund/close voucher deleted.");
+}
+
+function openSchemeClosurePicker() {
+  document.body.insertAdjacentHTML("beforeend", `<div class="modal-backdrop scheme-picker-backdrop"><section class="scheme-collection-picker"><header><h2>Scheme Close Entry</h2><button data-action="close-modal">×</button></header><label>Entry No/Account Head <input data-scheme-close-picker-search autofocus /></label><div class="scheme-picker-table"><div class="scheme-picker-head"><span>Sl</span><span>Voucher No</span><span>Voucher Date</span><span>Account Head</span><span>SchemeID</span><span>BookNo</span><span>Amount</span></div>${(state.schemeClosures || []).flatMap((voucher) => voucher.lines.map((line, index) => `<button data-scheme-close-voucher="${escapeHtml(voucher.id)}"><span>${index + 1}</span><span>${escapeHtml(voucher.voucherNo)}</span><span>${escapeHtml(voucher.date)}</span><span>${escapeHtml(line.accountHead)}</span><span>${escapeHtml(line.schemeId)}</span><span>${escapeHtml(line.book)}</span><span>${numericValue(line.amount)}</span></button>`)).join("") || `<p class="soft-note">No saved close vouchers.</p>`}</div></section></div>`);
+  document.querySelector(".scheme-picker-backdrop [data-action='close-modal']")?.addEventListener("click", closeModal); document.querySelector("[data-scheme-close-picker-search]")?.addEventListener("input", (event) => { const q = event.currentTarget.value.toLowerCase(); document.querySelectorAll("[data-scheme-close-voucher]").forEach((row) => row.hidden = !row.textContent.toLowerCase().includes(q)); }); document.querySelectorAll("[data-scheme-close-voucher]").forEach((row) => row.addEventListener("click", () => { schemeClosureDraft = normalizeSchemeClosure(state.schemeClosures.find((item) => item.id === row.dataset.schemeCloseVoucher)); closeModal(); render(); toast("Scheme close voucher loaded."); }));
+}
+
+function schemeDateInput(value = "") {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const match = String(value).match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  return match ? `${match[3]}-${match[2]}-${match[1]}` : "";
+}
+
+function nextSchemeMemberId() {
+  const max = Math.max(0, ...(state.schemes || []).map((item) => Number(String(item.memberId || "").replace(/\D/g, "")) || 0));
+  return `H${String(max + 1).padStart(4, "0")}`;
+}
+
+function nextSchemeBookNo(schemeName = "") {
+  const master = (state.schemeMasters || []).find((item) => item.schemeName === schemeName || item.schemeId === schemeName);
+  const prefix = master?.schemeId || (schemeName.toUpperCase().includes("DIAMOND") ? "DMT" : "MT");
+  const numbers = (state.schemes || []).flatMap((member) => member.schemeLines || [member]).filter((line) => String(line.book || "").toUpperCase().startsWith(prefix)).map((line) => Number(String(line.book || "").slice(prefix.length).replace(/\D/g, "")) || 0);
+  return `${prefix}${String(Math.max(0, ...numbers) + 1).padStart(5, "0")}`;
+}
+
+function emptySchemeMember() {
+  const today = new Date().toISOString().slice(0, 10);
+  const scheme = state.schemeMasters?.[0]?.schemeName || "MT SUVARNA";
+  const member = normalizeScheme({ memberId: nextSchemeMemberId(), active: true, scheme, book: nextSchemeBookNo(scheme), qty: 1, joinDate: today, endDate: today, opDate: today, schemeLines: [] });
+  member.schemeLines = [];
+  return member;
+}
+
+function schemeMemberLineRow(line, index) {
+  return `<div class="scheme-member-enrollment-row"><button type="button" data-remove-scheme-line="${index}" title="Remove enrollment">×</button><span>${escapeHtml(line.scheme)}</span><span>${escapeHtml(line.book)}</span><span>${line.qty}</span><span>${escapeHtml(line.joinDate)}</span><span>${escapeHtml(line.endDate)}</span><span>${numericValue(line.opAmount)}</span><span>${numericValue(line.opWeight)}</span><span>${escapeHtml(line.opDate)}</span><span>${escapeHtml(line.agent || "")}</span></div>`;
+}
+
+function schemeMembersScreen() {
+  const members = state.schemes || [];
+  const query = schemeMemberSearch.trim().toLowerCase();
+  const filtered = members.filter((item) => !query || `${item.memberId} ${item.member} ${item.address} ${item.place} ${item.mobile}`.toLowerCase().includes(query));
+  const selected = members.find((item) => item.memberId === selectedSchemeMemberId) || (selectedSchemeMemberId ? members[0] : null);
+  const record = selected || emptySchemeMember();
+  const line = record.schemeLines?.[0] || { scheme: record.scheme, book: record.book, qty: record.qty || 1, joinDate: record.joinDate, endDate: record.endDate, opAmount: record.opAmount, opWeight: record.opWeight, opDate: record.opDate, agent: record.collectionAgent };
+  const schemeOptions = (state.schemeMasters || []).map((item) => item.schemeName);
+  const agents = ["", ...(state.miscellaneous?.agents || []).map((item) => item.name)];
+  const listRows = filtered.map((item) => `<button type="button" class="scheme-member-row ${item.memberId === selected?.memberId ? "selected" : ""}" data-scheme-member-id="${escapeHtml(item.memberId)}"><span>${escapeHtml(item.memberId)}</span><span>${escapeHtml(item.member)}</span><span>${escapeHtml(item.address)}</span><span>${escapeHtml(item.place)}</span></button>`).join("");
+  return `${moduleSwitcher("Scheme / Chitty", SCHEME_ITEMS, schemeView, "data-scheme-section")}
+    <section class="panel scheme-members-window">
+      <div class="classic-billing-toolbar scheme-member-toolbar" aria-label="Scheme Members actions">
+        ${toolbarButton("New", "new-scheme-member")}${toolbarButton(selected ? "Update" : "Save", "save-scheme-member")}${toolbarButton("Refresh", "refresh-scheme-members")}${toolbarButton("Delete", "delete-scheme-member")}${toolbarButton("Close", "close-scheme-members")}${toolbarButton("Export", "export-scheme-members")}
+      </div>
+      <div class="scheme-members-layout">
+        <aside class="scheme-members-list">
+          <label class="scheme-master-search"><span>Quick Search</span><input type="search" data-scheme-member-search value="${escapeHtml(schemeMemberSearch)}" autocomplete="off" /></label>
+          <div class="scheme-member-grid"><div class="scheme-member-grid-head"><span>MemberID</span><span>MemberName</span><span>Address</span><span>Place</span></div><div>${listRows || `<p class="soft-note">No matching members.</p>`}</div></div>
+        </aside>
+        <form class="scheme-member-form" data-scheme-member-form>
+          <div class="scheme-member-identity">
+            <div class="scheme-member-fields">
+              <label><span>Member ID</span><input name="memberId" value="${escapeHtml(record.memberId)}" readonly required /></label>
+              <label><span>Member Name</span><input name="member" value="${escapeHtml(record.member)}" required /></label>
+              <label><span>Address</span><input name="address" value="${escapeHtml(record.address)}" required /></label>
+              <label><span>Place</span><input name="place" value="${escapeHtml(record.place)}" required /></label>
+              <label><span>City</span><input name="city" value="${escapeHtml(record.city)}" required /></label>
+              <label><span>Area</span><input name="area" value="${escapeHtml(record.area)}" required /></label>
+              <label><span>Mobile</span><input name="mobile" value="${escapeHtml(record.mobile)}" inputmode="tel" required /></label>
+              <label><span>Nominee Name</span><input name="nomineeName" value="${escapeHtml(record.nomineeName)}" required /></label>
+              <label class="member-relation"><span>Mobile, Relation</span><span><input name="relationMobile" value="${escapeHtml(record.relationMobile)}" inputmode="tel" required /><select name="relation" required>${["", "Father", "Mother", "Spouse", "Son", "Daughter", "Other"].map((value) => `<option ${value === record.relation ? "selected" : ""}>${value}</option>`).join("")}</select></span></label>
+              <label><span>Collection Agent</span><select name="collectionAgent" required>${agents.map((value) => `<option ${value === record.collectionAgent ? "selected" : ""}>${escapeHtml(value)}</option>`).join("")}</select></label>
+            </div>
+            <div class="scheme-member-photo"><div class="member-photo-box">${record.photo ? `<img src="${escapeHtml(record.photo)}" alt="Member photo" />` : "<span>Member Photo</span>"}</div><label class="member-photo-upload">Choose Photo<input name="photo" type="file" accept="image/*" /></label></div>
+            <div class="scheme-member-proof"><label><span>ID Proof</span><input name="idProof" value="${escapeHtml(record.idProof)}" required /></label><label class="member-active"><input name="active" type="checkbox" ${record.active ? "checked" : ""} /><strong>Active</strong></label></div>
+          </div>
+          <div class="scheme-enrollment-editor">
+            <label><span>Scheme</span><select name="scheme" data-member-scheme required>${schemeOptions.map((value) => `<option ${value === line.scheme ? "selected" : ""}>${escapeHtml(value)}</option>`).join("")}</select></label>
+            <label><span>Book No</span><input name="book" value="${escapeHtml(line.book)}" readonly required /></label>
+            <label><span>Qty</span><input name="qty" type="number" min="1" step="1" value="${line.qty || 1}" required /></label>
+            <label><span>Join Date</span><input name="joinDate" type="date" value="${schemeDateInput(line.joinDate)}" required /></label>
+            <label><span>End Date</span><input name="endDate" type="date" value="${schemeDateInput(line.endDate)}" required /></label>
+            <label><span>Op Amount</span><input name="opAmount" type="number" min="0" step="0.001" value="${numericValue(line.opAmount)}" required /></label>
+            <label><span>Op Weight</span><input name="opWeight" type="number" min="0" step="0.001" value="${numericValue(line.opWeight)}" required /></label>
+            <label><span>Op Date</span><input name="opDate" type="date" value="${schemeDateInput(line.opDate)}" required /></label>
+            <label><span>Agent</span><select name="agent" required>${agents.map((value) => `<option ${value === line.agent ? "selected" : ""}>${escapeHtml(value)}</option>`).join("")}</select></label>
+            <button type="button" class="scheme-line-add" data-action="add-scheme-member-line">+</button>
+          </div>
+          <div class="scheme-member-enrollments"><div class="scheme-member-enrollment-head"><span>×</span><span>Scheme</span><span>Book No</span><span>Qty</span><span>Joining Date</span><span>End Date</span><span>Op_Amt</span><span>OpWght</span><span>OpDate</span><span>Agent</span></div>${(record.schemeLines || []).map(schemeMemberLineRow).join("")}</div>
+        </form>
+      </div>
+    </section>`;
+}
+
+function readSchemeMemberForm() {
+  const form = document.querySelector("[data-scheme-member-form]");
+  if (!form || !form.reportValidity()) return null;
+  const data = new FormData(form);
+  const existing = (state.schemes || []).find((item) => item.memberId === selectedSchemeMemberId);
+  const line = { scheme: data.get("scheme"), book: data.get("book"), qty: Number(data.get("qty") || 1), joinDate: data.get("joinDate"), endDate: data.get("endDate"), opAmount: Number(data.get("opAmount") || 0), opWeight: Number(data.get("opWeight") || 0), opDate: data.get("opDate"), agent: data.get("agent") };
+  return normalizeScheme({ ...existing, memberId: data.get("memberId"), member: data.get("member"), address: data.get("address"), place: data.get("place"), city: data.get("city"), area: data.get("area"), mobile: data.get("mobile"), nomineeName: data.get("nomineeName"), relationMobile: data.get("relationMobile"), relation: data.get("relation"), idProof: data.get("idProof"), collectionAgent: data.get("collectionAgent"), active: data.has("active"), scheme: line.scheme, book: line.book, qty: line.qty, joinDate: line.joinDate, endDate: line.endDate, opAmount: line.opAmount, opWeight: line.opWeight, opDate: line.opDate, schemeLines: existing?.schemeLines?.length ? existing.schemeLines : [line] });
+}
+
+function saveSchemeMember(addLine = false) {
+  const record = readSchemeMemberForm(); if (!record) return;
+  const formData = new FormData(document.querySelector("[data-scheme-member-form]"));
+  const line = { scheme: formData.get("scheme"), book: formData.get("book"), qty: Number(formData.get("qty") || 1), joinDate: formData.get("joinDate"), endDate: formData.get("endDate"), opAmount: Number(formData.get("opAmount") || 0), opWeight: Number(formData.get("opWeight") || 0), opDate: formData.get("opDate"), agent: formData.get("agent") };
+  if (line.endDate < line.joinDate) return toast("Scheme end date cannot be before joining date.");
+  if (addLine) {
+    const duplicate = record.schemeLines.some((item) => item.book === line.book);
+    if (!duplicate) record.schemeLines.push(line);
+  } else if (record.schemeLines.length) record.schemeLines[0] = line;
+  else record.schemeLines = [line];
+  const index = (state.schemes || []).findIndex((item) => item.memberId === record.memberId);
+  if (index >= 0) state.schemes[index] = record; else state.schemes.push(record);
+  selectedSchemeMemberId = record.memberId;
+  state.audit.unshift(audit(`${index >= 0 ? "Updated" : "Created"} scheme member ${record.memberId}`)); saveState(); render(); toast(`Scheme member ${index >= 0 ? "updated" : "saved"}.`);
+}
+
+function deleteSchemeMember() {
+  const record = (state.schemes || []).find((item) => item.memberId === selectedSchemeMemberId);
+  if (!record || !window.confirm(`Delete member ${record.memberId} - ${record.member}?`)) return;
+  state.schemes = state.schemes.filter((item) => item.memberId !== record.memberId); selectedSchemeMemberId = state.schemes[0]?.memberId || "";
+  state.audit.unshift(audit(`Deleted scheme member ${record.memberId}`)); saveState(); render(); toast("Scheme member deleted.");
+}
+
+function exportSchemeMembers() {
+  const headings = ["Member ID", "Member Name", "Address", "Place", "City", "Area", "Mobile", "Nominee", "Relation Mobile", "Relation", "ID Proof", "Collection Agent", "Active", "Scheme", "Book No", "Qty", "Join Date", "End Date", "Opening Amount", "Opening Weight", "Opening Date", "Agent"];
+  const rows = (state.schemes || []).flatMap((member) => (member.schemeLines || [member]).map((line) => [member.memberId, member.member, member.address, member.place, member.city, member.area, member.mobile, member.nomineeName, member.relationMobile, member.relation, member.idProof, member.collectionAgent, member.active ? "Yes" : "No", line.scheme, line.book, line.qty, line.joinDate, line.endDate, line.opAmount, line.opWeight, line.opDate, line.agent]));
+  const csv = [headings, ...rows].map((row) => row.map((value) => `"${String(value ?? "").replaceAll('"', '""')}"`).join(",")).join("\n");
+  const link = document.createElement("a"); link.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" })); link.download = "scheme-members.csv"; link.click(); URL.revokeObjectURL(link.href); toast("Scheme members exported.");
+}
+
+function emptySchemeMaster() {
+  return normalizeSchemeMaster({ active: true, schemeHead: "Scheme Cash", schemeCash: "Cash in Hand" });
+}
+
+function schemeMasterScreen() {
+  const records = state.schemeMasters || [];
+  const query = schemeMasterSearch.trim().toLowerCase();
+  const filtered = records.filter((item) => !query || `${item.schemeId} ${item.schemeName}`.toLowerCase().includes(query));
+  const selected = records.find((item) => item.schemeId === selectedSchemeMasterId) || (selectedSchemeMasterId ? records[0] : null);
+  const record = selected || emptySchemeMaster();
+  const rows = filtered.map((item) => `
+    <button type="button" class="scheme-master-row ${item.schemeId === selected?.schemeId ? "selected" : ""}" data-scheme-master-id="${escapeHtml(item.schemeId)}">
+      <span>${escapeHtml(item.schemeId)}</span><span>${escapeHtml(item.schemeName)}</span><span>${numericValue(item.amount)}</span><span>${item.collectionDay}</span>
+    </button>`).join("");
+  return `
+    ${moduleSwitcher("Scheme / Chitty", SCHEME_ITEMS, schemeView, "data-scheme-section")}
+    <section class="panel scheme-master-window">
+      <div class="classic-billing-toolbar scheme-master-toolbar" aria-label="Scheme Master actions">
+        ${toolbarButton("New", "new-scheme-master")}
+        ${toolbarButton("Update", "update-scheme-master")}
+        ${toolbarButton("Refresh", "refresh-scheme-master")}
+        ${toolbarButton("Delete", "delete-scheme-master")}
+        ${toolbarButton("Close", "close-scheme-master")}
+      </div>
+      <div class="scheme-master-layout">
+        <div class="scheme-master-list">
+          <label class="scheme-master-search"><span>Quick Search</span><input type="search" data-scheme-master-search value="${escapeHtml(schemeMasterSearch)}" autocomplete="off" /></label>
+          <div class="scheme-master-grid" role="table">
+            <div class="scheme-master-grid-head" role="row"><span>SchemeID</span><span>SchemeName</span><span>SchemeAmount</span><span>collectionDay</span></div>
+            <div class="scheme-master-grid-body">${rows || `<p class="soft-note">No matching schemes.</p>`}</div>
+          </div>
+        </div>
+        <form class="scheme-master-form" data-scheme-master-form>
+          <label><span>Scheme ID</span><input name="schemeId" value="${escapeHtml(record.schemeId)}" ${selected ? "readonly" : ""} required /></label>
+          <label><span>Scheme Name</span><input name="schemeName" value="${escapeHtml(record.schemeName)}" required /></label>
+          <label class="scheme-period"><span>Period</span><span><input name="periodFrom" type="date" value="${escapeHtml(record.periodFrom)}" required /><input name="periodTo" type="date" value="${escapeHtml(record.periodTo)}" required /></span></label>
+          <label><span>Amount</span><input name="amount" type="number" min="0" step="0.001" value="${numericValue(record.amount)}" required /></label>
+          <label><span>No of EMI</span><input name="noOfEmi" type="number" min="0" step="1" value="${record.noOfEmi}" required /></label>
+          <label><span>EMI Amount</span><input name="emiAmount" type="number" min="0" step="0.001" value="${numericValue(record.emiAmount)}" required /></label>
+          <label><span>Min EMI</span><input name="minEmi" type="number" min="0" step="0.001" value="${numericValue(record.minEmi)}" required /></label>
+          <label><span>Max EMI</span><input name="maxEmi" type="number" min="0" step="0.001" value="${numericValue(record.maxEmi)}" required /></label>
+          <label><span>Scheme Head</span><select name="schemeHead" required>${["Scheme Acc", "Scheme Cash"].map((value) => `<option ${value === record.schemeHead ? "selected" : ""}>${value}</option>`).join("")}</select></label>
+          <label><span>Scheme Cash</span><select name="schemeCash" required>${["Cash in Hand", "Scheme Cash", "Canara Bank Edak", "Federal Bank Edak"].map((value) => `<option ${value === record.schemeCash ? "selected" : ""}>${value}</option>`).join("")}</select></label>
+          <label class="scheme-collection-day"><span>Collection Day</span><input name="collectionDay" type="number" min="0" max="31" step="1" value="${record.collectionDay}" required /></label>
+          <label class="scheme-check"><span>Scheme Status</span><span><input name="active" type="checkbox" ${record.active ? "checked" : ""} /> Active</span></label>
+          <label class="scheme-check scheme-disable"><span></span><span><input name="disableAfterPeriod" type="checkbox" ${record.disableAfterPeriod ? "checked" : ""} /> Disable Collection after Scheme Period</span></label>
+          <p class="scheme-master-note">Min &amp; Max Emi 0 Unlimited</p>
+        </form>
+      </div>
+    </section>`;
+}
+
+function schemeMasterFromForm() {
+  const form = document.querySelector("[data-scheme-master-form]");
+  if (!form || !form.reportValidity()) return null;
+  const data = new FormData(form);
+  return normalizeSchemeMaster({
+    schemeId: data.get("schemeId"), schemeName: data.get("schemeName"), periodFrom: data.get("periodFrom"), periodTo: data.get("periodTo"),
+    amount: data.get("amount"), noOfEmi: data.get("noOfEmi"), emiAmount: data.get("emiAmount"), minEmi: data.get("minEmi"), maxEmi: data.get("maxEmi"),
+    schemeHead: data.get("schemeHead"), schemeCash: data.get("schemeCash"), collectionDay: data.get("collectionDay"), active: data.has("active"), disableAfterPeriod: data.has("disableAfterPeriod")
+  });
+}
+
+function saveSchemeMaster() {
+  const record = schemeMasterFromForm();
+  if (!record) return;
+  if (!record.schemeId || !record.schemeName) return toast("Scheme ID and Scheme Name are required.");
+  if (record.periodTo < record.periodFrom) return toast("Scheme end date cannot be before the start date.");
+  state.schemeMasters ||= [];
+  const index = state.schemeMasters.findIndex((item) => item.schemeId === selectedSchemeMasterId || item.schemeId === record.schemeId);
+  if (index < 0 && state.schemeMasters.some((item) => item.schemeId === record.schemeId)) return toast("Scheme ID already exists.");
+  if (index >= 0) state.schemeMasters[index] = record; else state.schemeMasters.push(record);
+  selectedSchemeMasterId = record.schemeId;
+  state.audit.unshift(audit(`${index >= 0 ? "Updated" : "Created"} scheme master ${record.schemeId}`));
+  saveState(); render(); toast(`Scheme ${record.schemeId} ${index >= 0 ? "updated" : "created"}.`);
+}
+
+function deleteSchemeMaster() {
+  if (!selectedSchemeMasterId) return toast("Select a scheme to delete.");
+  const record = (state.schemeMasters || []).find((item) => item.schemeId === selectedSchemeMasterId);
+  if (!record || !window.confirm(`Delete scheme ${record.schemeId} - ${record.schemeName}?`)) return;
+  state.schemeMasters = state.schemeMasters.filter((item) => item.schemeId !== record.schemeId);
+  selectedSchemeMasterId = state.schemeMasters[0]?.schemeId || "";
+  state.audit.unshift(audit(`Deleted scheme master ${record.schemeId}`));
+  saveState(); render(); toast("Scheme deleted.");
 }
 
 function accountActionPage(view) {
@@ -11345,6 +12122,27 @@ function reportPreview(name) {
   if (name === "Direct Gold Purchase Return") return directGoldPurchaseReturnReportScreen();
   if (name === "Diamond Purchase") return diamondPurchaseReportScreen();
   if (name === "Diamond Sales") return diamondSalesReportScreen();
+  if (name === "Diamond Purchase Return") return diamondPendingReportScreen(name);
+  if (name === "Stock Adjustment") return stockAdjustmentReportScreen();
+  if (name === "Smith Transfer") return smithTransferReportScreen();
+  if (name === "Smith Ledger") return smithLedgerReportScreen();
+  if (name === "Smith Ledger Detailed") return smithLedgerDetailedReportScreen();
+  if (name === "Smith Reconciliation") return smithReconciliationReportScreen();
+  if (name === "Jeweller Transfer") return jewellerTransferReportScreen();
+  if (name === "Ledger") return jewellerLedgerReportScreen();
+  if (name === "Ledger Detailed") return jewellerDetailedLedgerReportScreen();
+  if (name === "Reconciliation") return jewellerReconciliationReportScreen();
+  if (name === "Sales Order" || name === "Sales Order Report") return salesOrderReportScreen();
+  if (name === "Additional Order Advance Report") return additionalOrderAdvanceReportScreen();
+  if (name === "Order Advance Refund Report") return orderAdvanceRefundReportScreen();
+  if (name === "Gold Deposit Ledger") return goldDepositLedgerReportScreen();
+  if (name === "Gold Deposit Summary") return goldDepositSummaryReportScreen();
+  if (name === "Gold Deposit Transactions") return goldDepositTransactionsReportScreen();
+  if (name === "Order Due") return orderDueReportScreen();
+  if (name === "Collection Due") return collectionDueReportScreen();
+  if (name === "Payment Due") return paymentDueReportScreen();
+  if (name === "Refiner Transfer") return refinerReportScreen();
+  if (name === "Item Transfer Report") return itemTransferReportScreen();
   if (STOCK_REPORT_MENU[0].items.includes(name)) {
     return stockReportSubmenuScreen(name);
   }
@@ -11360,6 +12158,904 @@ function reportPreview(name) {
       </div>
     </div>
   `;
+}
+
+function diamondPendingReportScreen(name) {
+  const label = name === "Diamond Purchase Return" ? "Purchase Return" : "Sales";
+  return `
+    <section class="panel reports-home-placeholder diamond-pending-report">
+      <p class="eyebrow">Reports / Diamond</p>
+      <h2>${escapeHtml(label)}</h2>
+      <p>This Diamond submenu screen is awaiting its reference screenshots and confirmed report rules.</p>
+      <div class="report-placeholder-grid">
+        ${readout("Menu", `Diamond → ${label}`)}
+        ${readout("Status", "Placeholder")}
+        ${readout("Available now", "Diamond → Purchase")}
+      </div>
+    </section>
+  `;
+}
+
+function stockAdjustmentReportScreen() {
+  const config = stockAdjustmentReportConfig();
+  return `
+    <div class="classic-report-layout focused-classic-report">
+      <section class="classic-stock-report sales-report stock-adjustment-report">
+        ${stockAdjustmentReportToolbar()}
+        <header class="classic-report-title sales-report-title stock-adjustment-report-title">
+          <h3>***MT GOLD LAND***</h3>
+          <h2>Stock Adjustment Report from ${escapeHtml(displaySalesDate(salesReportOptions.from))} To ${escapeHtml(displaySalesDate(salesReportOptions.to))}</h2>
+        </header>
+        ${salesReportOptions.shown ? salesReportTable(config.columns, config.rows, config.gridClass, config.totals) : salesReportBlankState()}
+      </section>
+    </div>
+  `;
+}
+
+function stockAdjustmentReportToolbar() {
+  const tools = [
+    ["SHOW", "sales-report-show"], ["PRINT", "print-now"], ["DIRECT PRINT", "print-now"], ["EXCEL", "export-report"], ["SAVE AS", "export-report"], ["DATE", "sales-report-date"],
+    ["FIRST", "noop"], ["PREV", "noop"], ["NEXT", "noop"], ["LAST", "noop"], ["VIEW/HIDE", "noop"], ["ZOOM IN", "noop"], ["DEFAULT", "noop"], ["ZOOM OUT", "noop"], ["CLOSE", "stock-adjustment-report-close"]
+  ];
+  return `<div class="classic-report-toolbar sales-report-toolbar stock-adjustment-report-toolbar"><div class="classic-tool-buttons">${tools.map(([label, action]) => `<button class="classic-tool" data-action="${action}" title="${escapeHtml(label)}"><strong>${toolbarGlyph(label)}</strong><span>${escapeHtml(label)}</span></button>`).join("")}</div><label class="classic-a4"><input type="checkbox" />A4</label>${salesReportOptions.dateOpen ? salesDatePopup() : ""}</div>`;
+}
+
+function stockAdjustmentReportConfig() {
+  const rows = (state.stockAdjustments || [])
+    .filter((record) => isDateWithinPeriod(record.date, salesReportOptions.from, salesReportOptions.to))
+    .flatMap((record) => (record.lines || []).map((source) => {
+      const line = normalizeStockAdjustmentLine(source);
+      return {
+        record,
+        itemType: line.type,
+        entryNo: record.entryNo,
+        entryDate: displaySalesDate(record.date),
+        refNo: record.refNo || "",
+        itemId: source.itemId || source.itemID || line.id || "",
+        itemName: line.itemName,
+        barcode: line.barcode,
+        oldNos: line.nos,
+        oldGross: line.gross,
+        oldStone: line.stone,
+        addNos: line.nosAdd,
+        addGross: line.grossAdd,
+        addStone: line.stoneAdd,
+        lessNos: line.nosLess,
+        lessGross: line.grossLess,
+        lessStone: line.stoneLess,
+        newNos: line.closingNos,
+        newGross: line.closingGross,
+        newStone: line.closingStone,
+        newNet: line.closingNet,
+        preparedBy: record.preparedBy,
+        reason: record.reason,
+        branchId: record.branchId || record.branchID || "MAIN",
+        sourceBillId: record.id,
+        sourceEntryNo: record.entryNo,
+        sourceSection: "stock-adjustment",
+        drillTarget: "stock-adjustment",
+        drillStorage: "stockAdjustments",
+        drillView: "Stock Adjustments"
+      };
+    }));
+  const quantity = (key, label) => ({ key, label, numeric: true, total: true, format: (value) => numberValue(value, 0) });
+  const weight = (key, label) => ({ key, label, numeric: true, total: true, format: (value) => numberValue(value, 3) });
+  const columns = [
+    { key: "itemType", label: "ItemType" }, { key: "entryNo", label: "EntryNo" }, { key: "entryDate", label: "entryDate" },
+    { key: "refNo", label: "refno" }, { key: "itemId", label: "itemID" }, { key: "itemName", label: "item_Name" }, { key: "barcode", label: "barcode" },
+    quantity("oldNos", "OldNos"), weight("oldGross", "OldGross"), weight("oldStone", "OldStone"), quantity("addNos", "AddNos"),
+    weight("addGross", "AddGross"), weight("addStone", "AddStone"), quantity("lessNos", "LessNos"), weight("lessGross", "LessGross"),
+    weight("lessStone", "LessStone"), quantity("newNos", "NewNos"), weight("newGross", "NewGross"), weight("newStone", "NewStone"), weight("newNet", "NewNet"),
+    { key: "preparedBy", label: "PreparedBy" }, { key: "reason", label: "reason" }, { key: "branchId", label: "branchID" }
+  ];
+  return { columns, rows, gridClass: "stock-adjustment-report-grid", totals: salesTotalsForColumns(rows, columns) };
+}
+
+function smithTransferReportScreen() {
+  const config = smithTransferReportConfig();
+  return `<div class="classic-report-layout focused-classic-report"><section class="classic-stock-report sales-report smith-transfer-report">${smithTransferReportToolbar()}<header class="classic-report-title sales-report-title smith-transfer-report-title"><h3>***MT GOLD LAND***</h3><h2>Smith Transfer Report from ${escapeHtml(displaySalesDate(salesReportOptions.from))} To ${escapeHtml(displaySalesDate(salesReportOptions.to))}</h2></header>${salesReportOptions.shown ? salesReportTable(config.columns, config.rows, config.gridClass, config.totals) : salesReportBlankState()}</section></div>`;
+}
+
+function smithTransferPartyOptions() {
+  const savedNames = (state.smithWorkOrders || []).map((record) => record.smithName);
+  const masterNames = (state.parties || []).filter((party) => party.type === "Smith").map((party) => party.name);
+  return [...new Set([...masterNames, ...savedNames].filter(Boolean))].sort((left, right) => left.localeCompare(right));
+}
+
+function smithTransferReportToolbar() {
+  const tools = [["SHOW", "sales-report-show"], ["PRINT", "print-now"], ["DIRECT PRINT", "print-now"], ["EXCEL", "export-report"], ["SAVE AS", "export-report"], ["DATE", "sales-report-date"], ["FIRST", "noop"], ["PREV", "noop"], ["NEXT", "noop"], ["LAST", "noop"], ["VIEW/HIDE", "noop"], ["ZOOM IN", "noop"], ["DEFAULT", "noop"], ["ZOOM OUT", "noop"], ["CLOSE", "smith-transfer-report-close"]];
+  const parties = smithTransferPartyOptions();
+  return `<div class="classic-report-toolbar sales-report-toolbar smith-transfer-report-toolbar"><div class="classic-tool-buttons">${tools.map(([label, action]) => `<button class="classic-tool" data-action="${action}" title="${escapeHtml(label)}"><strong>${toolbarGlyph(label)}</strong><span>${escapeHtml(label)}</span></button>`).join("")}</div><label class="classic-a4"><input type="checkbox" />A4</label><select class="smith-transfer-party-select" data-smith-transfer-party aria-label="Smith"><option value="">All Smiths</option>${parties.map((name) => `<option value="${escapeHtml(name)}" ${salesReportOptions.smithTransferParty === name ? "selected" : ""}>${escapeHtml(name)}</option>`).join("")}</select><label class="smith-transfer-line-total"><input type="checkbox" /> Line Total</label>${salesReportOptions.dateOpen ? salesDatePopup() : ""}</div>`;
+}
+
+function smithTransferReportConfig() {
+  const rows = (state.smithWorkOrders || [])
+    .filter((record) => isDateWithinPeriod(record.date, salesReportOptions.from, salesReportOptions.to))
+    .filter((record) => !salesReportOptions.smithTransferParty || record.smithName === salesReportOptions.smithTransferParty)
+    .flatMap((record) => (record.lines || []).map((source, index) => {
+      const line = normalizeSmithWorkLine(source);
+      const netWeight = Math.max(0, line.gross - line.stone - line.mudLess);
+      const smithWeight = line.smWeight;
+      const makingCharge = line.mc;
+      const cost = line.total;
+      return {
+        record, slNo: index + 1, transMode: record.transType || "Normal", entryNo: record.entryNo, entryDate: displaySalesDate(record.date), mode: line.mode,
+        partyId: record.smithCode || "", partyName: record.smithName || "", itemId: source.itemId || source.itemID || line.id || "", itemName: line.itemName,
+        subGroup: source.subGroup || "", employeeName: record.preparedBy || "", quantity: line.qty, gross: line.gross, stone: line.stone,
+        wastage: line.wastage, itemTouch: line.touch, netWeight, stoneCharge: line.stoneCharge, mcPerGram: line.mcGram, makingCharge, hmc: line.hmc,
+        barcode: line.barcode, smithWeight, rate24: Number(source.rate24 || 0), rate22: Number(source.rate22 ?? line.rate ?? 0), cost,
+        sourceBillId: record.id, sourceEntryNo: record.entryNo, sourceSection: "smith-transfer", drillTarget: "smith-transfer", drillStorage: "smithWorkOrders", drillView: "Smith"
+      };
+    }));
+  const qty = (key, label) => ({ key, label, numeric: true, total: true, format: (value) => numberValue(value, 0) });
+  const weight = (key, label, decimals = 3) => ({ key, label, numeric: true, total: true, format: (value) => numberValue(value, decimals) });
+  const columns = [
+    { key: "slNo", label: "Slno", numeric: true, format: (value) => numberValue(value, 0) }, { key: "transMode", label: "TransMode" }, { key: "entryNo", label: "EntryNo" }, { key: "entryDate", label: "EntryDate" }, { key: "mode", label: "Mode" },
+    { key: "partyId", label: "Partyid" }, { key: "partyName", label: "Party_Name" }, { key: "itemId", label: "ItemID" }, { key: "itemName", label: "Item_Name" },
+    { key: "subGroup", label: "SubGroup" }, { key: "employeeName", label: "EmpName" }, qty("quantity", "Qty"), weight("gross", "Gross"), weight("stone", "Stone"),
+    weight("wastage", "Wastage"), weight("itemTouch", "Itouch", 2), weight("netWeight", "NetWght"), weight("stoneCharge", "StnCharge"), weight("mcPerGram", "MCpGrm"),
+    weight("makingCharge", "MakeCharge"), weight("hmc", "HMC"), { key: "barcode", label: "Barcode" }, weight("smithWeight", "SmithWeig"),
+    weight("rate24", "Rate24"), weight("rate22", "Rate22"), weight("cost", "Cost")
+  ];
+  return { columns, rows, gridClass: "smith-transfer-report-grid", totals: salesTotalsForColumns(rows, columns) };
+}
+
+function smithLedgerParties() {
+  const masters = (state.parties || []).filter((party) => party.type === "Smith");
+  const savedNames = [...(state.smithWorkOrders || []).map((record) => record.smithName), ...(state.cashWeightSmiths || []).map((record) => record.partyName)].filter(Boolean);
+  const map = new Map(masters.map((party) => [party.name, party]));
+  savedNames.forEach((name) => { if (!map.has(name)) map.set(name, { id: "", customerCode: "", name, mobile: "", address: "", place: "", careOf: "", openingWeight: 0 }); });
+  return [...map.values()].sort((left, right) => left.name.localeCompare(right.name));
+}
+
+function jewellerTransferReportScreen() {
+  const config = jewellerTransferReportConfig();
+  return `<div class="classic-report-layout focused-classic-report"><section class="classic-stock-report sales-report jeweller-transfer-report">${jewellerTransferReportToolbar()}<header class="classic-report-title sales-report-title jeweller-transfer-report-title"><h3>***MT GOLD LAND***</h3><h2>Jeweller Transfer Report from ${escapeHtml(displaySalesDate(salesReportOptions.from))} To ${escapeHtml(displaySalesDate(salesReportOptions.to))}</h2></header>${salesReportOptions.shown ? salesReportTable(config.columns, config.rows, config.gridClass, config.totals) : salesReportBlankState()}</section></div>`;
+}
+
+function jewellerTransferReportToolbar() {
+  const tools = [["SHOW", "sales-report-show"], ["PRINT", "print-now"], ["DIRECT PRINT", "print-now"], ["EXCEL", "export-report"], ["SAVE AS", "export-report"], ["DATE", "sales-report-date"], ["FIRST", "noop"], ["PREV", "noop"], ["NEXT", "noop"], ["LAST", "noop"], ["VIEW/HIDE", "noop"], ["ZOOM IN", "noop"], ["DEFAULT", "noop"], ["ZOOM OUT", "noop"], ["CLOSE", "jeweller-transfer-report-close"]];
+  return `<div class="classic-report-toolbar sales-report-toolbar jeweller-transfer-report-toolbar"><div class="classic-tool-buttons">${tools.map(([label, action]) => `<button class="classic-tool" data-action="${action}" title="${escapeHtml(label)}"><strong>${toolbarGlyph(label)}</strong><span>${escapeHtml(label)}</span></button>`).join("")}</div><label class="classic-a4"><input type="checkbox" />A4</label><select class="jeweller-transfer-filter-select" data-jeweller-transfer-filter aria-label="Jeweller transfer filter">${["All", "Sample OUT"].map((option) => `<option ${salesReportOptions.jewellerTransferFilter === option ? "selected" : ""}>${option}</option>`).join("")}</select><label class="smith-transfer-line-total"><input type="checkbox" /> Line Total</label>${salesReportOptions.dateOpen ? salesDatePopup() : ""}</div>`;
+}
+
+function jewellerTransferReportConfig() {
+  const sampleOut = salesReportOptions.jewellerTransferFilter === "Sample OUT";
+  const rows = (state.jewellerWorkOrders || [])
+    .filter((record) => isDateWithinPeriod(record.date, salesReportOptions.from, salesReportOptions.to))
+    .flatMap((record) => (record.lines || []).map((source, index) => ({ record, source, index, line: normalizeJewellerWorkLine(source) })))
+    .filter(({ record, line }) => !sampleOut || line.mode === "OUT" || String(record.transType || "").toLowerCase() === "sample out")
+    .map(({ record, source, index, line }) => {
+      const netWeight = Math.max(0, line.gross - line.stone - line.mudLess);
+      const difference = line.jwWeight - line.pureWeight;
+      return {
+        slNo: index + 1, transMode: record.transType || "Normal Work", entryNo: record.entryNo, entryDate: displaySalesDate(record.date), mode: line.mode,
+        partyId: record.jewellerCode || "", partyName: record.jewellerName || "", itemId: line.itemId || source.itemID || "", itemName: line.itemName,
+        subGroup: source.subGroup || line.gType || line.iType || "", employeeName: record.preparedBy || "", quantity: line.qty, gross: line.gross, stone: line.stone,
+        wastage: line.wastage, mudLess: line.mudLess, netWeight, stoneCharge: line.stoneCharge, mcPerGram: line.mcGram, makingCharge: line.mc, hmc: line.hmc,
+        barcode: line.barcode, jewellerWeight: line.jwWeight, itemTouch: line.touch, difference,
+        sourceBillId: record.id, sourceEntryNo: record.entryNo, sourceSection: "jeweller-transfer", drillTarget: "jeweller-transfer", drillStorage: "jewellerWorkOrders", drillView: "Jeweller Transfer"
+      };
+    });
+  const qty = { key: "quantity", label: "Qty", numeric: true, total: true, format: (value) => numberValue(value, 0) };
+  const weight = (key, label, decimals = 3) => ({ key, label, numeric: true, total: true, format: (value) => numberValue(value, decimals) });
+  const columns = [
+    { key: "slNo", label: "Slno", numeric: true, format: (value) => numberValue(value, 0) }, { key: "transMode", label: "TransMode" }, { key: "entryNo", label: "EntryNo" }, { key: "entryDate", label: "EntryDate" }, { key: "mode", label: "Mode" },
+    { key: "partyId", label: "Partyid" }, { key: "partyName", label: "Party_Name" }, { key: "itemId", label: "ItemID" }, { key: "itemName", label: "Item_Name" }, { key: "subGroup", label: "SubGroup" }, { key: "employeeName", label: "EmpName" },
+    qty, weight("gross", "Gross"), weight("stone", "Stone"), weight("wastage", "Wastage"), weight("netWeight", "NetWght"), weight("stoneCharge", "StnCharge"), weight("mcPerGram", "MCpGrm"), weight("makingCharge", "MakeCharge"), weight("hmc", "HMC"),
+    { key: "barcode", label: "Barcode" }, weight("jewellerWeight", "JewellerWeight"), weight("itemTouch", "iTouch", 2), weight("difference", "Difference")
+  ];
+  return { columns, rows, gridClass: "jeweller-transfer-report-grid", totals: salesTotalsForColumns(rows, columns) };
+}
+
+function smithLedgerReportScreen() {
+  return smithLedgerOptions.detailed && selectedSmithLedgerParty ? smithWeightLedgerDetailScreen() : smithLedgerPartyPicker();
+}
+
+function smithLedgerPartyPicker() {
+  const query = smithLedgerOptions.search.trim().toLowerCase();
+  const parties = smithLedgerParties().filter((party) => !query || `${party.customerCode || party.id} ${party.name} ${party.mobile} ${party.address} ${party.place}`.toLowerCase().includes(query));
+  const costCenters = miscOptions("costCenters", ["cost1"]);
+  return `<section class="smith-ledger-picker-stage"><div class="smith-ledger-picker-window">
+    <div class="smith-ledger-picker-form">
+      <label><span>Date From</span><input type="date" data-smith-ledger-option="from" value="${toDateInputValue(smithLedgerOptions.from)}" /></label><button data-action="smith-ledger-today">Today</button>
+      <label><span>Date To</span><input type="date" data-smith-ledger-option="to" value="${toDateInputValue(smithLedgerOptions.to)}" /></label><button data-action="smith-ledger-term">Term</button>
+      <label><span>CostCenter</span><select data-smith-ledger-option="costCenter">${costCenters.map((value) => `<option ${value === smithLedgerOptions.costCenter ? "selected" : ""}>${escapeHtml(value)}</option>`).join("")}</select></label><span></span>
+      <label class="smith-ledger-account-search"><span>Account Head</span><input data-smith-ledger-search value="${escapeHtml(smithLedgerOptions.search)}" /></label>
+    </div>
+    <div class="smith-ledger-party-table-wrap"><table class="smith-ledger-party-table"><thead><tr><th></th><th>AccID</th><th>AccName</th><th>Mobile</th><th>address</th><th>c/o</th><th>Adminonly</th></tr></thead><tbody>${parties.map((party) => `<tr class="${selectedSmithLedgerParty === party.name ? "selected" : ""}" data-smith-ledger-party="${escapeHtml(party.name)}"><td>&#9654;</td><td>${escapeHtml(party.customerCode || party.id || "")}</td><td>${escapeHtml(party.name)}</td><td>${escapeHtml(party.mobile || "")}</td><td>${escapeHtml(party.address || "")}</td><td>${escapeHtml(party.careOf || party.place || "")}</td><td>${party.adminOnly ? "1" : "0"}</td></tr>`).join("")}</tbody></table></div>
+    <footer><button data-action="open-smith-weight-ledger">OK</button></footer>
+  </div></section>`;
+}
+
+function smithWeightLedgerEntries() {
+  const party = smithLedgerParties().find((item) => item.name === selectedSmithLedgerParty) || {};
+  const from = toDateInputValue(smithLedgerOptions.from), to = toDateInputValue(smithLedgerOptions.to);
+  const records = (state.smithWorkOrders || []).filter((record) => record.smithName === selectedSmithLedgerParty).sort((left, right) => toDateInputValue(left.date).localeCompare(toDateInputValue(right.date)) || String(left.entryNo).localeCompare(String(right.entryNo)));
+  const movement = (record) => {
+    const lines = (record.lines || []).map(normalizeSmithWorkLine);
+    return { toSmith: lines.filter((line) => line.mode === "OUT").reduce((sum, line) => sum + line.smWeight, 0), fromSmith: lines.filter((line) => line.mode === "IN").reduce((sum, line) => sum + line.smWeight, 0) };
+  };
+  let opening = Number(party.openingWeight || 0);
+  records.filter((record) => toDateInputValue(record.date) < from).forEach((record) => { const value = movement(record); opening += value.toSmith - value.fromSmith; });
+  let balance = opening;
+  const rows = [{ id: "opening", date: "", voucherNo: "", particular: "Day Opening", toSmith: 0, fromSmith: -opening, balance, direction: balance >= 0 ? "IN" : "OUT" }];
+  records.filter((record) => { const date = toDateInputValue(record.date); return date >= from && date <= to; }).forEach((record) => {
+    const value = movement(record); balance += value.toSmith - value.fromSmith;
+    rows.push({ id: record.id, date: displaySalesDate(record.date), voucherNo: record.entryNo, particular: record.remarks || record.transType || "Smith Transfer", ...value, balance: Math.abs(balance), direction: balance >= 0 ? "IN" : "OUT" });
+  });
+  return { party, rows, totalToSmith: rows.slice(1).reduce((sum, row) => sum + row.toSmith, 0), totalFromSmith: rows.slice(1).reduce((sum, row) => sum + row.fromSmith, 0), closing: balance };
+}
+
+function smithWeightLedgerDetailScreen() {
+  const ledger = smithWeightLedgerEntries();
+  return `<section class="classic-stock-report smith-weight-ledger-report">${smithWeightLedgerToolbar()}<header class="smith-weight-ledger-title"><h3>***MT GOLD LAND***</h3><h4>M.T.PLAZA,OOTY ROAD</h4><h2>${escapeHtml(selectedSmithLedgerParty)} - Weight Ledger Report From ${escapeHtml(displaySalesDate(smithLedgerOptions.from))} To ${escapeHtml(displaySalesDate(smithLedgerOptions.to))}</h2></header><div class="smith-weight-ledger-wrap"><table><thead><tr><th>SL</th><th>Date</th><th>Vou.No</th><th>Particular</th><th>To Smith</th><th>From Smith</th><th>Balance</th><th>Out/In</th></tr></thead><tbody>${ledger.rows.map((row, index) => `<tr class="${index === 0 ? "selected" : ""}"><td>${index + 1}</td><td>${escapeHtml(row.date)}</td><td>${escapeHtml(row.voucherNo)}</td><td>${escapeHtml(row.particular)}</td><td class="num">${numberValue(row.toSmith, 3)}</td><td class="num">${numberValue(row.fromSmith, 3)}</td><td class="num">${numberValue(row.balance, 3)}</td><td>${row.direction}</td></tr>`).join("")}</tbody><tfoot><tr><td></td><td></td><td></td><td><em>Total Weight</em></td><td>${numberValue(ledger.totalToSmith, 3)}</td><td>${numberValue(ledger.totalFromSmith, 3)}</td><td></td><td></td></tr><tr><td></td><td></td><td></td><td><strong>Balance Weight</strong></td><td></td><td><strong>${numberValue(Math.abs(ledger.closing), 3)}</strong></td><td></td><td></td></tr></tfoot></table></div></section>`;
+}
+
+function smithWeightLedgerToolbar() {
+  const tools = [["SHOW", "noop"], ["PRINT", "print-now"], ["DIRECT PRINT", "print-now"], ["EXCEL", "export-report"], ["SAVE AS", "export-report"], ["DATE", "smith-ledger-back"], ["FIRST", "noop"], ["PREV", "noop"], ["NEXT", "noop"], ["LAST", "noop"], ["VIEW/HIDE", "noop"], ["ZOOM IN", "noop"], ["DEFAULT", "noop"], ["ZOOM OUT", "noop"], ["CLOSE", "smith-ledger-back"]];
+  return `<div class="classic-report-toolbar sales-report-toolbar smith-ledger-toolbar"><div class="classic-tool-buttons">${tools.map(([label, action]) => `<button class="classic-tool" data-action="${action}"><strong>${toolbarGlyph(label)}</strong><span>${label}</span></button>`).join("")}</div><label class="classic-a4"><input type="checkbox" />A4</label><label class="smith-ledger-firm"><input type="checkbox" checked /> Print FirmName</label></div>`;
+}
+
+function jewellerLedgerParties() {
+  const masters = (state.parties || []).filter((party) => party.type === "Jeweller");
+  const savedNames = (state.jewellerWorkOrders || []).map((record) => record.jewellerName).filter(Boolean);
+  const map = new Map(masters.map((party) => [party.name, party]));
+  savedNames.forEach((name) => { if (!map.has(name)) map.set(name, { id: "", customerCode: "", name, mobile: "", address: "", place: "", careOf: "", openingWeight: 0 }); });
+  return [...map.values()].sort((left, right) => left.name.localeCompare(right.name));
+}
+
+function jewellerLedgerReportScreen() {
+  return jewellerLedgerOptions.detailed && selectedJewellerLedgerParty ? jewellerWeightLedgerDetailScreen() : jewellerLedgerPartyPicker();
+}
+
+function jewellerLedgerPartyPicker() {
+  const query = jewellerLedgerOptions.search.trim().toLowerCase();
+  const parties = jewellerLedgerParties().filter((party) => !query || `${party.customerCode || party.id} ${party.name} ${party.mobile || ""} ${party.address || ""} ${party.place || ""}`.toLowerCase().includes(query));
+  const costCenters = miscOptions("costCenters", ["cost1"]);
+  return `<section class="smith-ledger-picker-stage jeweller-ledger-picker-stage"><div class="smith-ledger-picker-window">
+    <div class="smith-ledger-picker-form">
+      <label><span>Date From</span><input type="date" data-jeweller-ledger-option="from" value="${toDateInputValue(jewellerLedgerOptions.from)}" /></label><button data-action="jeweller-ledger-today">Today</button>
+      <label><span>Date To</span><input type="date" data-jeweller-ledger-option="to" value="${toDateInputValue(jewellerLedgerOptions.to)}" /></label><button data-action="jeweller-ledger-term">Term</button>
+      <label><span>CostCenter</span><select data-jeweller-ledger-option="costCenter">${costCenters.map((value) => `<option ${value === jewellerLedgerOptions.costCenter ? "selected" : ""}>${escapeHtml(value)}</option>`).join("")}</select></label><span></span>
+      <label class="smith-ledger-account-search"><span>Account Head</span><input data-jeweller-ledger-search value="${escapeHtml(jewellerLedgerOptions.search)}" /></label>
+    </div>
+    <div class="smith-ledger-party-table-wrap"><table class="smith-ledger-party-table"><thead><tr><th></th><th>AccID</th><th>AccName</th><th>Mobile</th><th>address</th><th>c/o</th><th>Adminonly</th></tr></thead><tbody>${parties.map((party) => `<tr class="${selectedJewellerLedgerParty === party.name ? "selected" : ""}" data-jeweller-ledger-party="${escapeHtml(party.name)}"><td>&#9654;</td><td>${escapeHtml(party.customerCode || party.id || "")}</td><td>${escapeHtml(party.name)}</td><td>${escapeHtml(party.mobile || "")}</td><td>${escapeHtml(party.address || "")}</td><td>${escapeHtml(party.careOf || party.place || "")}</td><td>${party.adminOnly ? "1" : "0"}</td></tr>`).join("")}</tbody></table></div>
+    <footer><button data-action="open-jeweller-weight-ledger">OK</button></footer>
+  </div></section>`;
+}
+
+function jewellerWeightLedgerEntries() {
+  const party = jewellerLedgerParties().find((item) => item.name === selectedJewellerLedgerParty) || {};
+  const from = toDateInputValue(jewellerLedgerOptions.from), to = toDateInputValue(jewellerLedgerOptions.to);
+  const records = (state.jewellerWorkOrders || []).filter((record) => record.jewellerName === selectedJewellerLedgerParty).sort((left, right) => toDateInputValue(left.date).localeCompare(toDateInputValue(right.date)) || String(left.entryNo).localeCompare(String(right.entryNo)));
+  const movement = (record) => {
+    const lines = (record.lines || []).map(normalizeJewellerWorkLine);
+    return { toJeweller: lines.filter((line) => line.mode === "OUT").reduce((sum, line) => sum + line.jwWeight, 0), fromJeweller: lines.filter((line) => line.mode === "IN").reduce((sum, line) => sum + line.jwWeight, 0) };
+  };
+  let opening = Number(party.openingWeight || 0);
+  records.filter((record) => toDateInputValue(record.date) < from).forEach((record) => { const value = movement(record); opening += value.toJeweller - value.fromJeweller; });
+  let balance = opening;
+  const rows = [{ id: "opening", date: "", voucherNo: "", particular: "Day Opening", toJeweller: 0, fromJeweller: -opening, balance: Math.abs(balance), direction: balance >= 0 ? "IN" : "OUT" }];
+  records.filter((record) => { const date = toDateInputValue(record.date); return date >= from && date <= to; }).forEach((record) => {
+    const value = movement(record); balance += value.toJeweller - value.fromJeweller;
+    rows.push({ id: record.id, date: displaySalesDate(record.date), voucherNo: record.entryNo, particular: record.remarks || record.transType || "Jeweller Transfer", ...value, balance: Math.abs(balance), direction: balance >= 0 ? "IN" : "OUT" });
+  });
+  return { party, rows, totalToJeweller: rows.slice(1).reduce((sum, row) => sum + row.toJeweller, 0), totalFromJeweller: rows.slice(1).reduce((sum, row) => sum + row.fromJeweller, 0), closing: balance };
+}
+
+function jewellerWeightLedgerDetailScreen() {
+  const ledger = jewellerWeightLedgerEntries();
+  return `<section class="classic-stock-report smith-weight-ledger-report jeweller-weight-ledger-report">${jewellerWeightLedgerToolbar()}<header class="smith-weight-ledger-title"><h3>***MT GOLD LAND***</h3><h4>M.T.PLAZA,OOTY ROAD</h4><h2>${escapeHtml(selectedJewellerLedgerParty)} - Weight Ledger Report From ${escapeHtml(displaySalesDate(jewellerLedgerOptions.from))} To ${escapeHtml(displaySalesDate(jewellerLedgerOptions.to))}</h2></header><div class="smith-weight-ledger-wrap"><table><thead><tr><th>SL</th><th>Date</th><th>Vou.No</th><th>Particular</th><th>To Jeweller</th><th>From Jeweller</th><th>Balance</th><th>Out/In</th></tr></thead><tbody>${ledger.rows.map((row, index) => `<tr class="${index === 0 ? "selected" : ""}"><td>${index + 1}</td><td>${escapeHtml(row.date)}</td><td>${escapeHtml(row.voucherNo)}</td><td>${escapeHtml(row.particular)}</td><td class="num">${numberValue(row.toJeweller, 3)}</td><td class="num">${numberValue(row.fromJeweller, 3)}</td><td class="num">${numberValue(row.balance, 3)}</td><td>${row.direction}</td></tr>`).join("")}</tbody><tfoot><tr><td></td><td></td><td></td><td><em>Total Weight</em></td><td>${numberValue(ledger.totalToJeweller, 3)}</td><td>${numberValue(ledger.totalFromJeweller, 3)}</td><td></td><td></td></tr><tr><td></td><td></td><td></td><td><strong>Balance Weight</strong></td><td></td><td><strong>${numberValue(Math.abs(ledger.closing), 3)}</strong></td><td></td><td></td></tr></tfoot></table></div></section>`;
+}
+
+function jewellerWeightLedgerToolbar() {
+  const tools = [["SHOW", "noop"], ["PRINT", "print-now"], ["DIRECT PRINT", "print-now"], ["EXCEL", "export-report"], ["SAVE AS", "export-report"], ["DATE", "jeweller-ledger-back"], ["FIRST", "noop"], ["PREV", "noop"], ["NEXT", "noop"], ["LAST", "noop"], ["VIEW/HIDE", "noop"], ["ZOOM IN", "noop"], ["DEFAULT", "noop"], ["ZOOM OUT", "noop"], ["CLOSE", "jeweller-ledger-back"]];
+  return `<div class="classic-report-toolbar sales-report-toolbar smith-ledger-toolbar"><div class="classic-tool-buttons">${tools.map(([label, action]) => `<button class="classic-tool" data-action="${action}"><strong>${toolbarGlyph(label)}</strong><span>${label}</span></button>`).join("")}</div><label class="classic-a4"><input type="checkbox" />A4</label><label class="smith-ledger-firm"><input type="checkbox" checked /> Print FirmName</label></div>`;
+}
+
+function jewellerDetailedLedgerReportScreen() {
+  return jewellerDetailedLedgerOptions.detailed && selectedJewellerDetailedLedgerParty ? jewellerDetailedLedgerDetailScreen() : jewellerDetailedLedgerPartyPicker();
+}
+
+function jewellerDetailedLedgerPartyPicker() {
+  const query = jewellerDetailedLedgerOptions.search.trim().toLowerCase();
+  const parties = jewellerLedgerParties().filter((party) => !query || `${party.customerCode || party.id} ${party.name} ${party.mobile || ""} ${party.address || ""} ${party.place || ""}`.toLowerCase().includes(query));
+  const costCenters = miscOptions("costCenters", ["cost1"]);
+  return `<section class="smith-ledger-picker-stage jeweller-detailed-ledger-picker-stage"><div class="smith-ledger-picker-window smith-detailed-picker-window"><div class="smith-ledger-picker-form">
+    <label><span>Date From</span><input type="date" data-jeweller-detailed-option="from" value="${toDateInputValue(jewellerDetailedLedgerOptions.from)}" /></label><button data-action="jeweller-detailed-today">Today</button>
+    <label><span>Date To</span><input type="date" data-jeweller-detailed-option="to" value="${toDateInputValue(jewellerDetailedLedgerOptions.to)}" /></label><button data-action="jeweller-detailed-term">Term</button>
+    <label><span>CostCenter</span><select data-jeweller-detailed-option="costCenter">${costCenters.map((value) => `<option ${value === jewellerDetailedLedgerOptions.costCenter ? "selected" : ""}>${escapeHtml(value)}</option>`).join("")}</select></label><span></span>
+    <label class="smith-ledger-account-search"><span>Account Head</span><input data-jeweller-detailed-search value="${escapeHtml(jewellerDetailedLedgerOptions.search)}" /></label></div>
+    <div class="smith-ledger-party-table-wrap"><table class="smith-ledger-party-table"><thead><tr><th></th><th>AccID</th><th>AccName</th><th>Mobile</th><th>address</th><th>c/o</th></tr></thead><tbody>${parties.map((party) => `<tr class="${selectedJewellerDetailedLedgerParty === party.name ? "selected" : ""}" data-jeweller-detailed-party="${escapeHtml(party.name)}"><td>&#9654;</td><td>${escapeHtml(party.customerCode || party.id || "")}</td><td>${escapeHtml(party.name)}</td><td>${escapeHtml(party.mobile || "")}</td><td>${escapeHtml(party.address || "")}</td><td>${escapeHtml(party.careOf || party.place || "")}</td></tr>`).join("")}</tbody></table></div><footer><button data-action="open-jeweller-detailed-ledger">OK</button></footer></div></section>`;
+}
+
+function jewellerDetailedLedgerConfig() {
+  const party = jewellerLedgerParties().find((item) => item.name === selectedJewellerDetailedLedgerParty) || {};
+  const from = toDateInputValue(jewellerDetailedLedgerOptions.from), to = toDateInputValue(jewellerDetailedLedgerOptions.to);
+  const records = (state.jewellerWorkOrders || []).filter((record) => record.jewellerName === selectedJewellerDetailedLedgerParty).sort((left, right) => toDateInputValue(left.date).localeCompare(toDateInputValue(right.date)) || String(left.entryNo).localeCompare(String(right.entryNo)));
+  let openingWeight = Number(party.openingWeight || 0), openingPureWeight = openingWeight * Number(party.touch || 100) / 100;
+  records.filter((record) => toDateInputValue(record.date) < from).forEach((record) => (record.lines || []).map(normalizeJewellerWorkLine).forEach((line) => { const sign = line.mode === "OUT" ? 1 : -1; openingWeight += sign * line.jwWeight; openingPureWeight += sign * line.pureWeight; }));
+  const rows = [{ sl: 1, entryNo: "0", entryDate: "01-01-1900", itemId: "", itemName: "Opening", mode: "IN", nos: 0, grossWeight: 0, stoneWeight: 0, touch: Number(party.touch || 0), wastage: 0, netWeight: 0, stoneCharge: 0, mcPerGram: 0, makeCharge: 0, jewellerWeight: openingWeight, pureWeight: openingPureWeight, rowTotal: openingWeight, transType: "0", remarks: "OP" }];
+  records.filter((record) => { const date = toDateInputValue(record.date); return date >= from && date <= to; }).forEach((record) => (record.lines || []).forEach((source) => {
+    const line = normalizeJewellerWorkLine(source), netWeight = Math.max(0, line.gross - line.stone - line.mudLess);
+    rows.push({ sl: rows.length + 1, entryNo: record.entryNo, entryDate: displaySalesDate(record.date), itemId: line.itemId || source.itemID || "", itemName: line.itemName, mode: line.mode, nos: line.qty, grossWeight: line.gross, stoneWeight: line.stone, touch: line.touch, wastage: line.wastage, netWeight, stoneCharge: line.stoneCharge, mcPerGram: line.mcGram, makeCharge: line.mc, jewellerWeight: line.jwWeight, pureWeight: line.pureWeight, rowTotal: line.total, transType: record.transType || "Normal Work", remarks: record.remarks || "" });
+  }));
+  const totalKeys = ["nos", "grossWeight", "stoneWeight", "wastage", "netWeight", "stoneCharge", "makeCharge", "jewellerWeight", "pureWeight", "rowTotal"];
+  const totals = Object.fromEntries(totalKeys.map((key) => [key, rows.reduce((sum, row) => sum + Number(row[key] || 0), 0)]));
+  return { party, rows, totals };
+}
+
+function jewellerDetailedLedgerDetailScreen() {
+  const config = jewellerDetailedLedgerConfig(), number = (value, decimals = 3) => numberValue(value, decimals);
+  const columns = [["sl", "Sl", 0], ["entryNo", "EntryNo"], ["entryDate", "EntryDate"], ["itemId", "ItemID"], ["itemName", "ItemName"], ["mode", "Mode"], ["nos", "Nos", 0], ["grossWeight", "GrossWght", 3], ["stoneWeight", "StoneWght", 3], ["touch", "Touch", 2], ["wastage", "Wastage", 3], ["netWeight", "NetWeight", 3], ["stoneCharge", "StnCharge", 2], ["mcPerGram", "MCperGrm", 2], ["makeCharge", "MakeCharge", 3], ["jewellerWeight", "JewellerWght", 3], ["pureWeight", "PureWeight", 3], ["rowTotal", "RowTotal", 3], ["transType", "transType"], ["remarks", "Remarks"]];
+  const totalKeys = new Set(["nos", "grossWeight", "stoneWeight", "wastage", "netWeight", "stoneCharge", "makeCharge", "jewellerWeight", "pureWeight", "rowTotal"]);
+  return `<section class="classic-stock-report smith-detailed-ledger-report jeweller-detailed-ledger-report">${jewellerDetailedLedgerToolbar()}<header class="smith-weight-ledger-title"><h3>***MT GOLD LAND***</h3><h4>M.T.PLAZA,OOTY ROAD</h4><h2>${escapeHtml(config.party.customerCode || config.party.id || "")}/${escapeHtml(selectedJewellerDetailedLedgerParty)} - Jeweller Ledger For the Period from ${escapeHtml(displaySalesDate(jewellerDetailedLedgerOptions.from))} To ${escapeHtml(displaySalesDate(jewellerDetailedLedgerOptions.to))}</h2></header><div class="smith-detailed-ledger-wrap"><table><thead><tr>${columns.map(([, label]) => `<th>${label}</th>`).join("")}</tr></thead><tbody>${config.rows.map((row, index) => `<tr class="${index === 0 ? "selected" : ""}">${columns.map(([key,, decimals]) => `<td class="${decimals !== undefined ? "num" : ""}">${decimals !== undefined ? number(row[key], decimals) : escapeHtml(row[key])}</td>`).join("")}</tr>`).join("")}</tbody><tfoot><tr>${columns.map(([key], index) => `<td class="${totalKeys.has(key) ? "num" : ""}">${index === 4 ? "Total" : totalKeys.has(key) ? number(config.totals[key], key === "nos" ? 0 : 3) : ""}</td>`).join("")}</tr></tfoot></table></div></section>`;
+}
+
+function jewellerDetailedLedgerToolbar() {
+  const tools = [["SHOW", "noop"], ["PRINT", "print-now"], ["DIRECT PRINT", "print-now"], ["EXCEL", "export-report"], ["SAVE AS", "export-report"], ["DATE", "jeweller-detailed-back"], ["FIRST", "noop"], ["PREV", "noop"], ["NEXT", "noop"], ["LAST", "noop"], ["VIEW/HIDE", "noop"], ["ZOOM IN", "noop"], ["DEFAULT", "noop"], ["ZOOM OUT", "noop"], ["CLOSE", "jeweller-detailed-back"]];
+  return `<div class="classic-report-toolbar sales-report-toolbar smith-ledger-toolbar"><div class="classic-tool-buttons">${tools.map(([label, action]) => `<button class="classic-tool" data-action="${action}"><strong>${toolbarGlyph(label)}</strong><span>${label}</span></button>`).join("")}</div><label class="classic-a4"><input type="checkbox" />A4</label><label class="smith-ledger-firm"><input type="checkbox" checked /> Print FirmName</label></div>`;
+}
+
+const JEWELLER_RECONCILIATION_OPTIONS = ["Reconciliation", "Summary", "Day Summary"];
+
+function jewellerReconciliationPartyRows() {
+  const from = toDateInputValue(salesReportOptions.from), to = toDateInputValue(salesReportOptions.to);
+  return jewellerLedgerParties().map((party) => {
+    const records = (state.jewellerWorkOrders || []).filter((record) => record.jewellerName === party.name);
+    let opening = Number(party.openingWeight || 0), toJeweller = 0, fromJeweller = 0;
+    const movement = (record) => (record.lines || []).map(normalizeJewellerWorkLine).reduce((value, line) => {
+      if (line.mode === "OUT") value.toJeweller += line.jwWeight; else value.fromJeweller += line.jwWeight;
+      return value;
+    }, { toJeweller: 0, fromJeweller: 0 });
+    records.forEach((record) => {
+      const date = toDateInputValue(record.date), value = movement(record);
+      if (date < from) opening += value.toJeweller - value.fromJeweller;
+      else if (date <= to) { toJeweller += value.toJeweller; fromJeweller += value.fromJeweller; }
+    });
+    const closing = opening + toJeweller - fromJeweller;
+    const openingAmount = Number(party.openingBalance || 0) * (party.balanceType === "Cr" ? -1 : 1);
+    const amount = openingAmount + records.filter((record) => toDateInputValue(record.date) <= to).reduce((sum, record) => sum - jewellerWorkFinancials(record).netTotal, 0);
+    return { partyId: party.customerCode || party.id || "", partyName: party.name, groups: party.group || party.subSchedule || "", opening, toJeweller, fromJeweller, closing, status: closing > 0.0000001 ? "Give" : closing < -0.0000001 ? "Receive" : "", weight: closing, amount };
+  });
+}
+
+function jewellerReconciliationReportScreen() {
+  const option = JEWELLER_RECONCILIATION_OPTIONS.includes(salesReportOptions.jewellerReconciliationOption) ? salesReportOptions.jewellerReconciliationOption : "Reconciliation";
+  return `<div class="classic-report-layout focused-classic-report"><section class="classic-stock-report sales-report jeweller-reconciliation-report">${jewellerReconciliationToolbar()}<header class="classic-report-title sales-report-title smith-reconciliation-title"><h3>***MT GOLD LAND***</h3><h2>Jeweller Reconciliation (${escapeHtml(displaySalesDate(salesReportOptions.from))} To ${escapeHtml(displaySalesDate(salesReportOptions.to))})</h2></header>${salesReportTable(...jewellerReconciliationTableArgs(option))}</section></div>`;
+}
+
+function jewellerReconciliationToolbar() {
+  const tools = [["SHOW", "sales-report-show"], ["PRINT", "print-now"], ["DIRECT PRINT", "print-now"], ["EXCEL", "export-report"], ["DATE", "sales-report-date"], ["FIRST", "noop"], ["PREV", "noop"], ["NEXT", "noop"], ["LAST", "noop"], ["VIEW/HIDE", "noop"], ["ZOOM IN", "noop"], ["DEFAULT", "noop"], ["ZOOM OUT", "noop"], ["CLOSE", "jeweller-reconciliation-close"]];
+  return `<div class="classic-report-toolbar sales-report-toolbar smith-reconciliation-toolbar jeweller-reconciliation-toolbar"><div class="classic-tool-buttons">${tools.map(([label, action]) => `<button class="classic-tool" data-action="${action}"><strong>${toolbarGlyph(label)}</strong><span>${label}</span></button>`).join("")}</div><select class="smith-reconciliation-select" data-jeweller-reconciliation-option>${JEWELLER_RECONCILIATION_OPTIONS.map((option) => `<option ${option === salesReportOptions.jewellerReconciliationOption ? "selected" : ""}>${option}</option>`).join("")}</select>${salesReportOptions.dateOpen ? salesDatePopup() : ""}</div>`;
+}
+
+function jewellerReconciliationTableArgs(option = salesReportOptions.jewellerReconciliationOption) {
+  const partyRows = jewellerReconciliationPartyRows();
+  const weight = (key, label) => ({ key, label, numeric: true, total: true, format: (value) => numberValue(value, 3) });
+  if (option === "Summary") {
+    const columns = [{ key: "partyId", label: "PartyID" }, { key: "partyName", label: "PartyName" }, { key: "groups", label: "Groups" }, weight("weight", "Weight"), weight("amount", "Amount")];
+    return [columns, partyRows, "jeweller-reconciliation-summary-grid", salesTotalsForColumns(partyRows, columns)];
+  }
+  if (option === "Day Summary") {
+    const rows = partyRows.flatMap((party) => {
+      const records = (state.jewellerWorkOrders || []).filter((record) => record.jewellerName === party.partyName && isDateWithinPeriod(record.date, salesReportOptions.from, salesReportOptions.to));
+      return records.map((record, index) => {
+        const lines = (record.lines || []).map(normalizeJewellerWorkLine), jewellerIn = lines.filter((line) => line.mode === "OUT").reduce((sum, line) => sum + line.jwWeight, 0), jewellerOut = lines.filter((line) => line.mode === "IN").reduce((sum, line) => sum + line.jwWeight, 0);
+        return { slNo: index + 1, transMode: record.transType || "Normal Work", entryDate: displaySalesDate(record.date), groupEntryNo: record.refNo || 0, entryNo: record.entryNo, partyName: party.partyName, netIn: jewellerIn, netOut: jewellerOut, smithIn: jewellerIn, smithOut: jewellerOut };
+      });
+    });
+    const columns = [{ key: "slNo", label: "Slno", numeric: true, format: (value) => numberValue(value, 0) }, { key: "transMode", label: "TransMode" }, { key: "entryDate", label: "EntryDate" }, { key: "groupEntryNo", label: "Grp_EntryNo" }, { key: "entryNo", label: "EntryNo" }, { key: "partyName", label: "Party_Name" }, weight("netIn", "NetIn"), weight("netOut", "NetOut"), weight("smithIn", "SmithIn"), weight("smithOut", "smithOut")];
+    return [columns, rows, "jeweller-reconciliation-day-grid", salesTotalsForColumns(rows, columns)];
+  }
+  const columns = [{ key: "partyId", label: "PartyID" }, { key: "partyName", label: "PartyName" }, { key: "groups", label: "Groups" }, weight("opening", "Opening"), weight("toJeweller", "ToJewell"), weight("fromJeweller", "FromJewel"), weight("closing", "Closing"), { key: "status", label: "Status" }];
+  return [columns, partyRows, "jeweller-reconciliation-grid", salesTotalsForColumns(partyRows, columns)];
+}
+
+function smithLedgerDetailedReportScreen() {
+  return smithDetailedLedgerOptions.detailed && selectedSmithDetailedLedgerParty ? smithDetailedLedgerDetailScreen() : smithDetailedLedgerPartyPicker();
+}
+
+function smithDetailedLedgerPartyPicker() {
+  const query = smithDetailedLedgerOptions.search.trim().toLowerCase();
+  const parties = smithLedgerParties().filter((party) => !query || `${party.customerCode || party.id} ${party.name} ${party.mobile} ${party.address} ${party.place}`.toLowerCase().includes(query));
+  const costCenters = miscOptions("costCenters", ["cost1"]);
+  return `<section class="smith-ledger-picker-stage"><div class="smith-ledger-picker-window smith-detailed-picker-window"><div class="smith-ledger-picker-form">
+    <label><span>Date From</span><input type="date" data-smith-detailed-option="from" value="${toDateInputValue(smithDetailedLedgerOptions.from)}" /></label><button data-action="smith-detailed-today">Today</button>
+    <label><span>Date To</span><input type="date" data-smith-detailed-option="to" value="${toDateInputValue(smithDetailedLedgerOptions.to)}" /></label><button data-action="smith-detailed-term">Term</button>
+    <label><span>CostCenter</span><select data-smith-detailed-option="costCenter">${costCenters.map((value) => `<option ${value === smithDetailedLedgerOptions.costCenter ? "selected" : ""}>${escapeHtml(value)}</option>`).join("")}</select></label><span></span>
+    <label class="smith-ledger-account-search"><span>Account Head</span><input data-smith-detailed-search value="${escapeHtml(smithDetailedLedgerOptions.search)}" /></label></div>
+    <div class="smith-ledger-party-table-wrap"><table class="smith-ledger-party-table"><thead><tr><th></th><th>AccID</th><th>AccName</th><th>Mobile</th><th>address</th><th>c/o</th></tr></thead><tbody>${parties.map((party) => `<tr class="${selectedSmithDetailedLedgerParty === party.name ? "selected" : ""}" data-smith-detailed-party="${escapeHtml(party.name)}"><td>&#9654;</td><td>${escapeHtml(party.customerCode || party.id || "")}</td><td>${escapeHtml(party.name)}</td><td>${escapeHtml(party.mobile || "")}</td><td>${escapeHtml(party.address || "")}</td><td>${escapeHtml(party.place || "")}</td></tr>`).join("")}</tbody></table></div><footer><button data-action="open-smith-detailed-ledger">OK</button></footer></div></section>`;
+}
+
+function smithDetailedLedgerConfig() {
+  const party = smithLedgerParties().find((item) => item.name === selectedSmithDetailedLedgerParty) || {};
+  const from = toDateInputValue(smithDetailedLedgerOptions.from), to = toDateInputValue(smithDetailedLedgerOptions.to);
+  const records = (state.smithWorkOrders || []).filter((record) => record.smithName === selectedSmithDetailedLedgerParty).sort((left, right) => toDateInputValue(left.date).localeCompare(toDateInputValue(right.date)) || String(left.entryNo).localeCompare(String(right.entryNo)));
+  let openingWeight = Number(party.openingWeight || 0), openingPureWeight = openingWeight * Number(party.touch || 100) / 100;
+  records.filter((record) => toDateInputValue(record.date) < from).forEach((record) => (record.lines || []).map(normalizeSmithWorkLine).forEach((line) => { const sign = line.mode === "OUT" ? 1 : -1; openingWeight += sign * line.smWeight; openingPureWeight += sign * line.smWeight * line.touch / 100; }));
+  const rows = [{ sl: 1, entryNo: "0", entryDate: "01-01-1900", itemId: "", itemName: "Opening", mode: "IN", nos: 0, grossWeight: 0, stoneWeight: 0, touch: Number(party.touch || 0), wastage: 0, netWeight: 0, stoneCharge: 0, mcPerGram: 0, makeCharge: 0, jewellerWeight: openingWeight, pureWeight: openingPureWeight, rowTotal: openingWeight, transType: "0", remarks: "OP" }];
+  records.filter((record) => { const date = toDateInputValue(record.date); return date >= from && date <= to; }).forEach((record) => (record.lines || []).forEach((source) => {
+    const line = normalizeSmithWorkLine(source), netWeight = Math.max(0, line.gross - line.stone - line.mudLess), pureWeight = line.smWeight * line.touch / 100;
+    rows.push({ sl: rows.length + 1, entryNo: record.entryNo, entryDate: displaySalesDate(record.date), itemId: source.itemId || source.itemID || line.id || "", itemName: line.itemName, mode: line.mode, nos: line.qty, grossWeight: line.gross, stoneWeight: line.stone, touch: line.touch, wastage: line.wastage, netWeight, stoneCharge: line.stoneCharge, mcPerGram: line.mcGram, makeCharge: line.mc, jewellerWeight: line.smWeight, pureWeight, rowTotal: line.total, transType: record.transType || "Normal", remarks: record.remarks || "" });
+  }));
+  const totalKeys = ["nos", "grossWeight", "stoneWeight", "wastage", "netWeight", "stoneCharge", "makeCharge", "jewellerWeight", "pureWeight", "rowTotal"];
+  const totals = Object.fromEntries(totalKeys.map((key) => [key, rows.reduce((sum, row) => sum + Number(row[key] || 0), 0)]));
+  return { party, rows, totals };
+}
+
+function smithDetailedLedgerDetailScreen() {
+  const config = smithDetailedLedgerConfig();
+  const number = (value, decimals = 3) => numberValue(value, decimals);
+  const columns = [["sl", "Sl", 0], ["entryNo", "EntryNo"], ["entryDate", "EntryDate"], ["itemId", "ItemID"], ["itemName", "ItemName"], ["mode", "Mode"], ["nos", "Nos", 0], ["grossWeight", "GrossWght", 3], ["stoneWeight", "StoneWght", 3], ["touch", "Touch", 2], ["wastage", "Wastage", 3], ["netWeight", "NetWeight", 3], ["stoneCharge", "StnCharge", 2], ["mcPerGram", "MCperGrm", 2], ["makeCharge", "MakeCharge", 3], ["jewellerWeight", "JewellerWght", 3], ["pureWeight", "PureWeight", 3], ["rowTotal", "RowTotal", 3], ["transType", "transType"], ["remarks", "Remarks"]];
+  const totalKeys = new Set(["nos", "grossWeight", "stoneWeight", "wastage", "netWeight", "stoneCharge", "makeCharge", "jewellerWeight", "pureWeight", "rowTotal"]);
+  return `<section class="classic-stock-report smith-detailed-ledger-report">${smithDetailedLedgerToolbar()}<header class="smith-weight-ledger-title"><h3>***MT GOLD LAND***</h3><h4>M.T.PLAZA,OOTY ROAD</h4><h2>${escapeHtml(config.party.customerCode || config.party.id || "")}/${escapeHtml(selectedSmithDetailedLedgerParty)} - Smith Ledger For the Period from ${escapeHtml(displaySalesDate(smithDetailedLedgerOptions.from))} To ${escapeHtml(displaySalesDate(smithDetailedLedgerOptions.to))}</h2></header><div class="smith-detailed-ledger-wrap"><table><thead><tr>${columns.map(([, label]) => `<th>${label}</th>`).join("")}</tr></thead><tbody>${config.rows.map((row, index) => `<tr class="${index === 0 ? "selected" : ""}">${columns.map(([key,, decimals]) => `<td class="${decimals !== undefined ? "num" : ""}">${decimals !== undefined ? number(row[key], decimals) : escapeHtml(row[key])}</td>`).join("")}</tr>`).join("")}</tbody><tfoot><tr>${columns.map(([key], index) => `<td class="${totalKeys.has(key) ? "num" : ""}">${index === 4 ? "Total" : totalKeys.has(key) ? number(config.totals[key], key === "nos" ? 0 : 3) : ""}</td>`).join("")}</tr></tfoot></table></div></section>`;
+}
+
+function smithDetailedLedgerToolbar() {
+  const tools = [["SHOW", "noop"], ["PRINT", "print-now"], ["DIRECT PRINT", "print-now"], ["EXCEL", "export-report"], ["SAVE AS", "export-report"], ["DATE", "smith-detailed-back"], ["FIRST", "noop"], ["PREV", "noop"], ["NEXT", "noop"], ["LAST", "noop"], ["VIEW/HIDE", "noop"], ["ZOOM IN", "noop"], ["DEFAULT", "noop"], ["ZOOM OUT", "noop"], ["CLOSE", "smith-detailed-back"]];
+  return `<div class="classic-report-toolbar sales-report-toolbar smith-ledger-toolbar"><div class="classic-tool-buttons">${tools.map(([label, action]) => `<button class="classic-tool" data-action="${action}"><strong>${toolbarGlyph(label)}</strong><span>${label}</span></button>`).join("")}</div><label class="classic-a4"><input type="checkbox" />A4</label><label class="smith-ledger-firm"><input type="checkbox" checked /> Print FirmName</label></div>`;
+}
+
+const SMITH_RECONCILIATION_OPTIONS = ["Reconciliation", "Summary", "Day Summary"];
+
+function smithReconciliationPartyRows() {
+  const from = toDateInputValue(salesReportOptions.from), to = toDateInputValue(salesReportOptions.to);
+  return smithLedgerParties().map((party) => {
+    const records = (state.smithWorkOrders || []).filter((record) => record.smithName === party.name);
+    let opening = Number(party.openingWeight || 0), toSmith = 0, fromSmith = 0;
+    const movement = (record) => (record.lines || []).map(normalizeSmithWorkLine).reduce((value, line) => {
+      if (line.mode === "OUT") value.toSmith += line.smWeight; else value.fromSmith += line.smWeight;
+      return value;
+    }, { toSmith: 0, fromSmith: 0 });
+    records.forEach((record) => {
+      const date = toDateInputValue(record.date), value = movement(record);
+      if (date < from) opening += value.toSmith - value.fromSmith;
+      else if (date <= to) { toSmith += value.toSmith; fromSmith += value.fromSmith; }
+    });
+    const closing = opening + toSmith - fromSmith;
+    const openingAmount = Number(party.openingBalance || 0) * (party.balanceType === "Cr" ? -1 : 1);
+    const workAmount = records.filter((record) => toDateInputValue(record.date) <= to).reduce((sum, record) => sum - smithWorkFinancials(record).netTotal, 0);
+    const amount = openingAmount + workAmount;
+    return { partyId: party.customerCode || party.id || "", partyName: party.name, opening, toSmith, fromSmith, closing, status: closing > 0.0000001 ? "Give" : closing < -0.0000001 ? "Receive" : "", weight: closing, amount, mode: closing > 0.0000001 ? "Give" : "Receive", touch: Number(party.touch || 100) };
+  });
+}
+
+function smithReconciliationReportScreen() {
+  const option = salesReportOptions.smithReconciliationOption || "Reconciliation";
+  return `<div class="classic-report-layout focused-classic-report"><section class="classic-stock-report sales-report smith-reconciliation-report">${smithReconciliationToolbar()}<header class="classic-report-title sales-report-title smith-reconciliation-title"><h3>***MT GOLD LAND***</h3><h2>Smith Reconciliation (${escapeHtml(displaySalesDate(salesReportOptions.from))} To ${escapeHtml(displaySalesDate(salesReportOptions.to))})</h2></header>${salesReportTable(...smithReconciliationTableArgs(option))}</section></div>`;
+}
+
+function smithReconciliationToolbar() {
+  const tools = [["SHOW", "sales-report-show"], ["PRINT", "print-now"], ["DIRECT PRINT", "print-now"], ["EXCEL", "export-report"], ["DATE", "sales-report-date"], ["FIRST", "noop"], ["PREV", "noop"], ["NEXT", "noop"], ["LAST", "noop"], ["VIEW/HIDE", "noop"], ["ZOOM IN", "noop"], ["DEFAULT", "noop"], ["ZOOM OUT", "noop"], ["CLOSE", "smith-reconciliation-close"]];
+  return `<div class="classic-report-toolbar sales-report-toolbar smith-reconciliation-toolbar"><div class="classic-tool-buttons">${tools.map(([label, action]) => `<button class="classic-tool" data-action="${action}"><strong>${toolbarGlyph(label)}</strong><span>${label}</span></button>`).join("")}</div><select class="smith-reconciliation-select" data-smith-reconciliation-option>${SMITH_RECONCILIATION_OPTIONS.map((option) => `<option ${option === salesReportOptions.smithReconciliationOption ? "selected" : ""}>${option}</option>`).join("")}</select>${salesReportOptions.dateOpen ? salesDatePopup() : ""}</div>`;
+}
+
+function smithReconciliationTableArgs(option = salesReportOptions.smithReconciliationOption) {
+  const partyRows = smithReconciliationPartyRows();
+  const weight = (key, label) => ({ key, label, numeric: true, total: true, format: (value) => numberValue(value, 3) });
+  if (option === "Summary") {
+    const columns = [{ key: "partyId", label: "PartyID" }, { key: "partyName", label: "PartyName" }, weight("weight", "Weight"), weight("amount", "Amount"), { key: "mode", label: "Mode" }, { key: "touch", label: "Touch", numeric: true, format: (value) => numberValue(value, 0) }];
+    return [columns, partyRows, "smith-reconciliation-summary-grid", salesTotalsForColumns(partyRows, columns)];
+  }
+  if (option === "Day Summary") {
+    const rows = partyRows.map((row, index) => ({ slNo: index + 1, transMode: "Normal", entryDate: displaySalesDate(salesReportOptions.from), groupEntryNo: 0, entryNo: 0, partyName: row.partyName, netIn: Math.max(0, row.closing), netOut: Math.max(0, -row.closing), smithIn: row.toSmith || Math.max(0, row.opening), smithOut: row.fromSmith || Math.max(0, -row.opening) }));
+    const columns = [{ key: "slNo", label: "Slno", numeric: true, format: (value) => numberValue(value, 0) }, { key: "transMode", label: "TransMode" }, { key: "entryDate", label: "EntryDate" }, { key: "groupEntryNo", label: "Grp_EntryNo" }, { key: "entryNo", label: "EntryNo" }, { key: "partyName", label: "Party_Name" }, weight("netIn", "NetIn"), weight("netOut", "NetOut"), weight("smithIn", "SmithIn"), weight("smithOut", "smithOut")];
+    return [columns, rows, "smith-reconciliation-day-grid", salesTotalsForColumns(rows, columns)];
+  }
+  const columns = [{ key: "partyId", label: "PartyID" }, { key: "partyName", label: "PartyName" }, weight("opening", "Opening"), weight("toSmith", "ToSmith"), weight("fromSmith", "FromSmith"), weight("closing", "Closing"), { key: "status", label: "Status" }];
+  return [columns, partyRows, "smith-reconciliation-grid", salesTotalsForColumns(partyRows, columns)];
+}
+
+function itemTransferReportScreen() {
+  const config = salesReportOptions.itemTransferFormat === "2" ? itemTransferFormatTwoConfig() : itemTransferReportConfig();
+  return `<div class="classic-report-layout focused-classic-report"><section class="classic-stock-report sales-report item-transfer-report">${itemTransferReportToolbar()}<header class="classic-report-title sales-report-title item-transfer-report-title"><h3>***MT GOLD LAND***</h3><h2>Item Transfer Report from ${escapeHtml(displaySalesDate(salesReportOptions.from))} To ${escapeHtml(displaySalesDate(salesReportOptions.to))}</h2></header>${salesReportTable(config.columns, config.rows, config.gridClass, config.totals)}</section></div>`;
+}
+
+function salesOrderReportScreen() {
+  const config = salesOrderReportConfig();
+  return `<div class="classic-report-layout focused-classic-report"><section class="classic-stock-report sales-report sales-order-report">${salesOrderReportToolbar()}<header class="classic-report-title sales-report-title sales-order-report-title"><h3>***MT GOLD LAND***</h3><h4>M.T.PLAZA,OOTY ROAD</h4><h2>Report From ${escapeHtml(displaySalesDate(salesReportOptions.from))} To ${escapeHtml(displaySalesDate(salesReportOptions.to))}</h2></header>${salesReportTable(config.columns, config.rows, config.gridClass, config.totals)}</section></div>`;
+}
+
+function additionalOrderAdvanceReportScreen() {
+  const config = additionalOrderAdvanceReportConfig();
+  return `<div class="classic-report-layout focused-classic-report"><section class="classic-stock-report sales-report additional-order-advance-report">${additionalOrderAdvanceReportToolbar()}<header class="classic-report-title sales-report-title"><h3>***MT GOLD LAND***</h3><h4>M.T.PLAZA,OOTY ROAD</h4><h2>Report From ${escapeHtml(displaySalesDate(salesReportOptions.from))} To ${escapeHtml(displaySalesDate(salesReportOptions.to))}</h2></header>${salesReportTable(config.columns, config.rows, config.gridClass, config.totals)}</section></div>`;
+}
+
+function additionalOrderAdvanceReportToolbar() {
+  const tools = [["SHOW", "sales-report-show"], ["PRINT", "print-now"], ["EXCEL", "export-report"], ["SAVE AS", "export-report"], ["DATE", "sales-report-date"], ["FIRST", "noop"], ["PREV", "noop"], ["NEXT", "noop"], ["LAST", "noop"], ["VIEW/HIDE", "noop"], ["ZOOM IN", "noop"], ["DEFAULT", "noop"], ["ZOOM OUT", "noop"], ["CLOSE", "sales-order-report-close"]];
+  return `<div class="classic-report-toolbar sales-report-toolbar additional-order-advance-report-toolbar"><div class="classic-tool-buttons">${tools.map(([label, action]) => `<button class="classic-tool" data-action="${action}"><strong>${toolbarGlyph(label)}</strong><span>${label}</span></button>`).join("")}</div><label class="classic-a4"><input type="checkbox" />A4</label>${salesReportOptions.dateOpen ? salesDatePopup() : ""}</div>`;
+}
+
+function additionalOrderAdvanceReportConfig() {
+  const rows = (state.orderAdvances || []).filter((record) => isDateWithinPeriod(record.date, salesReportOptions.from, salesReportOptions.to)).map((record) => {
+    const order = findSalesOrderForAdvance(record.orderId || record.orderEntryNo || record.orderRefNo);
+    const orderTotal = order ? billFinancials(order).invoiceTotal : Number(record.orderTotal || 0);
+    const amount = Number(record.advanceAmount || record.amount || record.totalAmount || 0), exchangeAmount = Number(record.exchangeAmount || 0), totalAdvance = amount + exchangeAmount, goldRate = Number(record.goldRateGram || record.goldRate || 0);
+    return { entryNo: record.entryNo || "", entryDate: displaySalesDate(record.date), refNo: record.refNo || "", partyName: order?.customer || record.partyName || record.customer || "", phone: order?.phone || record.phone || "", orderNo: order?.entryNo || record.orderEntryNo || "", orderDate: displaySalesDate(order?.date || record.orderDate || ""), orderTotal, advanceType: record.cashBank || record.paymentMode || "", amount, exchangeAmount, totalAdvance, goldRate, approximateWeight: goldRate > 0 ? totalAdvance / goldRate : 0, remark: record.remark || "", sourceBillId: record.id, sourceEntryNo: record.entryNo, sourceBillNo: record.refNo, sourceSection: "order-advance", drillTarget: "order-advance", drillStorage: "orderAdvances", drillView: "Additional Order Advance" };
+  });
+  const moneyColumn = (key, label) => ({ key, label, numeric: true, total: true, format: (value) => numberValue(value, 2) });
+  const columns = [{ key: "entryNo", label: "EntryNo" }, { key: "entryDate", label: "EntryDate" }, { key: "refNo", label: "RefNo" }, { key: "partyName", label: "PartyName" }, { key: "phone", label: "Phone" }, { key: "orderNo", label: "OrderNo" }, { key: "orderDate", label: "OrderDate" }, moneyColumn("orderTotal", "OrderTotal"), { key: "advanceType", label: "AdvanceType" }, moneyColumn("amount", "Amount"), moneyColumn("exchangeAmount", "ExchangeAmount"), moneyColumn("totalAdvance", "TotalAdvance"), { key: "goldRate", label: "Goldrate", numeric: true, format: (value) => numberValue(value, 0) }, { key: "approximateWeight", label: "AprxWeight", numeric: true, total: true, format: (value) => numberValue(value, 3) }, { key: "remark", label: "Remark" }];
+  return { columns, rows, gridClass: "additional-order-advance-report-grid", totals: salesTotalsForColumns(rows, columns) };
+}
+
+function orderAdvanceRefundReportScreen() {
+  const config = orderAdvanceRefundReportConfig();
+  return `<div class="classic-report-layout focused-classic-report"><section class="classic-stock-report sales-report order-advance-refund-report">${additionalOrderAdvanceReportToolbar()}<header class="classic-report-title sales-report-title"><h3>***MT GOLD LAND***</h3><h4>M.T.PLAZA,OOTY ROAD</h4><h2>Report From ${escapeHtml(displaySalesDate(salesReportOptions.from))} To ${escapeHtml(displaySalesDate(salesReportOptions.to))}</h2></header>${salesReportTable(config.columns, config.rows, config.gridClass, config.totals)}</section></div>`;
+}
+
+function orderAdvanceRefundReportConfig() {
+  const rows = (state.orderAdvanceRefunds || []).filter((record) => isDateWithinPeriod(record.date, salesReportOptions.from, salesReportOptions.to)).map((record) => {
+    const refundAmount = Number(record.refundAmount || record.amount || 0), goldRate = Number(record.goldRateGram || record.goldRate || 0);
+    return { branchEntryNo: record.entryNo || record.branchEntryNo || "", entryDate: displaySalesDate(record.date), refNo: record.refNo || "", orderNo: record.orderEntryNo || record.orderRefNo || "", refundAmount, refundWeight: goldRate > 0 ? refundAmount / goldRate : Number(record.refundWeight || 0), remark: record.remark || "", sourceBillId: record.id, sourceEntryNo: record.entryNo, sourceBillNo: record.refNo, sourceSection: "order-advance-refund", drillTarget: "order-advance-refund", drillStorage: "orderAdvanceRefunds", drillView: "Order Advance Refund" };
+  });
+  const columns = [{ key: "branchEntryNo", label: "branchENo" }, { key: "entryDate", label: "eDate" }, { key: "refNo", label: "refNo" }, { key: "orderNo", label: "orderNo" }, { key: "refundAmount", label: "refundAmt", numeric: true, total: true, format: (value) => numberValue(value, 2) }, { key: "refundWeight", label: "refundWeight", numeric: true, total: true, format: (value) => numberValue(value, 3) }, { key: "remark", label: "remark" }];
+  return { columns, rows, gridClass: "order-advance-refund-report-grid", totals: salesTotalsForColumns(rows, columns) };
+}
+
+function goldDepositLedgerParties(applySearch = true) {
+  const parties = new Map(), add = (item = {}, fallbackName = "") => {
+    const name = item.name || item.customerName || item.partyName || fallbackName;
+    if (!name) return;
+    const id = item.customerCode || item.customerId || item.partyId || item.accountId || item.id || "";
+    const existing = [...parties.values()].find((party) => party.name.trim().toLowerCase() === name.trim().toLowerCase());
+    if (existing) return;
+    const key = id || name.toLowerCase();
+    if (!parties.has(key)) parties.set(key, { id, name, mobile: item.mobile || item.phone || "", address: item.address || "", careOf: item.careOf || item.c_o || item.place || "", adminOnly: Number(item.adminOnly || 0), openingWeight: Number(item.openingWeight || item.openingDrWeight || 0) - Number(item.openingCrWeight || 0), openingAmount: Number(item.openingAmount || item.openingDr || 0) - Number(item.openingCr || 0) });
+  };
+  [...(state.customers || []), ...(state.parties || [])].forEach((party) => add(party));
+  [...(state.goldDeposits || []), ...(state.goldWithdrawals || [])].forEach((record) => add({ partyName: record.partyName, partyId: record.partyId || record.customerId || "" }, record.partyName));
+  const search = goldDepositLedgerOptions.search.trim().toLowerCase();
+  return [...parties.values()].filter((party) => !applySearch || !search || `${party.id} ${party.name} ${party.mobile} ${party.address} ${party.careOf}`.toLowerCase().includes(search)).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function goldDepositLedgerReportScreen() {
+  if (selectedGoldDepositLedgerParty) return goldDepositWeightLedgerScreen();
+  const parties = goldDepositLedgerParties();
+  return `<div class="classic-report-layout focused-classic-report"><section class="gold-deposit-ledger-picker"><div class="gold-ledger-picker-fields"><label>Date From <input type="date" data-gold-ledger-field="from" value="${toDateInputValue(goldDepositLedgerOptions.from)}" /></label><button data-action="gold-ledger-today">Today</button><label>Date To <input type="date" data-gold-ledger-field="to" value="${toDateInputValue(goldDepositLedgerOptions.to)}" /></label><button data-action="gold-ledger-term">Term</button><label>CostCenter <select data-gold-ledger-field="costCenter"><option>${escapeHtml(goldDepositLedgerOptions.costCenter)}</option></select></label><span></span><label class="gold-ledger-account-search">Account Head <input data-gold-ledger-field="search" value="${escapeHtml(goldDepositLedgerOptions.search)}" /></label></div><div class="classic-report-grid-wrap"><table class="classic-report-grid gold-deposit-party-grid"><thead><tr><th></th><th>AccID</th><th>AccName</th><th>Mobile</th><th>Address</th><th>c / o</th><th>Adminonly</th></tr></thead><tbody>${parties.length ? parties.map((party, index) => `<tr class="${index === 0 ? "selected" : ""}" data-gold-ledger-party="${escapeHtml(party.id || party.name)}"><td>${index + 1}</td><td>${escapeHtml(party.id)}</td><td>${escapeHtml(party.name)}</td><td>${escapeHtml(party.mobile)}</td><td>${escapeHtml(party.address)}</td><td>${escapeHtml(party.careOf)}</td><td class="num">${party.adminOnly}</td></tr>`).join("") : `<tr><td colspan="7">No matching accounts.</td></tr>`}</tbody></table></div><button class="gold-ledger-ok" data-action="gold-ledger-open">OK</button></section></div>`;
+}
+
+function selectedGoldDepositParty() {
+  return goldDepositLedgerParties(false).find((party) => party.id === selectedGoldDepositLedgerParty || party.name === selectedGoldDepositLedgerParty) || null;
+}
+
+function goldDepositRecordMatchesParty(record, party) {
+  if (!party) return false;
+  const recordId = record.partyId || record.customerId || record.accountId || "";
+  return (recordId && recordId === party.id) || String(record.partyName || "").trim().toLowerCase() === party.name.trim().toLowerCase();
+}
+
+function goldDepositWeightLedgerData() {
+  const party = selectedGoldDepositParty(), from = toDateInputValue(goldDepositLedgerOptions.from), to = toDateInputValue(goldDepositLedgerOptions.to);
+  const movements = [
+    ...(state.goldDeposits || []).filter((record) => goldDepositRecordMatchesParty(record, party)).map((record) => ({ record, type: "Deposit", sortDate: toDateInputValue(record.date), weight: goldDepositFinancials(record).totalWeight })),
+    ...(state.goldWithdrawals || []).filter((record) => goldDepositRecordMatchesParty(record, party)).map((record) => ({ record, type: "Withdrawal", sortDate: toDateInputValue(record.date), weight: goldDepositFinancials(record).totalWeight }))
+  ].sort((a, b) => a.sortDate.localeCompare(b.sortDate) || String(a.record.entryNo).localeCompare(String(b.record.entryNo)));
+  let balance = Number(party?.openingWeight || 0);
+  movements.filter((movement) => movement.sortDate < from).forEach((movement) => { balance += movement.type === "Deposit" ? movement.weight : -movement.weight; });
+  const opening = balance, rows = [];
+  movements.filter((movement) => movement.sortDate >= from && movement.sortDate <= to).forEach((movement, index) => { balance += movement.type === "Deposit" ? movement.weight : -movement.weight; rows.push({ slNo: index + 2, entryNo: movement.record.entryNo || "", date: displaySalesDate(movement.record.date), remarks: movement.record.remarks || movement.type, deposit: movement.type === "Deposit" ? movement.weight : "", withdraw: movement.type === "Withdrawal" ? movement.weight : "", balance }); });
+  const openingDateValue = new Date(`${from}T00:00:00`); openingDateValue.setDate(openingDateValue.getDate() - 1);
+  rows.unshift({ slNo: 1, entryNo: "0", date: openingDateValue.toLocaleDateString("en-GB"), remarks: "Opening", deposit: "", withdraw: "", balance: opening });
+  return { party, rows, opening, closing: balance };
+}
+
+function goldDepositWeightLedgerScreen() {
+  const report = goldDepositWeightLedgerData(), weight = (key, label, total = false) => ({ key, label, numeric: true, total, format: (value) => value === "" ? "" : numberValue(value, 3) });
+  const columns = [{ key: "slNo", label: "Slno" }, { key: "entryNo", label: "EntryNo" }, { key: "date", label: "Date" }, { key: "remarks", label: "Remarks" }, weight("deposit", "Deposit", true), weight("withdraw", "WithDraw", true), weight("balance", "Balance")];
+  const totals = salesTotalsForColumns(report.rows, columns);
+  return `<div class="classic-report-layout focused-classic-report"><section class="classic-stock-report sales-report gold-deposit-weight-ledger">${goldDepositLedgerToolbar()}<header class="classic-report-title sales-report-title"><h3>***MT GOLD LAND***</h3><h4>***MT GOLD LAND***</h4><h2>Deposit Weight Ledger</h2><p>${escapeHtml(report.party?.id || "")}/${escapeHtml(report.party?.name || "")} From ${escapeHtml(displaySalesDate(goldDepositLedgerOptions.from))} To ${escapeHtml(displaySalesDate(goldDepositLedgerOptions.to))}</p></header>${salesReportTable(columns, report.rows, "gold-deposit-weight-ledger-grid", totals)}</section></div>`;
+}
+
+function goldDepositLedgerToolbar() {
+  const tools = [["SHOW", "noop"], ["PRINT", "print-now"], ["DIRECT PRINT", "print-now"], ["EXCEL", "export-report"], ["SAVE AS", "export-report"], ["DATE", "gold-ledger-date"], ["FIRST", "noop"], ["PREV", "noop"], ["NEXT", "noop"], ["LAST", "noop"], ["VIEW/HIDE", "noop"], ["ZOOM IN", "noop"], ["DEFAULT", "noop"], ["ZOOM OUT", "noop"], ["CLOSE", "gold-ledger-close"]];
+  return `<div class="classic-report-toolbar sales-report-toolbar"><div class="classic-tool-buttons">${tools.map(([label, action]) => `<button class="classic-tool" data-action="${action}"><strong>${toolbarGlyph(label)}</strong><span>${label}</span></button>`).join("")}</div><label class="classic-a4"><input type="checkbox" />A4</label></div>`;
+}
+
+function goldDepositSummaryReportData() {
+  const to = toDateInputValue(goldDepositLedgerOptions.to);
+  const rows = goldDepositLedgerParties(false).map((party) => {
+    const deposits = (state.goldDeposits || []).filter((record) => goldDepositRecordMatchesParty(record, party) && toDateInputValue(record.date) <= to).reduce((sum, record) => sum + goldDepositFinancials(record).totalWeight, 0);
+    const withdrawals = (state.goldWithdrawals || []).filter((record) => goldDepositRecordMatchesParty(record, party) && toDateInputValue(record.date) <= to).reduce((sum, record) => sum + goldDepositFinancials(record).totalWeight, 0);
+    const net = Number(party.openingWeight || 0) + deposits - withdrawals;
+    return { accountId: party.id, partyName: party.name, net, party, deposits, withdrawals };
+  }).filter((row) => Math.abs(row.net) > 0.0000001 || row.deposits > 0 || row.withdrawals > 0 || Math.abs(row.party.openingWeight) > 0.0000001);
+  return { rows, totalNet: sumField(rows, "net") };
+}
+
+function goldDepositSummaryReportScreen() {
+  const report = goldDepositSummaryReportData();
+  const columns = [{ key: "accountId", label: "AccID" }, { key: "partyName", label: "PartyName" }, { key: "net", label: "Net", numeric: true, total: true, format: (value) => numberValue(value, 3) }];
+  return `<div class="classic-report-layout focused-classic-report"><section class="classic-stock-report sales-report gold-deposit-summary-report">${goldDepositSummaryToolbar()}<header class="classic-report-title sales-report-title"><h3>***MT GOLD LAND***</h3><h4>***MT GOLD LAND***</h4><h2>Deposit Summary</h2><p>From ${escapeHtml(displaySalesDate(goldDepositLedgerOptions.from))} To ${escapeHtml(displaySalesDate(goldDepositLedgerOptions.to))}</p></header>${salesReportTable(columns, report.rows, "gold-deposit-summary-grid", { net: report.totalNet })}</section></div>`;
+}
+
+function goldDepositSummaryToolbar() {
+  const tools = [["SHOW", "noop"], ["PRINT", "print-now"], ["DIRECT PRINT", "print-now"], ["EXCEL", "export-report"], ["SAVE AS", "export-report"], ["DATE", "gold-summary-date"], ["FIRST", "noop"], ["PREV", "noop"], ["NEXT", "noop"], ["LAST", "noop"], ["VIEW/HIDE", "noop"], ["ZOOM IN", "noop"], ["DEFAULT", "noop"], ["ZOOM OUT", "noop"], ["CLOSE", "gold-summary-close"]];
+  return `<div class="classic-report-toolbar sales-report-toolbar"><div class="classic-tool-buttons">${tools.map(([label, action]) => `<button class="classic-tool" data-action="${action}"><strong>${toolbarGlyph(label)}</strong><span>${label}</span></button>`).join("")}</div><label class="classic-a4"><input type="checkbox" />A4</label>${goldDepositLedgerOptions.dateOpen ? `<div class="sales-date-popup"><label>From<input type="date" data-gold-ledger-field="from" value="${toDateInputValue(goldDepositLedgerOptions.from)}" /></label><label>To<input type="date" data-gold-ledger-field="to" value="${toDateInputValue(goldDepositLedgerOptions.to)}" /></label><button data-action="gold-summary-date-set">Apply</button></div>` : ""}</div>`;
+}
+
+function goldDepositTransactionRows() {
+  const from = toDateInputValue(goldDepositLedgerOptions.from), to = toDateInputValue(goldDepositLedgerOptions.to), parties = goldDepositLedgerParties(false);
+  const movements = [
+    ...(state.goldDeposits || []).flatMap((record) => (record.lines || []).filter((line) => line.active !== false).map((line, index) => ({ record, line: normalizeGoldDepositLine(line), lineIndex: index, transType: "Issued", sign: 1, sortDate: toDateInputValue(record.date), storage: "goldDeposits", view: "Gold Deposit" }))),
+    ...(state.goldWithdrawals || []).flatMap((record) => (record.lines || []).filter((line) => line.active !== false).map((line, index) => ({ record, line: normalizeGoldDepositLine(line), lineIndex: index, transType: "Redeemed", sign: -1, sortDate: toDateInputValue(record.date), storage: "goldWithdrawals", view: "Gold Withdrawal" })))
+  ].filter((movement) => movement.sortDate <= to).sort((a, b) => a.sortDate.localeCompare(b.sortDate) || String(a.record.entryNo).localeCompare(String(b.record.entryNo)) || a.lineIndex - b.lineIndex);
+  const balances = new Map();
+  const partyFor = (record) => parties.find((party) => goldDepositRecordMatchesParty(record, party)) || { id: record.partyId || "", name: record.partyName || "", openingWeight: 0, openingAmount: 0 };
+  const rows = [];
+  movements.forEach((movement) => {
+    const party = partyFor(movement.record), key = party.id || party.name.toLowerCase();
+    if (!balances.has(key)) balances.set(key, { weight: Number(party.openingWeight || 0), amount: Number(party.openingAmount || 0) });
+    const balance = balances.get(key);
+    balance.weight += movement.sign * Number(movement.line.partyWeight || 0);
+    balance.amount += movement.sign * Number(movement.line.amount || 0);
+    if (movement.sortDate < from || (goldDepositTransactionFilter !== "All" && movement.transType !== goldDepositTransactionFilter)) return;
+    rows.push({ transType: movement.transType, entryNo: movement.record.entryNo || "", entryDate: displaySalesDate(movement.record.date), partyId: party.id || "", partyName: party.name || movement.record.partyName || "", itemId: movement.line.itemId || "", itemName: movement.line.itemName || "", gross: movement.line.gross, stone: movement.line.stone, mudless: movement.line.mudless, net: movement.line.net, touch: movement.line.touch, rate: movement.line.rate, amount: movement.line.amount, balanceWeight: balance.weight, balanceAmount: balance.amount, dueDate: displaySalesDate(movement.record.dueDate || ""), remarks: movement.record.remarks || "", salesman: movement.record.preparedBy || "", sourceBillId: movement.record.id, sourceEntryNo: movement.record.entryNo, sourceBillNo: movement.record.refNo, sourceSection: "gold-deposit", drillTarget: "gold-deposit-entry", drillStorage: movement.storage, drillView: movement.view });
+  });
+  return rows;
+}
+
+function goldDepositTransactionsReportConfig() {
+  const rows = goldDepositTransactionRows(), weight = (key, label, total = true) => ({ key, label, numeric: true, total, format: (value) => numberValue(value, 3) }), moneyColumn = (key, label, total = true) => ({ key, label, numeric: true, total, format: (value) => numberValue(value, 2) });
+  const columns = [{ key: "transType", label: "TransType" }, { key: "entryNo", label: "EntryNo" }, { key: "entryDate", label: "EntryDate" }, { key: "partyId", label: "PartyID" }, { key: "partyName", label: "Party Name" }, { key: "itemId", label: "ItemID" }, { key: "itemName", label: "item_Name" }, weight("gross", "Gross"), weight("stone", "Stone"), weight("mudless", "Mudless"), weight("net", "Net"), { key: "touch", label: "Touch", numeric: true, format: (value) => numberValue(value, 2) }, moneyColumn("rate", "Rate", false), moneyColumn("amount", "Amount"), weight("balanceWeight", "Bal_Weight", false), moneyColumn("balanceAmount", "Bal_Amount", false), { key: "dueDate", label: "DueDate" }, { key: "remarks", label: "Remarks" }, { key: "salesman", label: "SaleMan" }];
+  return { columns, rows, gridClass: "gold-deposit-transactions-grid", totals: salesTotalsForColumns(rows, columns) };
+}
+
+function goldDepositTransactionsReportScreen() {
+  const config = goldDepositTransactionsReportConfig();
+  return `<div class="classic-report-layout focused-classic-report"><section class="classic-stock-report sales-report gold-deposit-transactions-report">${goldDepositTransactionsToolbar()}<header class="classic-report-title sales-report-title"><h3>***MT GOLD LAND***</h3><h4>M.T.PLAZA,OOTY ROAD</h4></header>${salesReportTable(config.columns, config.rows, config.gridClass, config.totals)}</section></div>`;
+}
+
+function goldDepositTransactionsToolbar() {
+  const tools = [["SHOW", "noop"], ["PRINT", "print-now"], ["DIRECT PRINT", "print-now"], ["EXCEL", "export-report"], ["SAVE AS", "export-report"], ["DATE", "gold-summary-date"], ["FIRST", "noop"], ["PREV", "noop"], ["NEXT", "noop"], ["LAST", "noop"], ["VIEW/HIDE", "noop"], ["ZOOM IN", "noop"], ["DEFAULT", "noop"], ["ZOOM OUT", "noop"], ["CLOSE", "gold-summary-close"]];
+  return `<div class="classic-report-toolbar sales-report-toolbar gold-deposit-transactions-toolbar"><div class="classic-tool-buttons">${tools.map(([label, action]) => `<button class="classic-tool" data-action="${action}"><strong>${toolbarGlyph(label)}</strong><span>${label}</span></button>`).join("")}</div><label class="classic-a4"><input type="checkbox" />A4</label><select data-gold-transaction-filter>${["All", "Issued", "Redeemed"].map((option) => `<option ${option === goldDepositTransactionFilter ? "selected" : ""}>${option}</option>`).join("")}</select>${goldDepositLedgerOptions.dateOpen ? `<div class="sales-date-popup"><label>From<input type="date" data-gold-ledger-field="from" value="${toDateInputValue(goldDepositLedgerOptions.from)}" /></label><label>To<input type="date" data-gold-ledger-field="to" value="${toDateInputValue(goldDepositLedgerOptions.to)}" /></label><button data-action="gold-summary-date-set">Apply</button></div>` : ""}</div>`;
+}
+
+function orderDueReportConfig() {
+  const dueDate = toDateInputValue(orderDueOptions.date), rows = [];
+  (state.salesOrders || []).filter((order) => salesOrderRecordStatus(order) === "Pending" && toDateInputValue(order.dueDate || order.deliveryDate || order.date) === dueDate).forEach((order) => {
+    const lines = (order.sections?.sales || []).map((line) => normalizeBillLine(line, 0, order, "order"));
+    const advance = orderAdvanceSummary(order, {}, "none").netAdvance;
+    (lines.length ? lines : [normalizeBillLine(order.line || {}, 0, order, "order")]).forEach((line, index) => rows.push({ orderNo: order.entryNo || "", refNo: order.refNo || "", dueDate: displaySalesDate(order.dueDate || order.deliveryDate || order.date), partyName: order.customer || order.partyName || "", address: order.address || "", phone: order.phone || order.customerMobile || "", salesman: order.staffName || order.preparedBy || "", advance: index === 0 ? advance : 0, itemName: line.itemName || line.item || "", qty: Number(line.qty || 0), gross: Number(line.gross || 0), model: line.model || "", length: line.length || "", breadth: line.breadth || "", sourceBillId: order.id, sourceEntryNo: order.entryNo, sourceBillNo: order.billNo || order.refNo, sourceSection: "sales-order", drillTarget: "sales-order", drillStorage: "salesOrders", drillView: "Sales Order" }));
+  });
+  const columns = [{ key: "orderNo", label: "OrderNo" }, { key: "refNo", label: "RefNo" }, { key: "dueDate", label: "dueDate" }, { key: "partyName", label: "PartyName" }, { key: "address", label: "address" }, { key: "phone", label: "phone" }, { key: "salesman", label: "Salesman" }, { key: "advance", label: "Advance", numeric: true, total: true, format: (value) => numberValue(value, 3) }, { key: "itemName", label: "ItemName" }, { key: "qty", label: "Qty", numeric: true, total: true, format: (value) => numberValue(value, 0) }, { key: "gross", label: "Gross", numeric: true, total: true, format: (value) => numberValue(value, 3) }, { key: "model", label: "Model" }, { key: "length", label: "Lenght" }, { key: "breadth", label: "bredth" }];
+  return { columns, rows, gridClass: "order-due-report-grid", totals: salesTotalsForColumns(rows, columns) };
+}
+
+function orderDueReportScreen() {
+  const config = orderDueReportConfig();
+  return `<div class="classic-report-layout focused-classic-report"><section class="classic-stock-report sales-report order-due-report">${orderDueReportToolbar()}${salesReportTable(config.columns, config.rows, config.gridClass, config.totals)}</section></div>`;
+}
+
+function orderDueReportToolbar() {
+  const tools = [["SHOW", "noop"], ["PRINT", "print-now"], ["DIRECT PRINT", "print-now"], ["EXCEL", "export-report"], ["SAVE AS", "export-report"], ["DATE", "order-due-date"], ["FIRST", "noop"], ["PREV", "noop"], ["NEXT", "noop"], ["LAST", "noop"], ["VIEW/HIDE", "noop"], ["ZOOM IN", "noop"], ["DEFAULT", "noop"], ["ZOOM OUT", "noop"], ["CLOSE", "order-due-close"]];
+  return `<div class="classic-report-toolbar sales-report-toolbar order-due-toolbar"><div class="classic-tool-buttons">${tools.map(([label, action]) => `<button class="classic-tool" data-action="${action}"><strong>${toolbarGlyph(label)}</strong><span>${label}</span></button>`).join("")}</div><label class="order-due-startup"><input type="checkbox" data-order-due-startup ${orderDueOptions.showAtStartup ? "checked" : ""}/> Show at Startup</label>${orderDueOptions.dateOpen ? `<div class="sales-date-popup"><label>Due date<input type="date" data-order-due-date value="${toDateInputValue(orderDueOptions.date)}" /></label><button data-action="order-due-date-set">Apply</button></div>` : ""}</div>`;
+}
+
+function collectionDueReceiptsForBill(bill) {
+  const references = new Set([bill.id, bill.entryNo, bill.refNo, bill.billNo].filter(Boolean).map(String));
+  let received = 0, adjustments = 0;
+  (state.billwiseCollections || []).filter(financialRecordIsPosted).forEach((record) => (record.lines || []).forEach((line) => {
+    if (!references.has(String(line.invoiceNo || ""))) return;
+    received += Number(line.received || 0);
+    adjustments += Number(line.discount || 0) + Number(line.oldCreditNote || 0);
+  }));
+  return { received, adjustments };
+}
+
+function dueDaysBetween(dueDate, asOfDate) {
+  const due = new Date(`${toDateInputValue(dueDate)}T00:00:00`), asOf = new Date(`${toDateInputValue(asOfDate)}T00:00:00`);
+  return Number.isNaN(due.getTime()) || Number.isNaN(asOf.getTime()) ? 0 : Math.max(0, Math.floor((asOf - due) / 86400000));
+}
+
+function collectionDueReportConfig() {
+  const asOf = toDateInputValue(collectionDueOptions.date);
+  const rows = (state.bills || []).filter((bill) => !/purchase|return/i.test(String(bill.type || "")) && toDateInputValue(bill.dueDate || bill.date) <= asOf).map((bill) => {
+    const financials = billFinancials(bill), breakup = normalizePaymentBreakup(bill.paymentBreakup), explicitPayment = breakup.cash + breakup.gpay + breakup.card + breakup.bank + breakup.other;
+    const initialReceived = explicitPayment > 0 ? explicitPayment : Number(bill.paid || bill.totals?.cashReceived || 0), receipt = collectionDueReceiptsForBill(bill);
+    const baseAdjustments = Number(financials.totalAdjustments || 0), invoiceTotal = Number(financials.invoiceTotal || 0) + baseAdjustments, totalReceived = initialReceived + receipt.received, adjustments = baseAdjustments + receipt.adjustments, balance = Math.max(0, invoiceTotal - totalReceived - adjustments);
+    return { entryNo: bill.entryNo || "", entryDate: displaySalesDate(bill.date), partyId: bill.customerId || bill.customerCode || "", partyName: bill.customer || bill.partyName || "", phone: bill.phone || bill.customerMobile || "", salesman: bill.staffName || bill.preparedBy || "", agentName: bill.customerAgent || bill.agentName || "", invoiceTotal, totalReceived, adjustments, balance, dueDate: displaySalesDate(bill.dueDate || bill.date), dueDays: dueDaysBetween(bill.dueDate || bill.date, collectionDueOptions.date), sourceBillId: bill.id, sourceEntryNo: bill.entryNo, sourceBillNo: bill.billNo || bill.refNo, sourceSection: "sales", drillStorage: "bills", drillView: "Sales Invoice" };
+  }).filter((row) => collectionDueOptions.withZero || row.balance > 0.000001).sort((a, b) => b.dueDays - a.dueDays || toDateInputValue(a.dueDate).localeCompare(toDateInputValue(b.dueDate)) || String(a.entryNo).localeCompare(String(b.entryNo)));
+  const moneyColumn = (key, label) => ({ key, label, numeric: true, total: true, format: (value) => numberValue(value, 2) });
+  const columns = [{ key: "entryNo", label: "EntryNo" }, { key: "entryDate", label: "EntryDate" }, { key: "partyId", label: "PartyID" }, { key: "partyName", label: "PartyName" }, { key: "phone", label: "Phone" }, { key: "salesman", label: "SalesMen" }, { key: "agentName", label: "AgentName" }, moneyColumn("invoiceTotal", "InvoiceTotal"), moneyColumn("totalReceived", "TotalReceived"), moneyColumn("adjustments", "Adjustments"), moneyColumn("balance", "Balance"), { key: "dueDate", label: "DueDate" }, { key: "dueDays", label: "DueDays", numeric: true, format: (value) => numberValue(value, 0) }];
+  return { columns, rows, gridClass: "collection-due-report-grid", totals: salesTotalsForColumns(rows, columns) };
+}
+
+function collectionDueReportScreen() {
+  const config = collectionDueReportConfig();
+  return `<div class="classic-report-layout focused-classic-report"><section class="classic-stock-report sales-report collection-due-report">${collectionDueReportToolbar()}<header class="classic-report-title sales-report-title"><h3>***MT GOLD LAND***</h3><h4>M.T.PLAZA,OOTY ROAD</h4><h2>Due Report</h2></header>${salesReportTable(config.columns, config.rows, config.gridClass, config.totals)}</section></div>`;
+}
+
+function collectionDueReportToolbar() {
+  const tools = [["SHOW", "noop"], ["PRINT", "print-now"], ["DIRECT PRINT", "print-now"], ["EXCEL", "export-report"], ["SAVE AS", "export-report"], ["DATE", "collection-due-date"], ["FIRST", "noop"], ["PREV", "noop"], ["NEXT", "noop"], ["LAST", "noop"], ["VIEW/HIDE", "noop"], ["ZOOM IN", "noop"], ["DEFAULT", "noop"], ["ZOOM OUT", "noop"], ["CLOSE", "collection-due-close"]];
+  return `<div class="classic-report-toolbar sales-report-toolbar collection-due-toolbar"><div class="classic-tool-buttons">${tools.map(([label, action]) => `<button class="classic-tool" data-action="${action}"><strong>${toolbarGlyph(label)}</strong><span>${label}</span></button>`).join("")}</div><label><input type="checkbox" data-collection-due-startup ${collectionDueOptions.showAtStartup ? "checked" : ""}/> Show at Startup</label><label><input type="checkbox" data-collection-due-zero ${collectionDueOptions.withZero ? "checked" : ""}/> With 0</label>${collectionDueOptions.dateOpen ? `<div class="sales-date-popup"><label>As of<input type="date" data-collection-due-date value="${toDateInputValue(collectionDueOptions.date)}" /></label><button data-action="collection-due-date-set">Apply</button></div>` : ""}</div>`;
+}
+
+function paymentDuePaymentsForBill(bill) {
+  const references = new Set([bill.id, bill.entryNo, bill.refNo, bill.billNo, bill.invoiceNo].filter(Boolean).map(String));
+  let paid = 0, adjustments = 0;
+  (state.billwisePayments || []).filter(financialRecordIsPosted).forEach((record) => (record.lines || []).forEach((line) => {
+    if (!references.has(String(line.invoiceNo || ""))) return;
+    paid += Number(line.paid || 0);
+    adjustments += Number(line.dnd || 0) + Number(line.discount || 0);
+  }));
+  return { paid, adjustments };
+}
+
+function paymentDuePurchaseSources() {
+  const sources = (state.bills || []).filter((bill) => String(bill.type || "").toLowerCase().includes("purchase")).map((bill) => ({ bill, storage: "bills", view: "Purchase Invoice" }));
+  [[state.directPurchases || [], "directPurchases", "Direct Purchase"], [state.diamondPurchases || [], "diamondPurchases", "Diamond Purchase"], [state.dmdStonePurchases || [], "dmdStonePurchases", "DMD Stone Purchase"]].forEach(([records, storage, view]) => records.forEach((bill) => sources.push({ bill, storage, view })));
+  return sources;
+}
+
+function paymentDueReportConfig() {
+  const asOf = toDateInputValue(paymentDueOptions.date);
+  const rows = paymentDuePurchaseSources().map(({ bill, storage, view }) => {
+    const purchase = purchaseReportBillRow(bill, storage, view), payment = paymentDuePaymentsForBill(bill), dueDate = bill.dueDate || bill.paymentDueDate || bill.date || bill.invoiceDate;
+    const invoiceDiscount = Number(purchase.discount || 0), invoiceTotal = Number(purchase.invoiceTotal || 0) + invoiceDiscount, totalReceived = Number(purchase.cashPaid || 0) + payment.paid, adjustments = invoiceDiscount + payment.adjustments, balance = Math.max(0, invoiceTotal - totalReceived - adjustments);
+    return { entryNo: purchase.entryNo, entryDate: purchase.entryDate, dueDate: displaySalesDate(dueDate), partyName: purchase.partyName, invoiceTotal, totalReceived, adjustments, balance, dueDays: dueDaysBetween(dueDate, paymentDueOptions.date), sourceBillId: bill.id, sourceEntryNo: bill.entryNo || bill.invoiceNo, sourceBillNo: bill.billNo || bill.invoiceNo || bill.refNo, sourceSection: "exchange", drillTarget: "purchase", drillStorage: storage, drillView: view, sortDueDate: toDateInputValue(dueDate) };
+  }).filter((row) => row.sortDueDate <= asOf && row.balance > 0.000001).sort((a, b) => b.dueDays - a.dueDays || a.sortDueDate.localeCompare(b.sortDueDate) || String(a.entryNo).localeCompare(String(b.entryNo)));
+  const moneyColumn = (key, label) => ({ key, label, numeric: true, total: true, format: (value) => numberValue(value, 2) });
+  const columns = [{ key: "entryNo", label: "EntryNo" }, { key: "entryDate", label: "EntryDate" }, { key: "dueDate", label: "DueDate" }, { key: "partyName", label: "PartyName" }, moneyColumn("invoiceTotal", "InvoiceTotal"), moneyColumn("totalReceived", "TotalReceived"), moneyColumn("adjustments", "Adjustments"), moneyColumn("balance", "Balance")];
+  return { columns, rows, gridClass: "payment-due-report-grid", totals: salesTotalsForColumns(rows, columns) };
+}
+
+function paymentDueReportScreen() {
+  const config = paymentDueReportConfig();
+  return `<div class="classic-report-layout focused-classic-report"><section class="classic-stock-report sales-report payment-due-report">${paymentDueReportToolbar()}${salesReportTable(config.columns, config.rows, config.gridClass, config.totals)}</section></div>`;
+}
+
+function paymentDueReportToolbar() {
+  const tools = [["SHOW", "noop"], ["PRINT", "print-now"], ["DIRECT PRINT", "print-now"], ["EXCEL", "export-report"], ["SAVE AS", "export-report"], ["DATE", "payment-due-date"], ["FIRST", "noop"], ["PREV", "noop"], ["NEXT", "noop"], ["LAST", "noop"], ["VIEW/HIDE", "noop"], ["ZOOM IN", "noop"], ["DEFAULT", "noop"], ["ZOOM OUT", "noop"], ["CLOSE", "payment-due-close"]];
+  return `<div class="classic-report-toolbar sales-report-toolbar payment-due-toolbar"><div class="classic-tool-buttons">${tools.map(([label, action]) => `<button class="classic-tool" data-action="${action}"><strong>${toolbarGlyph(label)}</strong><span>${label}</span></button>`).join("")}</div><label><input type="checkbox" data-payment-due-startup ${paymentDueOptions.showAtStartup ? "checked" : ""}/> Show at Startup</label>${paymentDueOptions.dateOpen ? `<div class="sales-date-popup"><label>As of<input type="date" data-payment-due-date value="${toDateInputValue(paymentDueOptions.date)}" /></label><button data-action="payment-due-date-set">Apply</button></div>` : ""}</div>`;
+}
+
+function salesOrderReportToolbar() {
+  const tools = [["SHOW", "sales-report-show"], ["PRINT", "print-now"], ["DIRECT PRINT", "print-now"], ["EXCEL", "export-report"], ["SAVE AS", "export-report"], ["DATE", "sales-report-date"], ["FIRST", "noop"], ["PREV", "noop"], ["NEXT", "noop"], ["LAST", "noop"], ["VIEW/HIDE", "noop"], ["ZOOM IN", "noop"], ["DEFAULT", "noop"], ["ZOOM OUT", "noop"], ["CLOSE", "sales-order-report-close"]];
+  return `<div class="classic-report-toolbar sales-report-toolbar sales-order-report-toolbar"><div class="classic-tool-buttons">${tools.map(([label, action]) => `<button class="classic-tool" data-action="${action}"><strong>${toolbarGlyph(label)}</strong><span>${label}</span></button>`).join("")}</div><label class="classic-a4"><input type="checkbox" />A4</label><select class="sales-order-status-select" data-sales-order-status aria-label="Sales Order status">${["All", "Pending", "Finished"].map((option) => `<option ${option === salesReportOptions.salesOrderStatus ? "selected" : ""}>${option}</option>`).join("")}</select><select class="sales-order-format-select" data-sales-order-format aria-label="Sales Order report format">${["Register", "Report"].map((option) => `<option ${option === salesReportOptions.salesOrderFormat ? "selected" : ""}>${option}</option>`).join("")}</select>${salesReportOptions.dateOpen ? salesDatePopup() : ""}</div>`;
+}
+
+function salesOrderRecordStatus(order = {}) {
+  const value = String(order.status || order.orderStatus || "").toLowerCase();
+  return order.closed || order.finished || order.completed || value.includes("finish") || value.includes("close") || value.includes("complete") ? "Finished" : "Pending";
+}
+
+function salesOrderReportSourceRows() {
+  return (state.salesOrders || [])
+    .filter((order) => isDateWithinPeriod(order.date, salesReportOptions.from, salesReportOptions.to))
+    .filter((order) => salesReportOptions.salesOrderStatus === "All" || salesOrderRecordStatus(order) === salesReportOptions.salesOrderStatus)
+    .map((order) => {
+      const financials = billFinancials(order), advance = orderAdvanceSummary(order);
+      const salesLines = (order.sections?.sales || []).map((line) => normalizeBillLine(line, 0, order, "order"));
+      const exchangeLines = (order.sections?.exchange || []).map((line) => normalizeBillLine(line, 0, order, "exchange"));
+      const returnLines = (order.sections?.return || []).map((line) => normalizeBillLine(line, 0, order, "return"));
+      const orderWeight = sumField(salesLines, "net"), exchangeWeight = sumField(exchangeLines, "net"), returnWeight = sumField(returnLines, "net");
+      const bankAmount = Number(order.paymentBreakup?.bank || 0) + Number(order.paymentBreakup?.gpay || 0) + Number(order.paymentBreakup?.card || 0) + Number(order.paymentBreakup?.other || 0) + Number(order.adjustments?.card || 0);
+      const cashAdvance = Number(order.paymentBreakup?.cash || 0) + Number(advance.additionalAdvance || 0) - Number(advance.advanceRefund || 0);
+      const totalAdvance = financials.exchangeTotal + financials.returnTotal + bankAmount + cashAdvance;
+      const balance = financials.invoiceTotal - totalAdvance;
+      const orderRate = Number(salesLines.find((line) => line.rate)?.rate || activeGoldRate() || 0);
+      const moneyWeight = orderRate > 0 ? (bankAmount + cashAdvance) / orderRate : 0;
+      return {
+        order, salesman: order.staffName || (state.staffs || []).find((staff) => staff.staffId === order.staffId || staff.employeeId === order.staffId)?.name || "", entryNo: order.entryNo || "", refNo: order.refNo || "", orderDate: displaySalesDate(order.date), dueDate: displaySalesDate(order.dueDate || order.date), orderType: order.paymentMode || order.orderType || "Cash", partyName: order.customer || order.partyName || "", address: order.address || "", phone: order.phone || "",
+        orderTotal: financials.invoiceTotal, exchangeAmount: financials.exchangeTotal, returnAmount: financials.returnTotal, bankAmount, cashAdvance, balance, totalAdvance, orderWeight, exchangeWeight, returnWeight, totalAdvanceWeight: exchangeWeight + returnWeight + moneyWeight,
+        status: salesOrderRecordStatus(order), salesLines, exchangeLines, returnLines,
+        sourceBillId: order.id, sourceEntryNo: order.entryNo, sourceBillNo: order.billNo || "", sourceSection: "sales-order", drillTarget: "sales-order", drillStorage: "salesOrders", drillView: "Sales Order"
+      };
+    });
+}
+
+function salesOrderReportConfig() {
+  const orders = salesOrderReportSourceRows();
+  if (salesReportOptions.salesOrderFormat === "Report") return salesOrderLineReportConfig(orders);
+  const moneyColumn = (key, label) => ({ key, label, numeric: true, total: true, format: (value) => numberValue(value, 2) });
+  const weightColumn = (key, label) => ({ key, label, numeric: true, total: true, format: (value) => numberValue(value, 3) });
+  const columns = [{ key: "salesman", label: "Salemen" }, { key: "entryNo", label: "Eno" }, { key: "refNo", label: "RefNo" }, { key: "orderDate", label: "OrdDate" }, { key: "dueDate", label: "DueDate" }, { key: "orderType", label: "OrderType" }, { key: "partyName", label: "PartyName" }, { key: "address", label: "Address" }, { key: "phone", label: "Phone" }, moneyColumn("orderTotal", "OrdTotal"), moneyColumn("exchangeAmount", "ExchAmt"), moneyColumn("returnAmount", "RtAmt"), moneyColumn("bankAmount", "BankAmt"), moneyColumn("cashAdvance", "CashAdvance"), moneyColumn("balance", "Balance"), moneyColumn("totalAdvance", "TtlAdvance"), weightColumn("orderWeight", "OrdWeight"), weightColumn("exchangeWeight", "ExchWeight"), weightColumn("returnWeight", "RtWeight"), weightColumn("totalAdvanceWeight", "TtlAdvWeight")];
+  return { columns, rows: orders, gridClass: "sales-order-register-grid", totals: salesTotalsForColumns(orders, columns) };
+}
+
+function salesOrderLineReportConfig(orders) {
+  const rows = orders.flatMap((order) => order.salesLines.map((line) => ({ ...order, customer: order.partyName, itemName: line.itemName || "", qty: line.qty, gross: line.gross, stone: line.stone, net: line.net, vaPercent: line.va, makingCharge: line.totalMc || line.makingCharge || 0, mcPerGram: line.mcPerGm, stoneCharge: line.stoneCharge, rate: line.rate, amount: line.itemTotal || line.amount || 0, model: line.model || "", length: line.length || "", breadth: line.breadth || "" })));
+  const number = (key, label, decimals = 3) => ({ key, label, numeric: true, total: true, format: (value) => numberValue(value, decimals) });
+  const columns = [{ key: "salesman", label: "Salemen" }, { key: "entryNo", label: "ENo" }, { key: "refNo", label: "RefNo" }, { key: "orderDate", label: "OrdDate" }, { key: "customer", label: "Customer" }, { key: "phone", label: "phone" }, { key: "itemName", label: "ItemName" }, number("qty", "Qty", 0), number("gross", "Gross"), number("stone", "Stone"), number("net", "Net"), number("vaPercent", "VA%", 2), number("makingCharge", "MC", 2), number("mcPerGram", "MC/Grm", 2), number("stoneCharge", "Stn Charge", 2), number("rate", "Rate", 2), number("amount", "Amount", 2), { key: "model", label: "Model" }, { key: "length", label: "Length" }, { key: "breadth", label: "Breadth" }];
+  return { columns, rows, gridClass: "sales-order-line-report-grid", totals: salesTotalsForColumns(rows, columns) };
+}
+
+function refinerReportScreen() {
+  const config = refinerReportConfig();
+  return `<div class="classic-report-layout focused-classic-report"><section class="classic-stock-report sales-report refiner-report">${refinerReportToolbar()}<header class="classic-report-title sales-report-title refiner-report-title"><h3>***MT GOLD LAND***</h3><h2>Refinery Report for the period From ${escapeHtml(displaySalesDate(salesReportOptions.from))} To ${escapeHtml(displaySalesDate(salesReportOptions.to))}</h2></header>${salesReportTable(config.columns, config.rows, config.gridClass, config.totals)}</section></div>`;
+}
+
+function refinerReportToolbar() {
+  const tools = [["SHOW", "sales-report-show"], ["PRINT", "print-now"], ["DIRECT PRINT", "print-now"], ["EXCEL", "export-report"], ["SAVE AS", "export-report"], ["DATE", "sales-report-date"], ["FIRST", "noop"], ["PREV", "noop"], ["NEXT", "noop"], ["LAST", "noop"], ["VIEW/HIDE", "noop"], ["ZOOM IN", "noop"], ["DEFAULT", "noop"], ["ZOOM OUT", "noop"], ["CLOSE", "refiner-report-close"]];
+  return `<div class="classic-report-toolbar sales-report-toolbar refiner-report-toolbar"><div class="classic-tool-buttons">${tools.map(([label, action]) => `<button class="classic-tool" data-action="${action}"><strong>${toolbarGlyph(label)}</strong><span>${label}</span></button>`).join("")}</div><select class="refiner-report-select" aria-label="Refinery report type"><option>Refinery</option></select>${salesReportOptions.dateOpen ? salesDatePopup() : ""}</div>`;
+}
+
+function refinerReportConfig() {
+  const issueById = new Map((state.refineryIssues || []).flatMap((record) => [[record.id, record], [record.entryNo, record]]));
+  const refineryReturnByIssue = new Map((state.refineryReturns || []).map((record) => [record.pendingIssueId, record]));
+  const meltingIssueById = new Map((state.meltingIssues || []).flatMap((record) => [[record.id, record], [record.entryNo, record]]));
+  const base = (record, type, storage, view, category, issue = null) => ({
+    entryType: type,
+    category: category || issue?.metalType || issue?.issueType || "Gold",
+    entryNo: record.entryNo || "",
+    issueNo: issue?.entryNo || record.refNo || "",
+    entryDate: displaySalesDate(record.date),
+    sourceBillId: record.id,
+    sourceEntryNo: record.entryNo,
+    sourceSection: "refinery",
+    drillTarget: "refinery",
+    drillStorage: storage,
+    drillView: view
+  });
+  const issueRows = (state.refineryIssues || []).flatMap((record) => (record.lines || []).map((source) => {
+    const line = normalizeRefineryIssueLine(source);
+    return { ...base(record, "Issue", "refineryIssues", "Refinery Issue", record.metalType), itemName: line.itemName, qty: line.qty, gross: line.gross, stone: line.stone, net: line.net, rate: line.rate, amount: line.amount, issueWeight: line.net, mudLess: 0, receivedWeight: 0, bottleStock: 0, testPieceWeight: 0, reissueWeight: 0 };
+  }));
+  const returnRows = (state.refineryReturns || []).flatMap((record) => {
+    const issue = issueById.get(record.pendingIssueId);
+    return (record.lines || []).map((source, index) => {
+      const line = normalizeRefineryReturnLine(source), issued = issue?.lines?.[index] ? normalizeRefineryIssueLine(issue.lines[index]) : null;
+      return { ...base(record, "Return", "refineryReturns", "Refinery Return", issue?.metalType, issue), itemName: line.itemName || issued?.itemName || "", qty: issued?.qty || 0, gross: issued?.gross || 0, stone: issued?.stone || 0, net: issued?.net || line.issuedWeight, rate: issued?.rate || 0, amount: issued?.amount || 0, issueWeight: line.issuedWeight, mudLess: line.meltingLoss, receivedWeight: line.receivedWeight, bottleStock: line.bottleStockWeight, testPieceWeight: line.testWeight, reissueWeight: line.reissueWeight };
+    });
+  });
+  const finalRows = (state.refineryFinalReturns || []).flatMap((record) => {
+    const issue = issueById.get(record.pendingIssueId), returnRecord = refineryReturnByIssue.get(record.pendingIssueId);
+    return (record.lines || []).map((source, index) => {
+      const line = normalizeRefineryFinalLine(source), issued = issue?.lines?.[index] ? normalizeRefineryIssueLine(issue.lines[index]) : null, returned = returnRecord?.lines?.[index] ? normalizeRefineryReturnLine(returnRecord.lines[index]) : null;
+      return { ...base(record, "Final Return", "refineryFinalReturns", "Refinery Final Return", issue?.metalType, issue), itemName: line.itemName || issued?.itemName || "", qty: issued?.qty || 0, gross: issued?.gross || 0, stone: issued?.stone || 0, net: issued?.net || line.receivedWeight, rate: line.rate, amount: line.amount, issueWeight: returned?.issuedWeight || issued?.net || 0, mudLess: line.acidingLoss, receivedWeight: line.receivedWeight, bottleStock: line.bottleStockWeight, testPieceWeight: line.testWeight, reissueWeight: returned?.reissueWeight || 0 };
+    });
+  });
+  const meltingIssueRows = (state.meltingIssues || []).flatMap((record) => (record.lines || []).map((source) => {
+    const line = normalizeMeltingIssueLine(source);
+    return { ...base(record, "Melting Issue", "meltingIssues", "Melting Issue", record.issueType), itemName: line.itemName, qty: line.qty, gross: line.gross, stone: line.stone, net: line.net, rate: line.rate, amount: line.amount, issueWeight: line.net, mudLess: 0, receivedWeight: 0, bottleStock: 0, testPieceWeight: 0, reissueWeight: 0 };
+  }));
+  const meltingReturnRows = (state.meltingReturns || []).flatMap((record) => {
+    const issue = meltingIssueById.get(record.pendingIssueId);
+    return (record.lines || []).map((source, index) => {
+      const line = normalizeMeltingReturnLine(source), issued = issue?.lines?.[index] ? normalizeMeltingIssueLine(issue.lines[index]) : null;
+      return { ...base(record, "Melting Return", "meltingReturns", "Melting Return", issue?.issueType, issue), itemName: line.itemName || issued?.itemName || "", qty: issued?.qty || 0, gross: issued?.gross || 0, stone: issued?.stone || 0, net: issued?.net || line.issuedWeight, rate: line.rate, amount: line.amount, issueWeight: line.issuedWeight, mudLess: line.meltingLoss, receivedWeight: line.receivedWeight, bottleStock: line.bottleStockWeight, testPieceWeight: line.testWeight, reissueWeight: 0 };
+    });
+  });
+  const rows = [...issueRows, ...returnRows, ...finalRows, ...meltingIssueRows, ...meltingReturnRows]
+    .filter((row) => isDateWithinPeriod(row.entryDate, salesReportOptions.from, salesReportOptions.to))
+    .sort((left, right) => toDateInputValue(left.entryDate).localeCompare(toDateInputValue(right.entryDate)) || String(left.entryNo).localeCompare(String(right.entryNo)));
+  const qty = { key: "qty", label: "Qty", numeric: true, total: true, format: (value) => numberValue(value, 0) };
+  const weight = (key, label) => ({ key, label, numeric: true, total: true, format: (value) => numberValue(value, 3) });
+  const columns = [{ key: "entryType", label: "eType" }, { key: "category", label: "Category" }, { key: "entryNo", label: "eNo" }, { key: "issueNo", label: "issueNo" }, { key: "entryDate", label: "eDate" }, { key: "itemName", label: "iName" }, qty, weight("gross", "Gross"), weight("stone", "Stone"), weight("net", "Net"), weight("rate", "Rate"), weight("amount", "Amount"), weight("issueWeight", "IssueWeight"), weight("mudLess", "MuddLess"), weight("receivedWeight", "ReceivedWeight"), weight("bottleStock", "BottleStock"), weight("testPieceWeight", "TestPieceWeight"), weight("reissueWeight", "ReissueWeight")];
+  return { columns, rows, gridClass: "refiner-report-grid", totals: salesTotalsForColumns(rows, columns) };
+}
+
+function itemTransferReportToolbar() {
+  const tools = [["SHOW", "sales-report-show"], ["PRINT", "print-now"], ["DIRECT PRINT", "print-now"], ["EXCEL", "export-report"], ["SAVE AS", "export-report"], ["DATE", "sales-report-date"], ["FIRST", "noop"], ["PREV", "noop"], ["NEXT", "noop"], ["LAST", "noop"], ["VIEW/HIDE", "noop"], ["ZOOM IN", "noop"], ["DEFAULT", "noop"], ["ZOOM OUT", "noop"], ["CLOSE", "item-transfer-report-close"]];
+  return `<div class="classic-report-toolbar sales-report-toolbar item-transfer-report-toolbar"><div class="classic-tool-buttons">${tools.map(([label, action]) => `<button class="classic-tool" data-action="${action}"><strong>${toolbarGlyph(label)}</strong><span>${label}</span></button>`).join("")}</div><div class="item-transfer-format-options"><label><input type="radio" name="item-transfer-format" value="1" data-item-transfer-format ${salesReportOptions.itemTransferFormat !== "2" ? "checked" : ""} /> Format 1</label><label><input type="radio" name="item-transfer-format" value="2" data-item-transfer-format ${salesReportOptions.itemTransferFormat === "2" ? "checked" : ""} /> Format 2</label></div>${salesReportOptions.dateOpen ? salesDatePopup() : ""}</div>`;
+}
+
+function itemTransferReportConfig() {
+  const rows = (state.itemTransfers || []).filter((record) => isDateWithinPeriod(record.date, salesReportOptions.from, salesReportOptions.to)).flatMap((record) => (record.lines || []).map((source) => {
+    const line = normalizeItemTransferLine(source);
+    return { entryNo: record.entryNo, date: displaySalesDate(record.date), refNo: record.refNo || record.remark || "", itemId: line.itemId, itemName: line.itemName, mode: line.mode, qty: line.qty, gross: line.gross, stone: line.stone, net: line.net, barcode: line.barcode, smCode: record.smCode || staffCodeForName(record.salesman) || "", sourceBillId: record.id, sourceEntryNo: record.entryNo, sourceSection: "item-transfer", drillTarget: "item-transfer", drillStorage: "itemTransfers", drillView: "Item Transfer" };
+  }));
+  const qty = { key: "qty", label: "Qty", numeric: true, total: true, format: (value) => numberValue(value, 0) };
+  const weight = (key, label) => ({ key, label, numeric: true, total: true, format: (value) => numberValue(value, 3) });
+  const columns = [{ key: "entryNo", label: "Entry_No" }, { key: "date", label: "Date" }, { key: "refNo", label: "Ref_No" }, { key: "itemId", label: "ITEM_ID" }, { key: "itemName", label: "Item_Name" }, { key: "mode", label: "Mode" }, qty, weight("gross", "Gross"), weight("stone", "Stone"), weight("net", "Net"), { key: "barcode", label: "Barcode" }, { key: "smCode", label: "SMCode" }];
+  return { columns, rows, gridClass: "item-transfer-format-one-grid", totals: salesTotalsForColumns(rows, columns) };
+}
+
+function itemTransferFormatTwoConfig() {
+  const records = (state.itemTransfers || []).filter((record) => isDateWithinPeriod(record.date, salesReportOptions.from, salesReportOptions.to));
+  const rows = records.flatMap((record) => {
+    const outgoing = (record.lines || []).map(normalizeItemTransferLine).filter((line) => line.mode === "OUT");
+    const incoming = (record.lines || []).map(normalizeItemTransferLine).filter((line) => line.mode === "IN");
+    return Array.from({ length: Math.max(outgoing.length, incoming.length, 1) }, (_, index) => {
+      const out = outgoing[index], incomingLine = incoming[index];
+      return { entryNo: index === 0 ? record.entryNo : "", date: index === 0 ? displaySalesDate(record.date) : "", outItem: out?.itemName || "", outMode: out?.mode || "", outQty: Number(out?.qty || 0), outGross: Number(out?.gross || 0), outStone: Number(out?.stone || 0), outNet: Number(out?.net || 0), inItem: incomingLine?.itemName || "", inMode: incomingLine?.mode || "", inQty: Number(incomingLine?.qty || 0), inGross: Number(incomingLine?.gross || 0), inStone: Number(incomingLine?.stone || 0), inNet: Number(incomingLine?.net || 0), sourceBillId: record.id, sourceEntryNo: record.entryNo, sourceSection: "item-transfer", drillTarget: "item-transfer", drillStorage: "itemTransfers", drillView: "Item Transfer" };
+    });
+  });
+  const qty = (key, label) => ({ key, label, numeric: true, total: true, format: (value) => numberValue(value, 0) });
+  const weight = (key, label) => ({ key, label, numeric: true, total: true, format: (value) => numberValue(value, 3) });
+  const columns = [{ key: "entryNo", label: "Entry_No" }, { key: "date", label: "Date" }, { key: "outItem", label: "Out_Item" }, { key: "outMode", label: "Out_Mode" }, qty("outQty", "Out_Qty"), weight("outGross", "Out_Gross"), weight("outStone", "Out_Stone"), weight("outNet", "Out_Net"), { key: "inItem", label: "In_Item" }, { key: "inMode", label: "In_Mode" }, qty("inQty", "In_Qty"), weight("inGross", "In_Gross"), weight("inStone", "In_Stone"), weight("inNet", "In_Net")];
+  return { columns, rows, gridClass: "item-transfer-format-two-grid", totals: salesTotalsForColumns(rows, columns) };
 }
 
 function isSalesReport(name) {
@@ -14957,6 +16653,147 @@ function exportDiamondSalesReportCsv() {
   downloadCsv(`diamond-sales-${salesReportOptions.diamondSalesMode}.csv`, [["MT GOLD LAND"], [`Diamond Sales ${salesReportOptions.diamondSalesMode}`], [`From ${displaySalesDate(salesReportOptions.from)} To ${displaySalesDate(salesReportOptions.to)}`], [], headers, ...data, totals]);
 }
 
+function exportStockAdjustmentReportCsv() {
+  const config = stockAdjustmentReportConfig();
+  const headers = config.columns.map((column) => column.label);
+  const data = config.rows.map((row) => config.columns.map((column) => column.format ? column.format(row[column.key], row) : row[column.key] ?? ""));
+  const totals = config.columns.map((column) => column.total ? (column.format ? column.format(config.totals[column.key], config.totals) : config.totals[column.key]) : "");
+  downloadCsv("stock-adjustment-report.csv", [["MT GOLD LAND"], [`Stock Adjustment Report from ${displaySalesDate(salesReportOptions.from)} To ${displaySalesDate(salesReportOptions.to)}`], [], headers, ...data, totals]);
+}
+
+function exportSmithTransferReportCsv() {
+  const config = smithTransferReportConfig();
+  const headers = config.columns.map((column) => column.label);
+  const data = config.rows.map((row) => config.columns.map((column) => column.format ? column.format(row[column.key], row) : row[column.key] ?? ""));
+  const totals = config.columns.map((column) => column.total ? (column.format ? column.format(config.totals[column.key], config.totals) : config.totals[column.key]) : "");
+  downloadCsv("smith-transfer-report.csv", [["MT GOLD LAND"], [`Smith Transfer Report from ${displaySalesDate(salesReportOptions.from)} To ${displaySalesDate(salesReportOptions.to)}`], [salesReportOptions.smithTransferParty || "All Smiths"], [], headers, ...data, totals]);
+}
+
+function exportJewellerTransferReportCsv() {
+  const config = jewellerTransferReportConfig(), headers = config.columns.map((column) => column.label);
+  const data = config.rows.map((row) => config.columns.map((column) => column.format ? column.format(row[column.key], row) : row[column.key] ?? ""));
+  const totals = config.columns.map((column) => column.total ? column.format(config.totals[column.key], config.totals) : "");
+  downloadCsv(`jeweller-transfer-${salesReportOptions.jewellerTransferFilter.toLowerCase().replaceAll(" ", "-")}.csv`, [["MT GOLD LAND"], [`Jeweller Transfer Report - ${salesReportOptions.jewellerTransferFilter}`], [`From ${displaySalesDate(salesReportOptions.from)} To ${displaySalesDate(salesReportOptions.to)}`], [], headers, ...data, totals]);
+}
+
+function exportSmithWeightLedgerCsv() {
+  const ledger = smithWeightLedgerEntries();
+  const rows = ledger.rows.map((row, index) => [index + 1, row.date, row.voucherNo, row.particular, numberValue(row.toSmith, 3), numberValue(row.fromSmith, 3), numberValue(row.balance, 3), row.direction]);
+  downloadCsv(`smith-weight-ledger-${selectedSmithLedgerParty.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.csv`, [["MT GOLD LAND"], [`${selectedSmithLedgerParty} - Weight Ledger Report`], [`From ${displaySalesDate(smithLedgerOptions.from)} To ${displaySalesDate(smithLedgerOptions.to)}`], [], ["SL", "Date", "Vou.No", "Particular", "To Smith", "From Smith", "Balance", "Out/In"], ...rows, ["", "", "", "Total Weight", numberValue(ledger.totalToSmith, 3), numberValue(ledger.totalFromSmith, 3), "", ""], ["", "", "", "Balance Weight", "", numberValue(Math.abs(ledger.closing), 3), "", ledger.closing >= 0 ? "IN" : "OUT"]]);
+}
+
+function exportJewellerWeightLedgerCsv() {
+  const ledger = jewellerWeightLedgerEntries();
+  const rows = ledger.rows.map((row, index) => [index + 1, row.date, row.voucherNo, row.particular, numberValue(row.toJeweller, 3), numberValue(row.fromJeweller, 3), numberValue(row.balance, 3), row.direction]);
+  downloadCsv(`jeweller-weight-ledger-${selectedJewellerLedgerParty.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.csv`, [["MT GOLD LAND"], [`${selectedJewellerLedgerParty} - Weight Ledger Report`], [`From ${displaySalesDate(jewellerLedgerOptions.from)} To ${displaySalesDate(jewellerLedgerOptions.to)}`], [], ["SL", "Date", "Vou.No", "Particular", "To Jeweller", "From Jeweller", "Balance", "Out/In"], ...rows, ["", "", "", "Total Weight", numberValue(ledger.totalToJeweller, 3), numberValue(ledger.totalFromJeweller, 3), "", ""], ["", "", "", "Balance Weight", "", numberValue(Math.abs(ledger.closing), 3), "", ledger.closing >= 0 ? "IN" : "OUT"]]);
+}
+
+function exportJewellerDetailedLedgerCsv() {
+  const config = jewellerDetailedLedgerConfig();
+  const keys = ["sl", "entryNo", "entryDate", "itemId", "itemName", "mode", "nos", "grossWeight", "stoneWeight", "touch", "wastage", "netWeight", "stoneCharge", "mcPerGram", "makeCharge", "jewellerWeight", "pureWeight", "rowTotal", "transType", "remarks"];
+  const headers = ["Sl", "EntryNo", "EntryDate", "ItemID", "ItemName", "Mode", "Nos", "GrossWght", "StoneWght", "Touch", "Wastage", "NetWeight", "StnCharge", "MCperGrm", "MakeCharge", "JewellerWght", "PureWeight", "RowTotal", "transType", "Remarks"];
+  downloadCsv(`jeweller-ledger-detailed-${selectedJewellerDetailedLedgerParty.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.csv`, [["MT GOLD LAND"], [`${selectedJewellerDetailedLedgerParty} - Jeweller Ledger Detailed`], [`From ${displaySalesDate(jewellerDetailedLedgerOptions.from)} To ${displaySalesDate(jewellerDetailedLedgerOptions.to)}`], [], headers, ...config.rows.map((row) => keys.map((key) => row[key]))]);
+}
+
+function exportSmithDetailedLedgerCsv() {
+  const config = smithDetailedLedgerConfig();
+  const keys = ["sl", "entryNo", "entryDate", "itemId", "itemName", "mode", "nos", "grossWeight", "stoneWeight", "touch", "wastage", "netWeight", "stoneCharge", "mcPerGram", "makeCharge", "jewellerWeight", "pureWeight", "rowTotal", "transType", "remarks"];
+  const headers = ["Sl", "EntryNo", "EntryDate", "ItemID", "ItemName", "Mode", "Nos", "GrossWght", "StoneWght", "Touch", "Wastage", "NetWeight", "StnCharge", "MCperGrm", "MakeCharge", "JewellerWght", "PureWeight", "RowTotal", "transType", "Remarks"];
+  downloadCsv(`smith-ledger-detailed-${selectedSmithDetailedLedgerParty.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.csv`, [["MT GOLD LAND"], [`${selectedSmithDetailedLedgerParty} - Smith Ledger Detailed`], [`From ${displaySalesDate(smithDetailedLedgerOptions.from)} To ${displaySalesDate(smithDetailedLedgerOptions.to)}`], [], headers, ...config.rows.map((row) => keys.map((key) => row[key]))]);
+}
+
+function exportSmithReconciliationCsv() {
+  const option = salesReportOptions.smithReconciliationOption;
+  const [columns, rows,, totals] = smithReconciliationTableArgs(option);
+  const headers = columns.map((column) => column.label);
+  const data = rows.map((row) => columns.map((column) => column.format ? column.format(row[column.key], row) : row[column.key] ?? ""));
+  const totalRow = columns.map((column) => column.total ? (column.format ? column.format(totals[column.key], totals) : totals[column.key]) : "");
+  downloadCsv(`smith-reconciliation-${option.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.csv`, [["MT GOLD LAND"], [`Smith Reconciliation - ${option}`], [`From ${displaySalesDate(salesReportOptions.from)} To ${displaySalesDate(salesReportOptions.to)}`], [], headers, ...data, totalRow]);
+}
+
+function exportJewellerReconciliationCsv() {
+  const option = salesReportOptions.jewellerReconciliationOption;
+  const [columns, rows,, totals] = jewellerReconciliationTableArgs(option);
+  const headers = columns.map((column) => column.label);
+  const data = rows.map((row) => columns.map((column) => column.format ? column.format(row[column.key], row) : row[column.key] ?? ""));
+  const totalRow = columns.map((column) => column.total ? (column.format ? column.format(totals[column.key], totals) : totals[column.key]) : "");
+  downloadCsv(`jeweller-reconciliation-${option.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.csv`, [["MT GOLD LAND"], [`Jeweller Reconciliation - ${option}`], [`From ${displaySalesDate(salesReportOptions.from)} To ${displaySalesDate(salesReportOptions.to)}`], [], headers, ...data, totalRow]);
+}
+
+function exportItemTransferReportCsv() {
+  const format = salesReportOptions.itemTransferFormat === "2" ? "2" : "1";
+  const config = format === "2" ? itemTransferFormatTwoConfig() : itemTransferReportConfig(), headers = config.columns.map((column) => column.label);
+  const data = config.rows.map((row) => config.columns.map((column) => column.format ? column.format(row[column.key], row) : row[column.key] ?? ""));
+  const totals = config.columns.map((column) => column.total ? column.format(config.totals[column.key], config.totals) : "");
+  downloadCsv(`item-transfer-format-${format}.csv`, [["MT GOLD LAND"], [`Item Transfer Report Format ${format} from ${displaySalesDate(salesReportOptions.from)} To ${displaySalesDate(salesReportOptions.to)}`], [], headers, ...data, totals]);
+}
+
+function exportSalesOrderReportCsv() {
+  const config = salesOrderReportConfig(), headers = config.columns.map((column) => column.label);
+  const data = config.rows.map((row) => config.columns.map((column) => column.format ? column.format(row[column.key], row) : row[column.key] ?? ""));
+  const totals = config.columns.map((column) => column.total ? column.format(config.totals[column.key], config.totals) : "");
+  downloadCsv(`sales-order-${salesReportOptions.salesOrderStatus.toLowerCase()}-${salesReportOptions.salesOrderFormat.toLowerCase().replaceAll(" ", "-")}.csv`, [["MT GOLD LAND"], [`Sales Order ${salesReportOptions.salesOrderFormat} - ${salesReportOptions.salesOrderStatus}`], [`From ${displaySalesDate(salesReportOptions.from)} To ${displaySalesDate(salesReportOptions.to)}`], [], headers, ...data, totals]);
+}
+
+function exportAdditionalOrderAdvanceReportCsv() {
+  const config = additionalOrderAdvanceReportConfig(), headers = config.columns.map((column) => column.label);
+  const data = config.rows.map((row) => config.columns.map((column) => column.format ? column.format(row[column.key], row) : row[column.key] ?? ""));
+  const totals = config.columns.map((column) => column.total ? column.format(config.totals[column.key], config.totals) : "");
+  downloadCsv("additional-order-advance.csv", [["MT GOLD LAND"], [`Additional Order Advance Report From ${displaySalesDate(salesReportOptions.from)} To ${displaySalesDate(salesReportOptions.to)}`], [], headers, ...data, totals]);
+}
+
+function exportOrderAdvanceRefundReportCsv() {
+  const config = orderAdvanceRefundReportConfig(), headers = config.columns.map((column) => column.label);
+  const data = config.rows.map((row) => config.columns.map((column) => column.format ? column.format(row[column.key], row) : row[column.key] ?? ""));
+  const totals = config.columns.map((column) => column.total ? column.format(config.totals[column.key], config.totals) : "");
+  downloadCsv("order-advance-refund.csv", [["MT GOLD LAND"], [`Order Advance Refund Report From ${displaySalesDate(salesReportOptions.from)} To ${displaySalesDate(salesReportOptions.to)}`], [], headers, ...data, totals]);
+}
+
+function exportGoldDepositLedgerCsv() {
+  const report = goldDepositWeightLedgerData(), party = report.party || {};
+  downloadCsv("gold-deposit-weight-ledger.csv", [["MT GOLD LAND"], ["Deposit Weight Ledger"], [`${party.id || ""}/${party.name || ""} From ${displaySalesDate(goldDepositLedgerOptions.from)} To ${displaySalesDate(goldDepositLedgerOptions.to)}`], [], ["Slno", "EntryNo", "Date", "Remarks", "Deposit", "WithDraw", "Balance"], ...report.rows.map((row) => [row.slNo, row.entryNo, row.date, row.remarks, row.deposit, row.withdraw, row.balance])]);
+}
+
+function exportGoldDepositSummaryCsv() {
+  const report = goldDepositSummaryReportData();
+  downloadCsv("gold-deposit-summary.csv", [["MT GOLD LAND"], ["Deposit Summary"], [`From ${displaySalesDate(goldDepositLedgerOptions.from)} To ${displaySalesDate(goldDepositLedgerOptions.to)}`], [], ["AccID", "PartyName", "Net"], ...report.rows.map((row) => [row.accountId, row.partyName, numberValue(row.net, 3)]), ["", "Total", numberValue(report.totalNet, 3)]]);
+}
+
+function exportGoldDepositTransactionsCsv() {
+  const config = goldDepositTransactionsReportConfig(), headers = config.columns.map((column) => column.label);
+  const data = config.rows.map((row) => config.columns.map((column) => column.format ? column.format(row[column.key], row) : row[column.key] ?? ""));
+  const totals = config.columns.map((column) => column.total ? column.format(config.totals[column.key], config.totals) : "");
+  downloadCsv(`gold-deposit-transactions-${goldDepositTransactionFilter.toLowerCase()}.csv`, [["MT GOLD LAND"], [`Gold Deposit Transactions - ${goldDepositTransactionFilter}`], [`From ${displaySalesDate(goldDepositLedgerOptions.from)} To ${displaySalesDate(goldDepositLedgerOptions.to)}`], [], headers, ...data, totals]);
+}
+
+function exportOrderDueReportCsv() {
+  const config = orderDueReportConfig(), headers = config.columns.map((column) => column.label);
+  const data = config.rows.map((row) => config.columns.map((column) => column.format ? column.format(row[column.key], row) : row[column.key] ?? ""));
+  const totals = config.columns.map((column) => column.total ? column.format(config.totals[column.key], config.totals) : "");
+  downloadCsv("order-due.csv", [["MT GOLD LAND"], [`Order Due - ${displaySalesDate(orderDueOptions.date)}`], [], headers, ...data, totals]);
+}
+
+function exportCollectionDueReportCsv() {
+  const config = collectionDueReportConfig(), headers = config.columns.map((column) => column.label);
+  const data = config.rows.map((row) => config.columns.map((column) => column.format ? column.format(row[column.key], row) : row[column.key] ?? ""));
+  const totals = config.columns.map((column) => column.total ? column.format(config.totals[column.key], config.totals) : "");
+  downloadCsv("collection-due.csv", [["MT GOLD LAND"], [`Collection Due as of ${displaySalesDate(collectionDueOptions.date)}`], [], headers, ...data, totals]);
+}
+
+function exportPaymentDueReportCsv() {
+  const config = paymentDueReportConfig(), headers = config.columns.map((column) => column.label);
+  const data = config.rows.map((row) => config.columns.map((column) => column.format ? column.format(row[column.key], row) : row[column.key] ?? ""));
+  const totals = config.columns.map((column) => column.total ? column.format(config.totals[column.key], config.totals) : "");
+  downloadCsv("payment-due.csv", [["MT GOLD LAND"], [`Payment Due as of ${displaySalesDate(paymentDueOptions.date)}`], [], headers, ...data, totals]);
+}
+
+function exportRefinerReportCsv() {
+  const config = refinerReportConfig(), headers = config.columns.map((column) => column.label);
+  const data = config.rows.map((row) => config.columns.map((column) => column.format ? column.format(row[column.key], row) : row[column.key] ?? ""));
+  const totals = config.columns.map((column) => column.total ? column.format(config.totals[column.key], config.totals) : "");
+  downloadCsv("refinery-report.csv", [["MT GOLD LAND"], [`Refinery Report from ${displaySalesDate(salesReportOptions.from)} To ${displaySalesDate(salesReportOptions.to)}`], [], headers, ...data, totals]);
+}
+
 function toolbarGlyph(label) {
   const glyphs = {
     SHOW: "▦",
@@ -18184,6 +20021,8 @@ function selectReport(name) {
   if (selectedReport === "Direct Gold Purchase Return") salesReportOptions = { ...salesReportOptions, shown: true, directGoldPurchaseReturnReportOption: salesReportOptions.directGoldPurchaseReturnReportOption || "Purchase Return Register" };
   if (selectedReport === "Diamond Purchase") salesReportOptions = { ...salesReportOptions, shown: true, diamondPurchaseReportOption: salesReportOptions.diamondPurchaseReportOption || "Purchase Register" };
   if (selectedReport === "Diamond Sales") salesReportOptions = { ...salesReportOptions, shown: true, diamondSalesMode: salesReportOptions.diamondSalesMode || "detailed" };
+  if (selectedReport === "Stock Adjustment") salesReportOptions = { ...salesReportOptions, shown: true };
+  if (selectedReport === "Smith Transfer") salesReportOptions = { ...salesReportOptions, shown: true };
   recentReportItems = [selectedReport, ...recentReportItems.filter((item) => item !== selectedReport)].slice(0, 5);
 }
 
@@ -18204,6 +20043,95 @@ function openReportBillDetail(row) {
   });
   if (!bill) {
     toast("Detailed bill not found for this report row.");
+    return;
+  }
+  if (target === "stock-adjustment") {
+    active = "Stock";
+    expandedNavGroups.add("Stock");
+    stockView = "Stock Adjustments";
+    stockAdjustmentDraft = normalizeStockAdjustment(bill);
+    render();
+    toast(`Opened Stock Adjustment ${bill.entryNo || bill.id}.`);
+    return;
+  }
+  if (target === "smith-transfer") {
+    active = "Work Orders";
+    expandedNavGroups.add("Work Orders");
+    workOrderView = "Smith";
+    smithWorkView = "Smith";
+    smithWorkDraft = normalizeSmithWorkOrder(bill);
+    render();
+    toast(`Opened Smith Transfer ${bill.entryNo || bill.id}.`);
+    return;
+  }
+  if (target === "jeweller-transfer") {
+    active = "Work Orders";
+    expandedNavGroups.add("Work Orders");
+    workOrderView = "Jeweller";
+    jewellerWorkDraft = normalizeJewellerWorkOrder(bill);
+    render();
+    toast(`Opened Jeweller Transfer ${bill.entryNo || bill.id}.`);
+    return;
+  }
+  if (target === "item-transfer") {
+    active = "Stock";
+    expandedNavGroups.add("Stock");
+    stockView = "Item Transfer";
+    itemTransferDraft = normalizeItemTransfer(bill);
+    render();
+    toast(`Opened Item Transfer ${bill.entryNo || bill.id}.`);
+    return;
+  }
+  if (target === "sales-order") {
+    state.salesOrders = [bill, ...(state.salesOrders || []).filter((item) => item !== bill)];
+    active = "Sales";
+    expandedNavGroups.add("Sales");
+    salesView = "Sales Order";
+    render();
+    toast(`Opened Order Entry ${bill.entryNo || bill.id}.`);
+    return;
+  }
+  if (target === "order-advance") {
+    state.orderAdvances = [bill, ...(state.orderAdvances || []).filter((item) => item !== bill)];
+    orderAdvanceDraft = { ...normalizeOrderAdvanceRecord(bill, "advance"), pickOrder: bill.orderEntryNo || bill.orderRefNo || "" };
+    active = "Sales";
+    expandedNavGroups.add("Sales");
+    salesView = "Additional Order Advance";
+    render();
+    toast(`Opened Additional Order Advance ${bill.entryNo || bill.id}.`);
+    return;
+  }
+  if (target === "order-advance-refund") {
+    state.orderAdvanceRefunds = [bill, ...(state.orderAdvanceRefunds || []).filter((item) => item !== bill)];
+    orderAdvanceRefundDraft = { ...normalizeOrderAdvanceRecord(bill, "refund"), pickOrder: bill.orderEntryNo || bill.orderRefNo || "" };
+    active = "Sales";
+    expandedNavGroups.add("Sales");
+    salesView = "Order Advance Refund";
+    render();
+    toast(`Opened Order Advance Refund ${bill.entryNo || bill.id}.`);
+    return;
+  }
+  if (target === "gold-deposit-entry") {
+    active = "Stock";
+    expandedNavGroups.add("Stock");
+    if (storage === "goldWithdrawals") { stockView = "Gold Withdrawal"; goldWithdrawalDraft = normalizeGoldDeposit(bill, "Withdrawal"); }
+    else { stockView = "Gold Deposit"; goldDepositDraft = normalizeGoldDeposit(bill, "Deposit"); }
+    render();
+    toast(`Opened ${view} ${bill.entryNo || bill.id}.`);
+    return;
+  }
+  if (target === "refinery") {
+    active = "Work Orders";
+    expandedNavGroups.add("Work Orders");
+    workOrderView = "Refining";
+    refineryView = view;
+    if (storage === "refineryIssues") refineryIssueDraft = normalizeRefineryIssue(bill);
+    if (storage === "refineryReturns") refineryReturnDraft = normalizeRefineryReturn(bill);
+    if (storage === "refineryFinalReturns") refineryFinalDraft = normalizeRefineryFinalReturn(bill);
+    if (storage === "meltingIssues") meltingIssueDraft = normalizeMeltingIssue(bill);
+    if (storage === "meltingReturns") meltingReturnDraft = normalizeMeltingReturn(bill);
+    render();
+    toast(`Opened ${view} ${bill.entryNo || bill.id}.`);
     return;
   }
   if (storage === "bills") state.bills = [bill, ...(state.bills || []).filter((item) => item !== bill)];
@@ -18438,6 +20366,82 @@ function bindEvents() {
     salesReportOptions = { ...salesReportOptions, diamondSalesMode: event.currentTarget.value, shown: true };
     render();
   }));
+  document.querySelector("[data-smith-transfer-party]")?.addEventListener("change", (event) => {
+    salesReportOptions = { ...salesReportOptions, smithTransferParty: event.currentTarget.value, shown: true };
+    render();
+  });
+  document.querySelectorAll("[data-smith-ledger-option]").forEach((input) => input.addEventListener("change", (event) => {
+    smithLedgerOptions = { ...smithLedgerOptions, [event.currentTarget.dataset.smithLedgerOption]: event.currentTarget.value };
+    render();
+  }));
+  document.querySelector("[data-smith-ledger-search]")?.addEventListener("input", (event) => {
+    smithLedgerOptions = { ...smithLedgerOptions, search: event.currentTarget.value };
+    renderAndFocus("[data-smith-ledger-search]");
+  });
+  document.querySelectorAll("[data-smith-ledger-party]").forEach((row) => {
+    row.addEventListener("click", () => { selectedSmithLedgerParty = row.dataset.smithLedgerParty; render(); });
+    row.addEventListener("dblclick", () => { selectedSmithLedgerParty = row.dataset.smithLedgerParty; smithLedgerOptions = { ...smithLedgerOptions, detailed: true }; render(); });
+  });
+  document.querySelectorAll("[data-jeweller-ledger-option]").forEach((input) => input.addEventListener("change", (event) => {
+    jewellerLedgerOptions = { ...jewellerLedgerOptions, [event.currentTarget.dataset.jewellerLedgerOption]: event.currentTarget.value };
+    render();
+  }));
+  document.querySelector("[data-jeweller-ledger-search]")?.addEventListener("input", (event) => {
+    jewellerLedgerOptions = { ...jewellerLedgerOptions, search: event.currentTarget.value };
+    renderAndFocus("[data-jeweller-ledger-search]");
+  });
+  document.querySelectorAll("[data-jeweller-ledger-party]").forEach((row) => {
+    row.addEventListener("click", () => { selectedJewellerLedgerParty = row.dataset.jewellerLedgerParty; render(); });
+    row.addEventListener("dblclick", () => { selectedJewellerLedgerParty = row.dataset.jewellerLedgerParty; jewellerLedgerOptions = { ...jewellerLedgerOptions, detailed: true }; render(); });
+  });
+  document.querySelectorAll("[data-jeweller-detailed-option]").forEach((input) => input.addEventListener("change", (event) => {
+    jewellerDetailedLedgerOptions = { ...jewellerDetailedLedgerOptions, [event.currentTarget.dataset.jewellerDetailedOption]: event.currentTarget.value };
+    render();
+  }));
+  document.querySelector("[data-jeweller-detailed-search]")?.addEventListener("input", (event) => {
+    jewellerDetailedLedgerOptions = { ...jewellerDetailedLedgerOptions, search: event.currentTarget.value };
+    renderAndFocus("[data-jeweller-detailed-search]");
+  });
+  document.querySelectorAll("[data-jeweller-detailed-party]").forEach((row) => {
+    row.addEventListener("click", () => { selectedJewellerDetailedLedgerParty = row.dataset.jewellerDetailedParty; render(); });
+    row.addEventListener("dblclick", () => { selectedJewellerDetailedLedgerParty = row.dataset.jewellerDetailedParty; jewellerDetailedLedgerOptions = { ...jewellerDetailedLedgerOptions, detailed: true }; render(); });
+  });
+  document.querySelectorAll("[data-smith-detailed-option]").forEach((input) => input.addEventListener("change", (event) => {
+    smithDetailedLedgerOptions = { ...smithDetailedLedgerOptions, [event.currentTarget.dataset.smithDetailedOption]: event.currentTarget.value };
+    render();
+  }));
+  document.querySelector("[data-smith-detailed-search]")?.addEventListener("input", (event) => {
+    smithDetailedLedgerOptions = { ...smithDetailedLedgerOptions, search: event.currentTarget.value };
+    renderAndFocus("[data-smith-detailed-search]");
+  });
+  document.querySelectorAll("[data-smith-detailed-party]").forEach((row) => {
+    row.addEventListener("click", () => { selectedSmithDetailedLedgerParty = row.dataset.smithDetailedParty; render(); });
+    row.addEventListener("dblclick", () => { selectedSmithDetailedLedgerParty = row.dataset.smithDetailedParty; smithDetailedLedgerOptions = { ...smithDetailedLedgerOptions, detailed: true }; render(); });
+  });
+  document.querySelector("[data-smith-reconciliation-option]")?.addEventListener("change", (event) => {
+    salesReportOptions = { ...salesReportOptions, smithReconciliationOption: event.currentTarget.value, shown: true };
+    render();
+  });
+  document.querySelector("[data-jeweller-reconciliation-option]")?.addEventListener("change", (event) => {
+    salesReportOptions = { ...salesReportOptions, jewellerReconciliationOption: event.currentTarget.value, shown: true };
+    render();
+  });
+  document.querySelector("[data-jeweller-transfer-filter]")?.addEventListener("change", (event) => {
+    salesReportOptions = { ...salesReportOptions, jewellerTransferFilter: event.currentTarget.value, shown: true };
+    render();
+  });
+  document.querySelectorAll("[data-item-transfer-format]").forEach((input) => input.addEventListener("change", (event) => {
+    salesReportOptions = { ...salesReportOptions, itemTransferFormat: event.currentTarget.value, shown: true };
+    render();
+  }));
+  document.querySelector("[data-sales-order-status]")?.addEventListener("change", (event) => {
+    salesReportOptions = { ...salesReportOptions, salesOrderStatus: event.currentTarget.value, shown: true };
+    render();
+  });
+  document.querySelector("[data-sales-order-format]")?.addEventListener("change", (event) => {
+    salesReportOptions = { ...salesReportOptions, salesOrderFormat: event.currentTarget.value, shown: true };
+    render();
+  });
 
   document.querySelectorAll("[data-sales-profit-option]").forEach((input) => {
     input.addEventListener("change", () => {
@@ -18595,6 +20599,75 @@ function bindEvents() {
     });
   });
 
+  document.querySelectorAll("[data-scheme-section]").forEach((button) => {
+    button.addEventListener("click", () => {
+      active = "Schemes";
+      expandedNavGroups.add("Schemes");
+      schemeView = button.dataset.schemeSection;
+      renderScreen();
+    });
+  });
+  document.querySelectorAll("[data-scheme-ledger-filter]").forEach((field) => field.addEventListener(field.tagName === "INPUT" && field.dataset.schemeLedgerFilter === "accountHead" ? "input" : "change", (event) => { schemeLedgerOptions[event.currentTarget.dataset.schemeLedgerFilter] = event.currentTarget.value; render(); }));
+  document.querySelectorAll("[data-scheme-ledger-member]").forEach((row) => row.addEventListener("dblclick", () => { selectedSchemeLedgerMemberId = row.dataset.schemeLedgerMember; render(); }));
+
+  document.querySelectorAll("[data-scheme-master-id]").forEach((button) => {
+    button.addEventListener("click", () => {
+      selectedSchemeMasterId = button.dataset.schemeMasterId;
+      render();
+    });
+  });
+
+  document.querySelector("[data-scheme-master-search]")?.addEventListener("input", (event) => {
+    schemeMasterSearch = event.currentTarget.value;
+    renderAndFocus("[data-scheme-master-search]");
+  });
+
+  document.querySelectorAll("[data-scheme-member-id]").forEach((button) => {
+    button.addEventListener("click", () => { selectedSchemeMemberId = button.dataset.schemeMemberId; render(); });
+  });
+  document.querySelector("[data-scheme-member-search]")?.addEventListener("input", (event) => {
+    schemeMemberSearch = event.currentTarget.value; renderAndFocus("[data-scheme-member-search]");
+  });
+  document.querySelector("[data-member-scheme]")?.addEventListener("change", (event) => {
+    if (selectedSchemeMemberId) return;
+    const book = event.currentTarget.form?.elements?.book;
+    if (book) book.value = nextSchemeBookNo(event.currentTarget.value);
+  });
+  document.querySelectorAll("[data-remove-scheme-line]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const member = (state.schemes || []).find((item) => item.memberId === selectedSchemeMemberId); if (!member) return;
+      member.schemeLines.splice(Number(button.dataset.removeSchemeLine), 1); saveState(); render(); toast("Scheme enrollment removed.");
+    });
+  });
+
+  document.querySelector("[data-scheme-cash-bank]")?.addEventListener("change", () => { schemeCollectionDraft = captureSchemeCollectionHeader(); render(); });
+  document.querySelector('[data-scheme-collection-form] input[name="autoVoucher"]')?.addEventListener("change", () => { schemeCollectionDraft = captureSchemeCollectionHeader(); render(); });
+  document.querySelector('[data-scheme-collection-form] input[name="headId"]')?.addEventListener("input", (event) => {
+    const form = event.currentTarget.form, value = event.currentTarget.value.trim().toUpperCase();
+    const member = (state.schemes || []).find((item) => item.memberId.toUpperCase() === value || item.book.toUpperCase() === value); if (!member) return;
+    form.elements.headId.value = member.memberId; form.elements.book.value = member.book; form.elements.memberName.value = member.member;
+    form.elements.schemeId.value = (state.schemeMasters || []).find((item) => item.schemeName.toLowerCase() === String(member.scheme).toLowerCase())?.schemeId || (String(member.scheme).toUpperCase().includes("DIAMOND") ? "DMT" : "MT");
+  });
+  document.querySelector("[data-scheme-collection-import]")?.addEventListener("change", async (event) => {
+    const file = event.currentTarget.files?.[0]; if (!file) return; const text = await file.text(); const record = captureSchemeCollectionHeader();
+    for (const row of text.split(/\r?\n/).slice(1)) { const [headId, amount, remark = ""] = row.split(",").map((value) => value.replace(/^"|"$/g, "").trim()); const member = (state.schemes || []).find((item) => item.memberId === headId), rate = Number(record.goldRate || 0); if (member && Number(amount) > 0) record.lines.push(normalizeSchemeCollectionLine({ headId, book: member.book, accountHead: member.member, schemeId: String(member.scheme).toUpperCase().includes("DIAMOND") ? "DMT" : "MT", amount, goldRate: rate, weight: rate > 0 ? Number(amount) / rate : 0, remark, voucherNo: record.voucherNo, opAmount: member.investedAmount ?? member.opAmount, opWeight: member.accumulatedWeight ?? member.opWeight, closingBalance: Number(member.investedAmount ?? member.balance ?? 0) + Number(amount) })); }
+    schemeCollectionDraft = record; render(); toast("Scheme collection file imported.");
+  });
+  document.querySelector("[data-scheme-close-cash-bank]")?.addEventListener("change", () => { schemeClosureDraft = captureSchemeClosureHeader(); render(); });
+  document.querySelector('[data-scheme-close-form] input[name="headId"]')?.addEventListener("input", (event) => {
+    const form = event.currentTarget.form, value = event.currentTarget.value.trim().toUpperCase(), member = (state.schemes || []).find((item) => item.memberId.toUpperCase() === value || item.book.toUpperCase() === value); if (!member) return;
+    form.elements.headId.value = member.memberId; form.elements.book.value = member.book; form.elements.memberName.value = member.member; form.elements.schemeId.value = (state.schemeMasters || []).find((item) => item.schemeName.toLowerCase() === String(member.scheme).toLowerCase())?.schemeId || (String(member.scheme).toUpperCase().includes("DIAMOND") ? "DMT" : "MT"); form.elements.amount.value = numericValue(member.investedAmount ?? member.balance ?? member.collection ?? 0); form.elements.weight.value = numericValue(member.accumulatedWeight ?? member.opWeight ?? 0, 3); form.elements.averageGoldRate.value = numericValue(member.averageRate || 0, 3);
+  });
+  document.querySelector("[data-scheme-report-view]")?.addEventListener("change", (event) => { schemeCollectionReportView = event.currentTarget.value; schemeReportOptions.page = 0; if (schemeCollectionReportView === "Collection Paid/Unpaid") { schemeReportOptions.from = "2025-12-01"; schemeReportOptions.to = "2026-08-06"; } render(); });
+  document.querySelector("[data-scheme-report-scheme]")?.addEventListener("change", (event) => { schemeReportOptions.scheme = event.currentTarget.value; schemeReportOptions.page = 0; render(); });
+  document.querySelector("[data-scheme-report-agent]")?.addEventListener("change", (event) => { schemeReportOptions.agent = event.currentTarget.value; schemeReportOptions.page = 0; render(); });
+  document.querySelector("[data-scheme-report-paid]")?.addEventListener("change", (event) => { schemeReportOptions.paidStatus = event.currentTarget.value; schemeReportOptions.page = 0; render(); });
+  document.querySelector("[data-scheme-report-search]")?.addEventListener("input", (event) => { const query = event.currentTarget.value.toLowerCase(); document.querySelectorAll("[data-scheme-report-member], [data-scheme-collection-report-id], [data-scheme-agent-member], [data-scheme-paid-member]").forEach((row) => row.hidden = !row.textContent.toLowerCase().includes(query)); });
+  document.querySelectorAll("[data-scheme-report-member]").forEach((row) => row.addEventListener("dblclick", () => { selectedSchemeMemberId = row.dataset.schemeReportMember; schemeView = "Scheme Members"; renderScreen(); }));
+  document.querySelectorAll("[data-scheme-collection-report-id]").forEach((row) => row.addEventListener("dblclick", () => { const voucher = (state.schemeCollections || []).find((item) => item.id === row.dataset.schemeCollectionReportId); if (!voucher) return; schemeCollectionDraft = normalizeSchemeCollection(voucher); schemeView = "Scheme Collection"; renderScreen(); }));
+  document.querySelectorAll("[data-scheme-agent-member]").forEach((row) => row.addEventListener("dblclick", () => { selectedSchemeMemberId = row.dataset.schemeAgentMember; schemeView = "Scheme Members"; renderScreen(); }));
+  document.querySelectorAll("[data-scheme-paid-member]").forEach((row) => row.addEventListener("dblclick", () => { selectedSchemeMemberId = row.dataset.schemePaidMember; schemeView = "Scheme Members"; renderScreen(); }));
+
   document.querySelectorAll("[data-item-category]").forEach((button) => {
     button.addEventListener("click", () => {
       active = "Management";
@@ -18707,6 +20780,32 @@ function bindEvents() {
   document.querySelectorAll(".sales-report-grid tbody tr[data-report-bill-id], .sales-report-grid tbody tr[data-report-entry-no], .sales-report-grid tbody tr[data-report-bill-no]").forEach((row) => {
     row.addEventListener("dblclick", () => openReportBillDetail(row));
   });
+  document.querySelectorAll("[data-gold-ledger-party]").forEach((row) => {
+    row.addEventListener("click", () => {
+      goldDepositLedgerPickerSelection = row.dataset.goldLedgerParty || "";
+      document.querySelectorAll("[data-gold-ledger-party]").forEach((item) => item.classList.toggle("selected", item === row));
+    });
+    row.addEventListener("dblclick", () => {
+      selectedGoldDepositLedgerParty = row.dataset.goldLedgerParty || "";
+      render();
+    });
+  });
+  document.querySelectorAll("[data-gold-ledger-field]").forEach((field) => field.addEventListener(field.tagName === "SELECT" ? "change" : "input", () => {
+    const key = field.dataset.goldLedgerField;
+    goldDepositLedgerOptions = { ...goldDepositLedgerOptions, [key]: key === "from" || key === "to" ? formatDisplayDate(field.value) : field.value };
+    if (key === "search") renderAndFocus('[data-gold-ledger-field="search"]');
+  }));
+  document.querySelector("[data-gold-transaction-filter]")?.addEventListener("change", (event) => {
+    goldDepositTransactionFilter = event.target.value;
+    render();
+  });
+  document.querySelector("[data-order-due-date]")?.addEventListener("input", (event) => { orderDueOptions = { ...orderDueOptions, date: formatDisplayDate(event.target.value) }; });
+  document.querySelector("[data-order-due-startup]")?.addEventListener("change", (event) => { orderDueOptions = { ...orderDueOptions, showAtStartup: event.target.checked }; });
+  document.querySelector("[data-collection-due-date]")?.addEventListener("input", (event) => { collectionDueOptions = { ...collectionDueOptions, date: formatDisplayDate(event.target.value) }; });
+  document.querySelector("[data-collection-due-startup]")?.addEventListener("change", (event) => { collectionDueOptions = { ...collectionDueOptions, showAtStartup: event.target.checked }; });
+  document.querySelector("[data-collection-due-zero]")?.addEventListener("change", (event) => { collectionDueOptions = { ...collectionDueOptions, withZero: event.target.checked }; render(); });
+  document.querySelector("[data-payment-due-date]")?.addEventListener("input", (event) => { paymentDueOptions = { ...paymentDueOptions, date: formatDisplayDate(event.target.value) }; });
+  document.querySelector("[data-payment-due-startup]")?.addEventListener("change", (event) => { paymentDueOptions = { ...paymentDueOptions, showAtStartup: event.target.checked }; });
 
   document.querySelectorAll(".inline-master-form").forEach((form) => {
     form.addEventListener("submit", formHandlers[form.dataset.form]);
@@ -18752,12 +20851,19 @@ function bindEvents() {
   setupDirectEntryScreen();
   setupExpenseEntryScreen();
 
-  document.addEventListener("keydown", (event) => {
+  document.onkeydown = (event) => {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
       event.preventDefault();
       document.getElementById("search")?.focus();
     }
-  }, { once: true });
+    if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "s") {
+      event.preventDefault();
+      active = "Schemes";
+      schemeView = "Scheme Collection";
+      expandedNavGroups.add("Schemes");
+      renderScreen();
+    }
+  };
 }
 
 function setupBillwiseScreens() {
@@ -23179,6 +25285,55 @@ function handleAction(action, source) {
     const { key, id } = parseMiscAction(action.replace("delete-misc-", ""));
     deleteMiscRecord(key, id);
   }
+  if (action === "new-scheme-master") { selectedSchemeMasterId = ""; render(); return; }
+  if (action === "update-scheme-master") { saveSchemeMaster(); return; }
+  if (action === "refresh-scheme-master") { selectedSchemeMasterId = (state.schemeMasters || [])[0]?.schemeId || ""; schemeMasterSearch = ""; render(); return; }
+  if (action === "delete-scheme-master") { deleteSchemeMaster(); return; }
+  if (action === "close-scheme-master") { active = "Dashboard"; expandedNavGroups.delete("Schemes"); renderScreen(); return; }
+  if (action === "new-scheme-member") { selectedSchemeMemberId = ""; render(); return; }
+  if (action === "save-scheme-member") { saveSchemeMember(); return; }
+  if (action === "add-scheme-member-line") { saveSchemeMember(true); return; }
+  if (action === "refresh-scheme-members") { selectedSchemeMemberId = (state.schemes || [])[0]?.memberId || ""; schemeMemberSearch = ""; render(); return; }
+  if (action === "delete-scheme-member") { deleteSchemeMember(); return; }
+  if (action === "close-scheme-members") { active = "Dashboard"; expandedNavGroups.delete("Schemes"); renderScreen(); return; }
+  if (action === "export-scheme-members") { exportSchemeMembers(); return; }
+  if (action === "add-scheme-collection-line") { addSchemeCollectionLine(); return; }
+  if (action === "remove-scheme-collection-line") { const record = captureSchemeCollectionHeader(); record.lines.splice(Number(source.dataset.index), 1); schemeCollectionDraft = record; render(); return; }
+  if (action === "save-scheme-collection") { saveSchemeCollection(false); return; }
+  if (action === "save-separate-scheme-voucher") { saveSchemeCollection(true); return; }
+  if (action === "refresh-scheme-collection") { schemeCollectionDraft = defaultSchemeCollection(); render(); return; }
+  if (action === "edit-scheme-collection") { openSchemeCollectionPicker(); return; }
+  if (action === "delete-scheme-collection") { deleteSchemeCollection(); return; }
+  if (action === "print-scheme-collection") { window.print(); return; }
+  if (action === "import-scheme-collection") { document.querySelector("[data-scheme-collection-import]")?.click(); return; }
+  if (action === "device-scheme-collection") { toast("Collection device is ready."); return; }
+  if (action === "close-scheme-collection") { active = "Dashboard"; expandedNavGroups.delete("Schemes"); renderScreen(); return; }
+  if (action === "add-scheme-close-line") { addSchemeClosureLine(); return; }
+  if (action === "remove-scheme-close-line") { const record = captureSchemeClosureHeader(); record.lines.splice(Number(source.dataset.index), 1); schemeClosureDraft = record; render(); return; }
+  if (action === "save-scheme-close") { saveSchemeClosure(); return; }
+  if (action === "refresh-scheme-close") { schemeClosureDraft = defaultSchemeClosure(); render(); return; }
+  if (action === "edit-scheme-close") { openSchemeClosurePicker(); return; }
+  if (action === "delete-scheme-close") { deleteSchemeClosure(); return; }
+  if (action === "print-scheme-close") { window.print(); return; }
+  if (action === "close-scheme-close") { active = "Dashboard"; expandedNavGroups.delete("Schemes"); renderScreen(); return; }
+  if (action === "show-scheme-report") { schemeReportOptions.page = 0; render(); return; }
+  if (action === "print-scheme-report") { window.print(); return; }
+  if (action === "excel-scheme-report" || action === "save-scheme-report") { if (schemeCollectionReportView === "Scheme Collection Report") exportSchemeTransactionReport(); else if (schemeCollectionReportView === "New Schemes By Agent-By Date") exportNewSchemesByAgentReport(); else if (schemeCollectionReportView === "Collection Paid/Unpaid") exportCollectionPaidUnpaidReport(); else exportSchemeMemberReport(); return; }
+  if (action === "date-scheme-report") { schemeReportOptions.dateOpen = !schemeReportOptions.dateOpen; render(); return; }
+  if (action === "apply-scheme-report-date") { schemeReportOptions.from = document.querySelector('[data-scheme-report-date="from"]')?.value || schemeReportOptions.from; schemeReportOptions.to = document.querySelector('[data-scheme-report-date="to"]')?.value || schemeReportOptions.to; schemeReportOptions.dateOpen = false; schemeReportOptions.page = 0; render(); return; }
+  if (action === "first-scheme-report") { schemeReportOptions.page = 0; render(); return; }
+  if (action === "prev-scheme-report") { schemeReportOptions.page = Math.max(0, schemeReportOptions.page - 1); render(); return; }
+  if (action === "next-scheme-report") { const pages = Math.max(1, Math.ceil(activeSchemeReportRowCount() / schemeReportOptions.pageSize)); schemeReportOptions.page = Math.min(pages - 1, schemeReportOptions.page + 1); render(); return; }
+  if (action === "last-scheme-report") { schemeReportOptions.page = Math.max(0, Math.ceil(activeSchemeReportRowCount() / schemeReportOptions.pageSize) - 1); render(); return; }
+  if (action === "toggle-scheme-report") { document.querySelector(".scheme-report-paper")?.classList.toggle("hide-header"); return; }
+  if (action === "zoom-in-scheme-report") { schemeReportOptions.zoom = Math.min(1.5, schemeReportOptions.zoom + 0.1); render(); return; }
+  if (action === "default-zoom-scheme-report") { schemeReportOptions.zoom = 1; render(); return; }
+  if (action === "zoom-out-scheme-report") { schemeReportOptions.zoom = Math.max(0.7, schemeReportOptions.zoom - 0.1); render(); return; }
+  if (action === "close-scheme-report") { active = "Dashboard"; expandedNavGroups.delete("Schemes"); renderScreen(); return; }
+  if (action === "back-scheme-ledger") { selectedSchemeLedgerMemberId = ""; render(); return; }
+  if (action === "scheme-ledger-today") { const today = new Date().toISOString().slice(0, 10); schemeLedgerOptions.from = today; schemeLedgerOptions.to = today; render(); return; }
+  if (action === "scheme-ledger-term") { schemeLedgerOptions.from = "2023-01-01"; schemeLedgerOptions.to = new Date().toISOString().slice(0, 10); render(); return; }
+  if (action === "close-scheme-ledger") { active = "Dashboard"; expandedNavGroups.delete("Schemes"); renderScreen(); return; }
   if (action === "open-scheme") openSchemeModal();
   if (action.startsWith("open-billwise-")) openBillwiseAction(action.replace("open-billwise-", ""));
   if (action === "open-transaction-complimentary-purchase") {
@@ -23685,6 +25840,17 @@ function handleAction(action, source) {
     openExistingRecordPicker("sales-only");
     return;
   }
+  if (action === "finish-sales-order") {
+    const order = salesOrderBill();
+    order.status = "Finished";
+    order.finished = true;
+    order.closedDate = new Date().toLocaleDateString("en-GB");
+    state.audit.unshift(audit(`Finished Sales Order ${order.entryNo || order.id}`));
+    saveState();
+    render();
+    toast(`Sales Order ${order.entryNo || order.id} marked Finished.`);
+    return;
+  }
   if (["void-bill", "repost-bill", "previous-bill", "next-bill", "billing-settings", "billing-notes", "refresh", "close-billing"].includes(action)) {
     toast("Billing action ready for detailed workflow.");
   }
@@ -23743,6 +25909,110 @@ function handleAction(action, source) {
       toast(`Diamond Sales ${salesReportOptions.diamondSalesMode} report exported for Excel.`);
       return;
     }
+    if (selectedReport === "Stock Adjustment") {
+      exportStockAdjustmentReportCsv();
+      toast("Stock Adjustment report exported for Excel.");
+      state.audit.unshift(audit("Exported Stock Adjustment report"));
+      saveState();
+      return;
+    }
+    if (selectedReport === "Smith Transfer") {
+      exportSmithTransferReportCsv();
+      toast("Smith Transfer report exported for Excel.");
+      state.audit.unshift(audit("Exported Smith Transfer report"));
+      saveState();
+      return;
+    }
+    if (selectedReport === "Jeweller Transfer") {
+      exportJewellerTransferReportCsv();
+      toast(`Jeweller Transfer ${salesReportOptions.jewellerTransferFilter} exported for Excel.`);
+      return;
+    }
+    if (selectedReport === "Smith Ledger" && smithLedgerOptions.detailed && selectedSmithLedgerParty) {
+      exportSmithWeightLedgerCsv();
+      toast("Smith Weight Ledger exported for Excel.");
+      return;
+    }
+    if (selectedReport === "Ledger" && jewellerLedgerOptions.detailed && selectedJewellerLedgerParty) {
+      exportJewellerWeightLedgerCsv();
+      toast("Jeweller Weight Ledger exported for Excel.");
+      return;
+    }
+    if (selectedReport === "Ledger Detailed" && jewellerDetailedLedgerOptions.detailed && selectedJewellerDetailedLedgerParty) {
+      exportJewellerDetailedLedgerCsv();
+      toast("Detailed Jeweller Ledger exported for Excel.");
+      return;
+    }
+    if (selectedReport === "Smith Ledger Detailed" && smithDetailedLedgerOptions.detailed && selectedSmithDetailedLedgerParty) {
+      exportSmithDetailedLedgerCsv();
+      toast("Detailed Smith Ledger exported for Excel.");
+      return;
+    }
+    if (selectedReport === "Smith Reconciliation") {
+      exportSmithReconciliationCsv();
+      toast(`Smith Reconciliation ${salesReportOptions.smithReconciliationOption} exported for Excel.`);
+      return;
+    }
+    if (selectedReport === "Reconciliation") {
+      exportJewellerReconciliationCsv();
+      toast(`Jeweller Reconciliation ${salesReportOptions.jewellerReconciliationOption} exported for Excel.`);
+      return;
+    }
+    if (selectedReport === "Item Transfer Report") {
+      exportItemTransferReportCsv();
+      toast(`Item Transfer Format ${salesReportOptions.itemTransferFormat} exported for Excel.`);
+      return;
+    }
+    if (selectedReport === "Sales Order Report") {
+      exportSalesOrderReportCsv();
+      toast(`Sales Order ${salesReportOptions.salesOrderFormat} exported for Excel.`);
+      return;
+    }
+    if (selectedReport === "Additional Order Advance Report") {
+      exportAdditionalOrderAdvanceReportCsv();
+      toast("Additional Order Advance report exported for Excel.");
+      return;
+    }
+    if (selectedReport === "Order Advance Refund Report") {
+      exportOrderAdvanceRefundReportCsv();
+      toast("Order Advance Refund report exported for Excel.");
+      return;
+    }
+    if (selectedReport === "Gold Deposit Ledger") {
+      exportGoldDepositLedgerCsv();
+      toast("Deposit Weight Ledger exported for Excel.");
+      return;
+    }
+    if (selectedReport === "Gold Deposit Summary") {
+      exportGoldDepositSummaryCsv();
+      toast("Gold Deposit Summary exported for Excel.");
+      return;
+    }
+    if (selectedReport === "Gold Deposit Transactions") {
+      exportGoldDepositTransactionsCsv();
+      toast(`Gold Deposit Transactions ${goldDepositTransactionFilter} exported for Excel.`);
+      return;
+    }
+    if (selectedReport === "Order Due") {
+      exportOrderDueReportCsv();
+      toast("Order Due report exported for Excel.");
+      return;
+    }
+    if (selectedReport === "Collection Due") {
+      exportCollectionDueReportCsv();
+      toast("Collection Due report exported for Excel.");
+      return;
+    }
+    if (selectedReport === "Payment Due") {
+      exportPaymentDueReportCsv();
+      toast("Payment Due report exported for Excel.");
+      return;
+    }
+    if (selectedReport === "Refiner Transfer") {
+      exportRefinerReportCsv();
+      toast("Refinery report exported for Excel.");
+      return;
+    }
     if (selectedReport === "Reconciliation Crosstab") {
       exportReconciliationCrosstabCsv();
       toast("Reconciliation Crosstab exported for Excel.");
@@ -23756,6 +26026,76 @@ function handleAction(action, source) {
   }
   if (action === "sales-report-show") {
     salesReportOptions = { ...salesReportOptions, shown: true, dateOpen: false, from: normalizeSalesDateInput(salesReportOptions.from), to: normalizeSalesDateInput(salesReportOptions.to) };
+    render();
+  }
+  if (action === "gold-ledger-today") {
+    goldDepositLedgerOptions = { ...goldDepositLedgerOptions, from: "06/08/2026", to: "06/08/2026" };
+    render();
+  }
+  if (action === "gold-ledger-term") {
+    goldDepositLedgerOptions = { ...goldDepositLedgerOptions, from: "01/04/2026", to: "31/03/2027" };
+    render();
+  }
+  if (action === "gold-ledger-open") {
+    const party = goldDepositLedgerPickerSelection || goldDepositLedgerParties()[0]?.id || goldDepositLedgerParties()[0]?.name || "";
+    if (!party) toast("Select an account to open its Deposit Weight Ledger.");
+    else { selectedGoldDepositLedgerParty = party; render(); }
+  }
+  if (action === "gold-ledger-date") {
+    selectedGoldDepositLedgerParty = "";
+    render();
+  }
+  if (action === "gold-ledger-close") {
+    selectedGoldDepositLedgerParty = "";
+    selectedReport = "";
+    render();
+  }
+  if (action === "gold-summary-date") {
+    goldDepositLedgerOptions = { ...goldDepositLedgerOptions, dateOpen: !goldDepositLedgerOptions.dateOpen };
+    render();
+  }
+  if (action === "gold-summary-date-set") {
+    goldDepositLedgerOptions = { ...goldDepositLedgerOptions, dateOpen: false };
+    render();
+  }
+  if (action === "gold-summary-close") {
+    selectedReport = "";
+    render();
+  }
+  if (action === "order-due-date") {
+    orderDueOptions = { ...orderDueOptions, dateOpen: !orderDueOptions.dateOpen };
+    render();
+  }
+  if (action === "order-due-date-set") {
+    orderDueOptions = { ...orderDueOptions, dateOpen: false };
+    render();
+  }
+  if (action === "order-due-close") {
+    selectedReport = "";
+    render();
+  }
+  if (action === "collection-due-date") {
+    collectionDueOptions = { ...collectionDueOptions, dateOpen: !collectionDueOptions.dateOpen };
+    render();
+  }
+  if (action === "collection-due-date-set") {
+    collectionDueOptions = { ...collectionDueOptions, dateOpen: false };
+    render();
+  }
+  if (action === "collection-due-close") {
+    selectedReport = "";
+    render();
+  }
+  if (action === "payment-due-date") {
+    paymentDueOptions = { ...paymentDueOptions, dateOpen: !paymentDueOptions.dateOpen };
+    render();
+  }
+  if (action === "payment-due-date-set") {
+    paymentDueOptions = { ...paymentDueOptions, dateOpen: false };
+    render();
+  }
+  if (action === "payment-due-close") {
+    selectedReport = "";
     render();
   }
   if (action === "sales-report-date") {
@@ -23801,11 +26141,120 @@ function handleAction(action, source) {
     render();
   }
   if (action === "diamond-purchase-report-close") {
-    selectedReport = "Diamond";
+    selectedReport = "Diamond Purchase";
     render();
   }
   if (action === "diamond-sales-report-close") {
-    selectedReport = "Diamond";
+    selectedReport = "Diamond Purchase";
+    render();
+  }
+  if (action === "stock-adjustment-report-close") {
+    selectedReport = "Stock Adjustment";
+    render();
+  }
+  if (action === "smith-transfer-report-close") {
+    selectedReport = "Transfers";
+    render();
+  }
+  if (action === "open-smith-weight-ledger") {
+    if (!selectedSmithLedgerParty) return toast("Select a Smith account first.");
+    smithLedgerOptions = { ...smithLedgerOptions, detailed: true };
+    render();
+  }
+  if (action === "smith-ledger-back") {
+    smithLedgerOptions = { ...smithLedgerOptions, detailed: false };
+    render();
+  }
+  if (action === "smith-ledger-today") {
+    const today = new Date().toISOString().slice(0, 10);
+    smithLedgerOptions = { ...smithLedgerOptions, from: today, to: today };
+    render();
+  }
+  if (action === "smith-ledger-term") {
+    smithLedgerOptions = { ...smithLedgerOptions, from: "2025-04-01", to: new Date().toISOString().slice(0, 10) };
+    render();
+  }
+  if (action === "open-jeweller-weight-ledger") {
+    if (!selectedJewellerLedgerParty) return toast("Select a Jeweller account first.");
+    jewellerLedgerOptions = { ...jewellerLedgerOptions, detailed: true };
+    render();
+  }
+  if (action === "jeweller-ledger-back") {
+    jewellerLedgerOptions = { ...jewellerLedgerOptions, detailed: false };
+    render();
+  }
+  if (action === "jeweller-ledger-today") {
+    const today = new Date().toISOString().slice(0, 10);
+    jewellerLedgerOptions = { ...jewellerLedgerOptions, from: today, to: today };
+    render();
+  }
+  if (action === "jeweller-ledger-term") {
+    jewellerLedgerOptions = { ...jewellerLedgerOptions, from: "2025-04-01", to: new Date().toISOString().slice(0, 10) };
+    render();
+  }
+  if (action === "open-jeweller-detailed-ledger") {
+    if (!selectedJewellerDetailedLedgerParty) return toast("Select a Jeweller account first.");
+    jewellerDetailedLedgerOptions = { ...jewellerDetailedLedgerOptions, detailed: true };
+    render();
+  }
+  if (action === "jeweller-detailed-back") {
+    jewellerDetailedLedgerOptions = { ...jewellerDetailedLedgerOptions, detailed: false };
+    render();
+  }
+  if (action === "jeweller-detailed-today") {
+    const today = new Date().toISOString().slice(0, 10);
+    jewellerDetailedLedgerOptions = { ...jewellerDetailedLedgerOptions, from: today, to: today };
+    render();
+  }
+  if (action === "jeweller-detailed-term") {
+    jewellerDetailedLedgerOptions = { ...jewellerDetailedLedgerOptions, from: "2025-04-01", to: new Date().toISOString().slice(0, 10) };
+    render();
+  }
+  if (action === "open-smith-detailed-ledger") {
+    if (!selectedSmithDetailedLedgerParty) return toast("Select a Smith account first.");
+    smithDetailedLedgerOptions = { ...smithDetailedLedgerOptions, detailed: true };
+    render();
+  }
+  if (action === "smith-detailed-back") {
+    smithDetailedLedgerOptions = { ...smithDetailedLedgerOptions, detailed: false };
+    render();
+  }
+  if (action === "smith-detailed-today") {
+    const today = new Date().toISOString().slice(0, 10);
+    smithDetailedLedgerOptions = { ...smithDetailedLedgerOptions, from: today, to: today };
+    render();
+  }
+  if (action === "smith-detailed-term") {
+    smithDetailedLedgerOptions = { ...smithDetailedLedgerOptions, from: "2025-04-01", to: new Date().toISOString().slice(0, 10) };
+    render();
+  }
+  if (action === "smith-reconciliation-close") {
+    selectedReport = "Transfers";
+    render();
+  }
+  if (action === "jeweller-reconciliation-close") {
+    selectedReport = "Transfers";
+    render();
+  }
+  if (action === "jeweller-transfer-report-close") {
+    selectedReport = "Transfers";
+    render();
+  }
+  if (action === "item-transfer-report-close") {
+    selectedReport = "Transfers";
+    render();
+  }
+  if (action === "sales-order-report-close") {
+    selectedReport = "";
+    active = "Reports";
+    render();
+  }
+  if (action === "refiner-report-close") {
+    selectedReport = "Transfers";
+    render();
+  }
+  if (action === "close-item-transfer-detail") {
+    stockView = "Stock Register";
     render();
   }
   if (["profit-first", "profit-prev", "profit-next", "profit-last"].includes(action)) {
