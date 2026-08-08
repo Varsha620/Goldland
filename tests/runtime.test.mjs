@@ -1525,4 +1525,276 @@ assert(appElement.innerHTML.includes("Refinery Report for the period"), "Refiner
 assert(appElement.innerHTML.includes("refiner-report-grid"), "Refinery report grid did not render");
 assert(appElement.innerHTML.includes('data-report-target="refinery"'), "Refinery report rows are not drillable");
 
+const dayEndMenu = vm.runInContext(`selectedReport = "Day End Day Summary"; dayEndReportNavigation("sidebar")`, context);
+assert(dayEndMenu.includes("Day Summary") && dayEndMenu.includes("Day Book"), "Day End Report is missing Day Summary or Day Book");
+for (const removed of ["Day Close Print", "Weight & Cash Summary", "Day Book - 2024"]) assert(!dayEndMenu.includes(removed), `Day End Report still contains ${removed}`);
+
+const dayBookCheck = vm.runInContext(`
+  const savedAccounts = state.accounts;
+  state.accounts = [
+    { id: "DAY-DR", date: "02/04/2026", vouNo: "DR-1", ledger: "Sales", particular: "Sales / BANGLE", debit: 1250, credit: 0, drWeight: 2.5, crWeight: 0, costCenter: "cost1" },
+    { id: "DAY-CR", date: "02/04/2026", vouNo: "CR-1", ledger: "Cash in Hand", particular: "Cash sale", debit: 0, credit: 1250, drWeight: 0, crWeight: 2.5, costCenter: "cost1" },
+    { id: "DAY-OTHER", date: "03/04/2026", vouNo: "DR-2", ledger: "Sales", particular: "Other branch", debit: 99, credit: 0, costCenter: "Other" }
+  ];
+  dayEndBookOptions = { from: "01/04/2026", to: "30/04/2026", costCenter: "cost1", cashAccount: "Cash in Hand", ready: false };
+  const dialog = dayEndBookDialog();
+  const data = dayEndBookData();
+  dayEndBookOptions.ready = true;
+  const report = dayEndBookReport();
+  state.accounts = savedAccounts;
+  ({ dialog, data, report });
+`, context);
+for (const label of ["Date From", "Date To", "Cost Center", "Cash Account", "Fin", "Today", "OK", "Close"]) assert(dayBookCheck.dialog.includes(label), `Day Book dialog is missing ${label}`);
+assert.equal(dayBookCheck.data.rows.length, 1, "Day Book should pair debit and credit postings into one display row");
+assert.equal(dayBookCheck.data.totalDebit, 1250, "Day Book debit total is incorrect");
+assert.equal(dayBookCheck.data.totalCredit, 1250, "Day Book credit total is incorrect");
+assert.equal(dayBookCheck.data.totalDrWeight, 2.5, "Day Book debit weight total is incorrect");
+assert.equal(dayBookCheck.data.totalCrWeight, 2.5, "Day Book credit weight total is incorrect");
+for (const column of ["Description", "Debit", "Dr-Weight", "Credit", "Cr-Weight"]) assert(dayBookCheck.report.includes(column), `Day Book printable report is missing ${column}`);
+assert(dayBookCheck.report.includes("Sales / BANGLE") && dayBookCheck.report.includes("Cash sale"), "Day Book printable report is missing transaction descriptions");
+assert(!dayBookCheck.report.includes("Other branch"), "Day Book cost-center filter included another branch");
+
+const daySummaryDialogCheck = vm.runInContext(`
+  dayEndSummaryOptions = { from: "07/08/2026", to: "07/08/2026", salesOnly: false, categories: ["Diamond", "Gold", "Other", "Pure Gold", "Silver"], ready: false };
+  dayEndSummaryDialog();
+`, context);
+for (const field of ["Sales Only", "Diamond", "Gold", "Other", "Pure Gold", "Silver"]) assert(daySummaryDialogCheck.includes(field), `Day Summary dialog is missing ${field}`);
+
+const taxHsnCheck = vm.runInContext(`
+  const savedBills = state.bills;
+  state.bills = [{ id: "TAX-1", type: "Sales", date: "10/04/2026", billNo: "CM100", customer: "Tax Customer", gstNo: "32ABCDE1234F1Z5", discount: 30, sections: { sales: [
+    { itemName: "SILVER RING", hsnCode: "71131120", gross: 10, stone: 0, net: 10, rate: 100, totalMc: 50, gstPercent: 3 },
+    { itemName: "DIAMOND RING", hsnCode: "7113", gross: 2, stone: 0, net: 2, rate: 500, diamondAmount: 400, totalMc: 100, gstPercent: 3 }
+  ] } }];
+  salesReportOptions = { ...salesReportOptions, from: "01/04/2026", to: "30/04/2026", shown: true };
+  const summary = taxSalesHsnRows(false);
+  const category = taxSalesHsnRows(true);
+  taxReportType = "Sales With HSN Summary";
+  const summaryScreen = taxSalesHsnReportScreen();
+  taxReportType = "Sales With HSN Summary By Category";
+  const categoryScreen = taxSalesHsnReportScreen();
+  state.bills = savedBills;
+  ({ summary, category, summaryScreen, categoryScreen });
+`, context);
+assert.equal(taxHsnCheck.summary.length, 2, "HSN Summary should create one row per invoice and HSN code");
+assert.equal(taxHsnCheck.category.length, 2, "HSN category report should preserve separate item categories");
+assert(taxHsnCheck.category.some((row) => row.itemCategory === "Silver") && taxHsnCheck.category.some((row) => row.itemCategory === "Diamond"), "HSN category classification is incorrect");
+for (const row of taxHsnCheck.summary) {
+  assert.equal(Number((row.cgst + row.sgst + row.igst).toFixed(6)), Number(row.gst.toFixed(6)), "HSN GST split does not reconcile");
+  assert.equal(Number(row.total.toFixed(6)), Number((row.taxable + row.gst - row.discount).toFixed(6)), "HSN row total formula is incorrect");
+}
+for (const column of ["Slno", "Date", "Billno", "CustName", "GstNo", "hsnCode", "Gross", "Amount", "DmdAmt", "Making Charge", "Taxable", "GST", "CGST", "SGST", "IGST", "Discount", "Total"]) assert(taxHsnCheck.summaryScreen.includes(column), `HSN Summary is missing ${column}`);
+assert(taxHsnCheck.categoryScreen.includes("item_category"), "HSN Summary By Category is missing item_category");
+assert(taxHsnCheck.categoryScreen.includes("Sales With HSN Summary By Category"), "HSN Summary By Category screen did not render");
+
+const taxModesCheck = vm.runInContext(`
+  const saved = { bills: state.bills, smithWorkOrders: state.smithWorkOrders, directPurchases: state.directPurchases, diamondPurchases: state.diamondPurchases, dmdStonePurchases: state.dmdStonePurchases, directPurchaseReturns: state.directPurchaseReturns, diamondPurchaseReturns: state.diamondPurchaseReturns, dmdReturns: state.dmdReturns, exchanges: state.exchanges };
+  const taxFixtureSale = { id: "SALE-TAX", type: "Sales", date: "10/04/2028", entryNo: "S1", customer: "Customer", phone: "999", discount: 10, roundOff: 0.5, sections: { sales: [{ itemName: "GOLD RING", hsnCode: "7113", gross: 2, stone: 0, net: 2, rate: 100, makingCharge: 20, gstPercent: 3 }], exchange: [{ itemName: "OLD GOLD", gross: 1, stone: 0, net: 1, rate: 80 }], return: [{ itemName: "RING", gross: 0.5, stone: 0, net: 0.5, rate: 100, makingCharge: 5, gstPercent: 3 }] }, paymentBreakup: { bank: 25 } };
+  const taxFixturePurchase = { id: "PUR-TAX", type: "Purchase", date: "11/04/2028", entryNo: "P1", partyName: "Supplier", discount: 5, addition: 2, roundOff: 0.25, invoiceTotal: 100, lines: [{ gross: 1, stone: 0, net: 1, amount: 99 }] };
+  const taxFixturePurchaseReturn = { id: "PR-TAX", type: "Purchase Return", date: "12/04/2028", entryNo: "PR1", partyName: "Supplier", discount: 1, invoiceTotal: 50, lines: [{ gross: 0.5, stone: 0, net: 0.5, amount: 49 }] };
+  state.bills = [taxFixtureSale, taxFixturePurchase, taxFixturePurchaseReturn]; state.smithWorkOrders = [{ id: "SM-TAX", entryNo: "SM1", date: "13/04/2028", lines: [{ itemName: "CHAIN", hsnCode: "7113", gross: 2, stone: 0, netWeight: 2, cost: 200, taxPercent: 3 }] }];
+  state.directPurchases = []; state.diamondPurchases = []; state.dmdStonePurchases = []; state.directPurchaseReturns = []; state.diamondPurchaseReturns = []; state.dmdReturns = []; state.exchanges = [];
+  salesReportOptions = { ...salesReportOptions, from: "01/04/2028", to: "30/04/2028", shown: true };
+  const result = { smith: taxSmithReportRows(), purchaseSummary: taxPurchaseSummaryRows(), sales: taxSalesDetailRows(), salesReturn: taxSalesReturnRows(), purchase: taxPurchaseRows(), purchaseReturn: taxPurchaseReturnRows(), salesExchange: taxSalesExchangeRows(), exchange: taxExchangeReportRows(), invoiceWise: taxSalesInvoiceWiseRows(), screens: {} };
+  for (const type of ["Smith Report", "Purchase Summary", "Sales", "Sales Return", "Purchase", "Purchase Return", "Sales With Exchange", "Exchange Report", "Sales Invoice Wise"]) { taxReportType = type; result.screens[type] = taxSalesHsnReportScreen(); }
+  Object.assign(state, saved);
+  result;
+`, context);
+assert.equal(taxModesCheck.smith.length, 1, "Smith tax report did not load smith transactions");
+assert.equal(taxModesCheck.purchaseSummary.length, 1, "Purchase Summary should include purchase invoices and exclude purchase returns");
+assert.equal(taxModesCheck.sales[0].netAmount, taxModesCheck.sales[0].taxable + taxModesCheck.sales[0].taxAmount - taxModesCheck.sales[0].discount, "Sales tax NetAmount does not reconcile");
+assert.equal(taxModesCheck.salesReturn[0].total, taxModesCheck.salesReturn[0].taxableAmount + taxModesCheck.salesReturn[0].gst, "Sales Return total does not reconcile");
+assert.equal(Number((taxModesCheck.purchase[0].sgst + taxModesCheck.purchase[0].cgst).toFixed(6)), Number(taxModesCheck.purchase[0].taxAmount.toFixed(6)), "Purchase GST split does not reconcile");
+assert.equal(taxModesCheck.purchaseReturn.length, 1, "Purchase Return report included the wrong transaction set");
+assert.equal(taxModesCheck.exchange[0].amount, taxModesCheck.exchange[0].netWeight * taxModesCheck.exchange[0].rate, "Exchange Report amount formula is incorrect");
+assert.equal(taxModesCheck.invoiceWise[0].invoiceTotal, taxModesCheck.invoiceWise[0].taxableValue + taxModesCheck.invoiceWise[0].gst - taxModesCheck.invoiceWise[0].discount + taxModesCheck.invoiceWise[0].roundOff, "Sales Invoice Wise total does not reconcile");
+const requiredTaxColumns = {
+  "Smith Report": ["TDate", "Entryno", "hsncode", "NetWeight", "TaxAmount"], "Purchase Summary": ["TDate", "Entryno", "NetWeight", "Amount"], "Sales": ["brancheno", "item_Category", "SGST_PERC", "NetAmount"], "Sales Return": ["BillNo", "StoneCharge", "TaxableAmt", "Total"], "Purchase": ["EntryNo", "TotalWght", "RoundOff", "NetTotal"], "Purchase Return": ["EntryNo", "TaxAmount", "RoundOff", "NetTotal"], "Sales With Exchange": ["cust_Phone", "exchange", "TtlNetWght", "bankCardDetails"], "Exchange Report": ["branchENo", "itemDescription", "NetWeight", "Amount"], "Sales Invoice Wise": ["InvoiceDate", "BillType", "DMDCarat", "Taxable_Value", "Invoice_Total"]
+};
+for (const [type, columns] of Object.entries(requiredTaxColumns)) for (const column of columns) assert(taxModesCheck.screens[type].includes(column), `${type} is missing ${column}`);
+
+const billReceivableCheck = vm.runInContext(`(() => {
+  const saved = { bills: state.bills, billwiseCollections: state.billwiseCollections, active, salesView };
+  state.bills = [
+    { id: "REC-1", type: "Sales", entryNo: "CM100", billNo: "CM100", date: "01/04/2029", dueDate: "10/04/2029", customerId: "C1", customer: "Customer One", phone: "9001", address: "Main Road", place: "Edakkara", agentId: "A1", agentName: "Agent One", staffName: "Sales One", invoiceTotal: 1000, totals: { invoiceTotal: 1000 }, paymentBreakup: { cash: 200 }, line: { itemName: "RING", qty: 1, gross: 1, stone: 0, wastage: 0, net: 1, rate: 1000, va: 0, makingCharge: 0, tax: 0, amount: 1000 }, sections: { sales: [{ itemName: "RING", gross: 1, stone: 0, net: 1, rate: 1000, itemTotal: 1000 }] } },
+    { id: "REC-2", type: "Sales", entryNo: "CM101", billNo: "CM101", date: "02/04/2029", dueDate: "12/04/2029", customerId: "C1", customer: "Customer One", phone: "9001", address: "Main Road", place: "Edakkara", agentId: "A1", agentName: "Agent One", staffName: "Sales One", invoiceTotal: 500, totals: { invoiceTotal: 500 }, paymentBreakup: { cash: 100 }, line: { itemName: "CHAIN", qty: 1, gross: 0.5, stone: 0, wastage: 0, net: 0.5, rate: 1000, va: 0, makingCharge: 0, tax: 0, amount: 500 }, sections: { sales: [{ itemName: "CHAIN", gross: 0.5, stone: 0, net: 0.5, rate: 1000, itemTotal: 500 }] } }
+  ];
+  state.billwiseCollections = [];
+  salesReportOptions = { ...salesReportOptions, from: "01/04/2029", to: "30/04/2029", shown: true };
+  billReportFilters = { agent: "", salesman: "" };
+  const detail = customerReceivableReportConfig(), summary = agentWiseReceivableSummaryConfig(), agentWise = agentWiseReceivableConfig();
+  billReportType = "Customer Receivable"; const detailScreen = customerReceivableReportScreen();
+  billReportType = "AgentWise Customer Receivable Summary"; const summaryScreen = customerReceivableReportScreen();
+  billReportType = "Agent wise Customer Receivable"; const agentScreen = customerReceivableReportScreen();
+  openReportBillDetail({ dataset: { reportBillId: "REC-2", reportEntryNo: "CM101", reportBillNo: "CM101", reportSection: "sales", reportTarget: "sales", reportStorage: "bills", reportView: "Sales Invoice" } });
+  const drill = { active, salesView, opened: state.bills[0]?.id };
+  state.bills = saved.bills; state.billwiseCollections = saved.billwiseCollections; active = saved.active; salesView = saved.salesView;
+  return { detail, summary, agentWise, detailScreen, summaryScreen, agentScreen, drill };
+})()`, context);
+assert.equal(billReceivableCheck.detail.rows.length, 2, "Customer Receivable should show each outstanding sales invoice");
+assert.equal(billReceivableCheck.summary.rows.length, 1, "AgentWise Customer Receivable Summary should consolidate the same customer");
+assert.equal(billReceivableCheck.summary.rows[0].balance, billReceivableCheck.detail.rows.reduce((sum, row) => sum + row.balance, 0), "AgentWise receivable summary balance does not reconcile");
+assert.equal(billReceivableCheck.summary.rows[0].sourceBillId, "REC-2", "AgentWise summary should drill into the latest outstanding invoice");
+for (const column of ["AgentName", "SalesMen", "EntryNo", "EntryDate", "PartyID", "PartyName", "Phone", "InvoiceTotal", "TotalReceived", "Adjustments", "Balance", "DueDate", "DueDays"]) assert(billReceivableCheck.detailScreen.includes(column), `Customer Receivable is missing ${column}`);
+for (const column of ["AgentId", "AgentName", "PartyID", "PartyName", "Phone", "Address", "Place", "LastInvDue", "Balance", "LedgerBalance"]) assert(billReceivableCheck.summaryScreen.includes(column), `AgentWise Customer Receivable Summary is missing ${column}`);
+assert(billReceivableCheck.agentScreen.includes("AgentName") && billReceivableCheck.agentScreen.includes("EntryNo"), "Agent wise Customer Receivable did not render its invoice columns");
+assert(billReceivableCheck.detailScreen.includes('data-report-bill-id="REC-1"') && billReceivableCheck.summaryScreen.includes('data-report-bill-id="REC-2"'), "Receivable rows are not configured for double-click drill-down");
+assert.equal(billReceivableCheck.drill.active, "Sales", "Receivable double-click did not open Sales");
+assert.equal(billReceivableCheck.drill.salesView, "Sales Invoice", "Receivable double-click opened the wrong Sales screen");
+assert.equal(billReceivableCheck.drill.opened, "REC-2", "Receivable double-click opened the wrong Sales Entry");
+
+const orderBalanceCheck = vm.runInContext(`(() => {
+  const saved = { salesOrders: state.salesOrders, orderAdvances: state.orderAdvances, orderAdvanceRefunds: state.orderAdvanceRefunds, active, salesView };
+  const base = state.salesOrders[0];
+  const order = { ...base, id: "ORDER-BAL-1", entryNo: "2121", billNo: "2121", refNo: "2121", date: "05/04/2030", customerId: "C100", customer: "Order Customer", paymentBreakup: { ...base.paymentBreakup, cash: 300 }, adjustments: { ...base.adjustments, card: 50 }, sections: { ...base.sections, exchange: [{ ...(base.sections?.exchange?.[0] || base.sections?.sales?.[0]), itemName: "OLD GOLD", itemTotal: 100, amount: 100 }] } };
+  state.salesOrders = [order];
+  state.orderAdvances = [normalizeOrderAdvanceRecord({ id: "ADV-BAL", orderId: order.id, orderEntryNo: order.entryNo, advanceAmount: 200, totalAmount: 200, date: "06/04/2030" }, "advance")];
+  state.orderAdvanceRefunds = [normalizeOrderAdvanceRecord({ id: "REF-BAL", orderId: order.id, orderEntryNo: order.entryNo, refundAmount: 25, date: "07/04/2030" }, "refund")];
+  salesReportOptions = { ...salesReportOptions, from: "01/04/2030", to: "30/04/2030", shown: true };
+  const config = orderBalanceReportConfig(); billReportType = "Order Balance"; const screen = customerReceivableReportScreen();
+  openReportBillDetail({ dataset: { reportBillId: order.id, reportEntryNo: order.entryNo, reportBillNo: order.billNo, reportSection: "sales-order", reportTarget: "sales-order", reportStorage: "salesOrders", reportView: "Sales Order" } });
+  const drill = { active, salesView, opened: state.salesOrders[0]?.id };
+  state.salesOrders = saved.salesOrders; state.orderAdvances = saved.orderAdvances; state.orderAdvanceRefunds = saved.orderAdvanceRefunds; active = saved.active; salesView = saved.salesView;
+  return { config, screen, drill };
+})()`, context);
+assert.equal(orderBalanceCheck.config.rows.length, 1, "Order Balance did not load the sales order");
+const orderBalanceRow = orderBalanceCheck.config.rows[0];
+assert.equal(orderBalanceRow.balance, orderBalanceRow.exchangeAdvance + orderBalanceRow.cashAdvance - orderBalanceRow.cashRefund, "Order Balance formula is incorrect");
+for (const column of ["custID", "PartyName", "OrderNo", "eDate", "exchangeAdvance", "cashAdvance", "CashRefund", "Balance"]) assert(orderBalanceCheck.screen.includes(column), `Order Balance is missing ${column}`);
+assert(!orderBalanceCheck.screen.includes("Supplier Payable"), "Supplier Payable was not removed from Bills Reports");
+assert(orderBalanceCheck.screen.includes('data-report-target="sales-order"'), "Order Balance rows are not configured for Order Entry drill-down");
+assert.equal(orderBalanceCheck.drill.active, "Sales", "Order Balance double-click did not open Sales");
+assert.equal(orderBalanceCheck.drill.salesView, "Sales Order", "Order Balance double-click opened the wrong screen");
+assert.equal(orderBalanceCheck.drill.opened, "ORDER-BAL-1", "Order Balance double-click opened the wrong order");
+
+const complimentaryReportCheck = vm.runInContext(`(() => {
+  const saved = { purchases: state.complimentaryPurchases, issues: state.complimentaryIssues, stock: state.complimentaryStock, movementOptions: complimentaryMovementOptions, active, workOrderView, complimentaryView, purchaseDraft: complimentaryPurchaseDraft, issueDraft: complimentaryIssueDraft };
+  state.complimentaryPurchases = [normalizeComplimentaryPurchase({ id: "COMP-P", entryNo: "CP1", date: "01/04/2031", partyName: "Gift Supplier", preparedBy: "Staff", addition: 10, discount: 0, lines: [{ itemId: "GBX", itemName: "Gift Box", quantity: 10, foc: 2, price: 5, unit: "Nos" }] })];
+  state.complimentaryIssues = [
+    normalizeComplimentaryIssue({ id: "COMP-I", entryNo: "CI1", date: "02/04/2031", issueType: "Sales / Issue", invoiceNo: "CM1", preparedBy: "Staff", remarks: "Gift with customer purchase", lines: [{ itemId: "GBX", itemName: "Gift Box", quantity: 3, unit: "Nos" }] }),
+    normalizeComplimentaryIssue({ id: "COMP-N", entryNo: "CI2", date: "03/04/2031", issueType: "Promotion", invoiceNo: "", preparedBy: "Staff", lines: [{ itemId: "CBG", itemName: "Carry Bag", quantity: 1, unit: "Nos" }] })
+  ];
+  salesReportOptions = { ...salesReportOptions, from: "01/04/2031", to: "30/04/2031", shown: true };
+  complimentaryMovementOptions = { item: "Gift Box", from: "01/04/2031", to: "30/04/2031", ready: false };
+  const purchase = complimentaryPurchaseReportRows(), allIssues = complimentaryIssueReportRows(false), sales = complimentaryIssueReportRows(true), stock = complimentaryStockReportRows(), movement = complimentaryStockMovementRows(), movementDialog = complimentaryMovementDialog();
+  const screens = {};
+  for (const type of COMPLIMENTARY_REPORT_TYPES) { complimentaryReportType = type; screens[type] = complimentaryItemsReportScreen(); }
+  const giftBox = stock.find((row) => row.itemName === "Gift Box");
+  openReportBillDetail({ dataset: { reportBillId: "COMP-I", reportEntryNo: "CI1", reportTarget: "complimentary-issue", reportStorage: "complimentaryIssues", reportView: "Complimentary Item Issue" } });
+  const issueDrill = { active, workOrderView, complimentaryView, id: complimentaryIssueDraft?.id };
+  openReportBillDetail({ dataset: { reportBillId: "COMP-P", reportEntryNo: "CP1", reportTarget: "complimentary-purchase", reportStorage: "complimentaryPurchases", reportView: "Complimentary Item Purchase" } });
+  const purchaseDrill = { active, workOrderView, complimentaryView, id: complimentaryPurchaseDraft?.id };
+  state.complimentaryPurchases = saved.purchases; state.complimentaryIssues = saved.issues; state.complimentaryStock = saved.stock; complimentaryMovementOptions = saved.movementOptions; active = saved.active; workOrderView = saved.workOrderView; complimentaryView = saved.complimentaryView; complimentaryPurchaseDraft = saved.purchaseDraft; complimentaryIssueDraft = saved.issueDraft;
+  return { purchase, allIssues, sales, stock, movement, movementDialog, screens, giftBox, issueDrill, purchaseDrill };
+})()`, context);
+assert.equal(complimentaryReportCheck.purchase[0].itemTotal, 40, "Complimentary purchase must exclude free-of-cost units from its payable total");
+assert.equal(complimentaryReportCheck.purchase[0].itemCost, 5, "Complimentary gift stock cost allocation is incorrect");
+assert.equal(complimentaryReportCheck.allIssues.length, 2, "Item List should include every complimentary gift issue");
+assert.equal(complimentaryReportCheck.sales.length, 1, "Sales must include only gifts tied to a customer sale");
+assert.equal(complimentaryReportCheck.sales[0].saleBillNo, "CM1", "Sales gift issue lost its customer invoice link");
+assert.equal(complimentaryReportCheck.giftBox.stock, 95, "Complimentary gift stock should equal opening plus purchases minus customer issues");
+assert.equal(complimentaryReportCheck.giftBox.drillTarget, "complimentary-issue", "Stock should drill to its latest gift transaction");
+assert(complimentaryReportCheck.movement.length > 0 && complimentaryReportCheck.movement.every((row) => row.itemName === "Gift Box"), "Stock Movement item filter included another gift item");
+for (const field of ["Item", "From", "To", "OK", "Cancel"]) assert(complimentaryReportCheck.movementDialog.includes(field), `Stock Movement dialog is missing ${field}`);
+for (const column of ["Type", "entryno", "Date", "SmanName", "Sup Customer", "itemID", "itemName", "Unit", "Qty", "foc", "Amount", "Cost"]) assert(complimentaryReportCheck.screens["Stock Movement"].includes(column), `Stock Movement is missing ${column}`);
+assert(complimentaryReportCheck.screens["Stock Movement"].includes('data-report-bill-id="COMP-I"'), "Stock Movement gift issues are not configured for bill drill-down");
+for (const column of ["itemID", "itemName", "Stock"]) assert(complimentaryReportCheck.screens.Stock.includes(column), `Complimentary Stock is missing ${column}`);
+for (const column of ["SmanName", "entryNo", "Date", "itemCode", "ItemName", "Unit", "Qty", "issueMode", "saleBillNo", "Remarks"]) assert(complimentaryReportCheck.screens["Item List"].includes(column), `Complimentary Item List is missing ${column}`);
+assert(complimentaryReportCheck.screens.Stock.includes('data-report-bill-id="COMP-I"'), "Complimentary Stock rows are not configured for bill drill-down");
+assert.equal(complimentaryReportCheck.issueDrill.active, "Work Orders", "Gift issue drill-down did not open transactions");
+assert.equal(complimentaryReportCheck.issueDrill.complimentaryView, "Complimentary Item Issue", "Gift issue drill-down opened the wrong bill");
+assert.equal(complimentaryReportCheck.issueDrill.id, "COMP-I", "Gift issue drill-down opened the wrong record");
+assert.equal(complimentaryReportCheck.purchaseDrill.complimentaryView, "Complimentary Item Purchase", "Gift purchase drill-down opened the wrong bill");
+assert.equal(complimentaryReportCheck.purchaseDrill.id, "COMP-P", "Gift purchase drill-down opened the wrong record");
+assert.equal(vm.runInContext(`REPORT_ROOT_MENU_ITEMS.some((item) => item.label === "Sample Issue/Return")`, context), false, "Sample Issue/Return was not removed from Reports");
+
+const discountVoucherCheck = vm.runInContext(`(() => {
+  const saved = { coupons: state.miscellaneous.discountCoupons, bills: state.bills, active, managementView, miscellaneousView, salesView, filter: discountVoucherReportFilter };
+  state.miscellaneous.discountCoupons = [{ id: "CP1", couponNo: "CP1", value: 100, active: true, issueDate: "01/04/2032" }, { id: "CP2", couponNo: "CP2", value: 50, active: true, issueDate: "02/04/2032" }];
+  state.bills = [{ id: "DV-SALE", type: "Sales", entryNo: "CM-DV", billNo: "CM-DV", date: "03/04/2032", couponNo: "CP1", adjustments: { coupon: 100 }, line: { itemName: "RING", qty: 1, gross: 1, stone: 0, wastage: 0, net: 1, rate: 100, va: 0, makingCharge: 0, tax: 0, amount: 100 }, sections: { sales: [{ itemName: "RING", qty: 1, gross: 1, stone: 0, net: 1, rate: 100, amount: 100 }] } }];
+  discountVoucherReportFilter = "All"; const all = discountVoucherReportRows(), screen = discountVoucherReportScreen();
+  discountVoucherReportFilter = "Issued"; const issued = discountVoucherReportRows();
+  discountVoucherReportFilter = "Redeemed"; const redeemed = discountVoucherReportRows();
+  openReportBillDetail({ dataset: { reportBillId: "DV-SALE", reportEntryNo: "CM-DV", reportTarget: "sales", reportStorage: "bills", reportView: "Sales Invoice" } });
+  const redeemedDrill = { active, salesView, id: state.bills[0]?.id };
+  openReportBillDetail({ dataset: { reportBillId: "CP2", reportEntryNo: "CP2", reportTarget: "discount-coupon-master", reportStorage: "", reportView: "Discount Coupon Master" } });
+  const issuedDrill = { active, managementView, miscellaneousView, id: managementSelection.miscellaneous.discountCoupons };
+  state.miscellaneous.discountCoupons = saved.coupons; state.bills = saved.bills; active = saved.active; managementView = saved.managementView; miscellaneousView = saved.miscellaneousView; salesView = saved.salesView; discountVoucherReportFilter = saved.filter;
+  return { all, issued, redeemed, screen, redeemedDrill, issuedDrill };
+})()`, context);
+assert.equal(discountVoucherCheck.all.length, 2, "Discount Voucher All did not reconcile issued and redeemed vouchers");
+assert.equal(discountVoucherCheck.issued.length, 1, "Discount Voucher Issued filter is incorrect");
+assert.equal(discountVoucherCheck.redeemed.length, 1, "Discount Voucher Redeemed filter is incorrect");
+for (const column of ["CouponID", "CouponAmt", "IssueNo", "IssueDate", "RedeemNo", "RedeemDate", "CouponStatus"]) assert(discountVoucherCheck.screen.includes(column), `Discount Voucher is missing ${column}`);
+assert(discountVoucherCheck.screen.includes('data-report-bill-id="DV-SALE"') && discountVoucherCheck.screen.includes('data-report-bill-id="CP2"'), "Discount Voucher rows are not drillable");
+assert.equal(discountVoucherCheck.redeemedDrill.active, "Sales", "Redeemed voucher did not open Sales Entry");
+assert.equal(discountVoucherCheck.redeemedDrill.id, "DV-SALE", "Redeemed voucher opened the wrong Sales Entry");
+assert.equal(discountVoucherCheck.issuedDrill.miscellaneousView, "Discount Coupon Master", "Issued voucher did not open its voucher master");
+assert.equal(discountVoucherCheck.issuedDrill.id, "CP2", "Issued voucher opened the wrong master record");
+for (const removed of ["Day Account Transactions", "Chart Of Accounts"]) assert(!vm.runInContext(`VOUCHER_REPORT_ITEMS`, context).includes(removed), `${removed} was not removed from Voucher Reports`);
+for (const removed of ["Opening Balance", "Receipt Due Report", "Sub Schedule Wise Ledger"]) assert(!vm.runInContext(`FINANCIAL_REPORT_ITEMS`, context).includes(removed), `${removed} was not removed from Financial Reports`);
+for (const removed of ["Stock Compare", "Other Location Stock"]) assert(!vm.runInContext(`STOCK_CURRENT_REPORTS`, context).includes(removed), `${removed} was not removed from CurrentStock reports`);
+
+const sundryDebtorsCheck = vm.runInContext(`(() => {
+  const saved = { parties: state.parties, bills: state.bills, from: financialReportOptions.from, to: financialReportOptions.to, view: sundryDebtorsView };
+  state.parties = [{ id: "C-DEBT", customerCode: "C-DEBT", name: "DEBTOR TEST CUSTOMER", type: "Customer", openingBalance: 0, address: "Debtor Road", place: "Edakkara", phone: "9000", mobile: "9111" }];
+  state.bills = [{ id: "DEBT-SALE", type: "Sales", entryNo: "CM-DEBT", date: "05/04/2033", dueDate: "15/04/2033", customer: "DEBTOR TEST CUSTOMER", invoiceTotal: 500, paid: 100, totals: { invoiceTotal: 500, cashReceived: 100 }, sections: { sales: [] } }];
+  financialReportOptions = { ...financialReportOptions, from: "01/04/2033", to: "30/04/2033", shown: true, page: 0 };
+  sundryDebtorsView = "General";
+  const data = sundryDebtorsGeneralData(), screens = {};
+  for (const view of ["General", "Detailed", "Datestamp", "With Due Date"]) { sundryDebtorsView = view; screens[view] = sundryDebtorsReportScreen(); }
+  state.parties = saved.parties; state.bills = saved.bills; financialReportOptions = { ...financialReportOptions, from: saved.from, to: saved.to }; sundryDebtorsView = saved.view;
+  return { data, screen: screens.General, screens };
+})()`, context);
+assert.equal(sundryDebtorsCheck.data.rows.length, 1, "Sundry Debtors General did not load customer balances");
+assert.equal(sundryDebtorsCheck.data.totalClosing, sundryDebtorsCheck.data.totalDebit - sundryDebtorsCheck.data.totalCredit, "Sundry Debtors closing total does not reconcile");
+for (const column of ["Id", "Name", "Debit", "Credit", "Closing"]) assert(sundryDebtorsCheck.screen.includes(column), `Sundry Debtors General is missing ${column}`);
+for (const view of ["General", "Detailed", "Datestamp", "With Due Date"]) assert(sundryDebtorsCheck.screen.includes(view), `Sundry Debtors selector is missing ${view}`);
+assert(sundryDebtorsCheck.screen.includes("<tfoot>") && sundryDebtorsCheck.screen.includes("Total"), "Sundry Debtors General is missing its final totals row");
+for (const column of ["PartyAddress", "place", "Phone", "mobile", "Debit", "Credit", "Closing"]) assert(sundryDebtorsCheck.screens.Detailed.includes(column), `Sundry Debtors Detailed is missing ${column}`);
+for (const column of ["Opening", "Debit", "Credit", "Closing"]) assert(sundryDebtorsCheck.screens.Datestamp.includes(column), `Sundry Debtors Datestamp is missing ${column}`);
+for (const column of ["PartyAddress", "Phone", "mobile", "Closing", "DR_CR", "LastDueDate"]) assert(sundryDebtorsCheck.screens["With Due Date"].includes(column), `Sundry Debtors With Due Date is missing ${column}`);
+assert(sundryDebtorsCheck.screens["With Due Date"].includes("15/04/2033") && !sundryDebtorsCheck.screens["With Due Date"].includes("01/01/1900"), "Sundry Debtors due-date logic is incorrect");
+for (const screen of Object.values(sundryDebtorsCheck.screens)) assert(screen.includes("<tfoot>") && screen.includes("Total"), "A Sundry Debtors view is missing its totals footer");
+
+const sundryCreditorsCheck = vm.runInContext(`(() => {
+  const saved = { parties: state.parties, bills: state.bills, accountMasters: state.accountMasters, from: financialReportOptions.from, to: financialReportOptions.to };
+  state.parties = [{ id: "S-CRED", supplierCode: "S-CRED", name: "CREDITOR TEST SUPPLIER", type: "Supplier", openingBalance: 0, balanceType: "Cr" }];
+  state.accountMasters = [];
+  state.bills = [{ id: "CRED-PURCHASE", type: "Purchase Invoice", entryNo: "P-CRED", date: "05/04/2034", supplier: "CREDITOR TEST SUPPLIER", partyName: "CREDITOR TEST SUPPLIER", invoiceTotal: 800, paid: 200, totals: { invoiceTotal: 800, cashPaid: 200 } }];
+  financialReportOptions = { ...financialReportOptions, from: "01/04/2034", to: "30/04/2034", shown: true, page: 0 };
+  const data = sundryCreditorsReportData(), screen = financialReportView("Sundry Creditors");
+  state.parties = saved.parties; state.bills = saved.bills; state.accountMasters = saved.accountMasters; financialReportOptions = { ...financialReportOptions, from: saved.from, to: saved.to };
+  return { data, screen };
+})()`, context);
+assert.equal(sundryCreditorsCheck.data.rows.length, 1, "Sundry Creditors did not load supplier balances");
+assert.equal(sundryCreditorsCheck.data.rows[0].credit, 800, "Sundry Creditors purchase credit is incorrect");
+assert.equal(sundryCreditorsCheck.data.rows[0].debit, 200, "Sundry Creditors payment debit is incorrect");
+assert.equal(sundryCreditorsCheck.data.rows[0].balance, -600, "Sundry Creditors balance is incorrect");
+for (const column of ["ID", "Name", "Credit", "Debit", "Balance", "DR_CR"]) assert(sundryCreditorsCheck.screen.includes(column), `Sundry Creditors is missing ${column}`);
+assert(!sundryCreditorsCheck.screen.includes("<select"), "Sundry Creditors must not contain a view dropdown");
+assert(sundryCreditorsCheck.screen.includes("<tfoot>") && sundryCreditorsCheck.screen.includes("Total"), "Sundry Creditors is missing its totals footer");
+
+const utilitiesCheck = vm.runInContext(`(() => {
+  const saved = { bills: state.bills, openingStockEntries: state.openingStockEntries, itemTransfers: state.itemTransfers, stock: state.stock, utilityView, barcodeCheckingQuery, utilities: state.utilities };
+  state.openingStockEntries = [{ id: "BC-IN", entryNo: "0", date: "01/04/2035", location: "Shop", lines: [{ barcode: "B002753", itemName: "BANGLE", qty: 1, gross: 10, stone: 0, net: 10 }] }];
+  state.bills = [{ id: "BC-OUT", type: "Sales", entryNo: "CM01292", date: "06/08/2035", customer: "ANEESH", sections: { sales: [{ barcode: "B002753", itemName: "BANGLE", qty: 1, gross: 10, stone: 0, net: 10 }] } }];
+  state.itemTransfers = []; state.stock = [];
+  barcodeCheckingQuery = "B002753"; utilityView = "Barcode Checking";
+  const movements = barcodeMovementData("B002753"), checking = barcodeCheckingScreen();
+  utilityView = "Barcode Verification"; barcodeVerification = { scan: "", location: "Shop", tagWeight: 0, autoVerify: false, appendScans: false, appendExpected: false, scanned: [], expected: [], verified: [] };
+  const verification = barcodeVerificationScreen();
+  state.utilities = { dayLock: { locked: true, from: "01/08/2035", to: "07/08/2035", user: "OWNER", lockedAt: "" } };
+  const locked = isTransactionDateLocked("06/08/2035"), open = isTransactionDateLocked("08/08/2035");
+  state.bills = saved.bills; state.openingStockEntries = saved.openingStockEntries; state.itemTransfers = saved.itemTransfers; state.stock = saved.stock; state.utilities = saved.utilities; utilityView = saved.utilityView; barcodeCheckingQuery = saved.barcodeCheckingQuery;
+  return { movements, checking, verification, locked, open, menu: UTILITY_ITEMS };
+})()`, context);
+assert.equal(Array.from(utilitiesCheck.menu).join("|"), ["Day Lock", "Barcode Verification", "Barcode Checking", "System Diagnostics", "Audit & Event Logs", "Backup & Restore", "Data Integrity Check", "Print Setup"].join("|"), "Utilities menu does not contain the approved eight tools");
+assert.equal(utilitiesCheck.movements.length, 2, "Barcode Checking did not reconstruct the full movement trail");
+assert.equal(utilitiesCheck.movements.at(-1).direction, "OUT", "Barcode Checking did not identify the final sale movement");
+assert(utilitiesCheck.checking.includes("Sold Out") && utilitiesCheck.checking.includes("CM01292"), "Barcode Checking status or trail is incorrect");
+for (const label of ["Auto Verify", "Append", "Tag Weight", "Verify", "No. of Record"]) assert(utilitiesCheck.verification.includes(label), `Barcode Verification is missing ${label}`);
+assert.equal(utilitiesCheck.locked, true, "Day Lock did not block an in-range date");
+assert.equal(utilitiesCheck.open, false, "Day Lock incorrectly blocked an out-of-range date");
+
 console.log("Goldland runtime and demo-data tests passed.");
