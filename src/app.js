@@ -1,4 +1,17 @@
 const ACCESS_PASSWORD = "goldland2026";
+const STAFF_TEST_VERSION = "STAFF-TEST 0.1";
+const STAFF_FEEDBACK_KEY = "goldland-staff-feedback";
+const STAFF_CHECKLIST_KEY = "goldland-staff-checklist";
+const STAFF_TEST_CHECKLIST = [
+  ["Masters", "Create and find a customer, supplier and item"],
+  ["Sales", "Create, save, find and edit a sales invoice"],
+  ["Sales", "Check return, order, advance and refund flows"],
+  ["Purchase", "Create a purchase and purchase return"],
+  ["Stock", "Check barcode, HUID, stock register and adjustment"],
+  ["Accounts", "Check receipt, payment, journal and bill-wise entries"],
+  ["Work Orders", "Check smith, jeweller, refinery and service flows"],
+  ["Reports", "Check filters, totals, printing and export labels"]
+];
 const SALES_ITEMS = ["Sales Invoice", "Sales Return", "DMD Return/DMD OP", "DMD Sales WholeSales", "Sales Order", "Additional Order Advance", "Order Advance Refund"];
 const PURCHASE_ITEMS = ["Purchase Invoice", "Purchase Return", "Diamond Purchase", "Diamond Purchase Return", "Direct Purchase", "Direct Purchase Return", "DMD Stone Purchase"];
 const WORK_ORDER_ITEMS = ["Smith", "Jeweller", "Refining", "Sample", "Polishing", "Service / Job", "Complimentary Item"];
@@ -701,6 +714,55 @@ let classicColumnMenu = null;
 let classicColumnFilters = {};
 let classicColumnSorts = {};
 let authenticated = sessionStorage.getItem("goldland-authenticated") === "true";
+
+function currentStaffTestScreen() {
+  if (active === "Sales") return salesView;
+  if (active === "Purchase") return purchaseView;
+  if (active === "Stock") return stockView;
+  if (active === "Work Orders") return workOrderView === "Complimentary Item" ? complimentaryView : workOrderView;
+  if (active === "Accounts") return accountView;
+  if (active === "Management") return managementView;
+  if (active === "Schemes") return schemeView;
+  if (active === "Utilities") return utilityView;
+  if (active === "Financial Reports") return selectedFinancialReport || active;
+  if (active === "Reports") return selectedReport || active;
+  return active;
+}
+
+function staffTestingChrome() {
+  const count = JSON.parse(localStorage.getItem(STAFF_FEEDBACK_KEY) || "[]").length;
+  return `<div class="staff-test-banner" role="status"><strong>TESTING VERSION</strong><span>Demo data only — do not enter real customer or financial information</span><small>${STAFF_TEST_VERSION}</small></div><div class="staff-test-actions" aria-label="Staff testing tools"><button type="button" data-staff-test-action="guide">Test guide</button><button type="button" data-staff-test-action="feedback">Report feedback${count ? ` (${count})` : ""}</button></div>`;
+}
+
+function openStaffTestGuide() {
+  const completed = JSON.parse(localStorage.getItem(STAFF_CHECKLIST_KEY) || "{}");
+  document.body.insertAdjacentHTML("beforeend", `<div class="staff-test-backdrop" data-staff-test-modal><section class="staff-test-modal staff-test-guide" role="dialog" aria-modal="true" aria-labelledby="staffTestGuideTitle"><header><div><small>${STAFF_TEST_VERSION}</small><h2 id="staffTestGuideTitle">Staff testing guide</h2></div><button type="button" aria-label="Close" data-staff-test-close>×</button></header><div class="staff-test-notice"><strong>This is not the live shop system.</strong><span>Use made-up names, phone numbers and transactions. Your test information stays in this browser.</span></div><p>Complete one workflow at a time. If something is missing, confusing or incorrect, report it from that exact screen.</p><div class="staff-test-checklist">${STAFF_TEST_CHECKLIST.map(([module, task], index) => `<label><input type="checkbox" data-staff-check="${index}" ${completed[index] ? "checked" : ""}/><span><b>${escapeHtml(module)}</b>${escapeHtml(task)}</span></label>`).join("")}</div><footer><button type="button" class="secondary" data-staff-test-action="reset">Reset demo data</button><button type="button" class="primary" data-staff-test-close>Start testing</button></footer></section></div>`);
+  bindStaffTestModalEvents();
+  document.querySelector("[data-staff-test-check]")?.focus();
+}
+
+function openStaffFeedback() {
+  const screen = currentStaffTestScreen();
+  document.body.insertAdjacentHTML("beforeend", `<div class="staff-test-backdrop" data-staff-test-modal><form class="staff-test-modal staff-feedback-form" data-staff-feedback-form><header><div><small>${STAFF_TEST_VERSION}</small><h2>Report feedback</h2></div><button type="button" aria-label="Close" data-staff-test-close>×</button></header><div class="staff-feedback-context"><span>Screen</span><strong>${escapeHtml(screen)}</strong></div><label><span>Your name</span><input name="staffName" required autocomplete="name" /></label><label><span>Result</span><select name="result"><option>Cannot complete</option><option>Works but needs changes</option><option>Works correctly</option><option>Not used by our shop</option></select></label><label><span>Priority</span><select name="priority"><option>Blocking</option><option>Important</option><option>Optional suggestion</option></select></label><label><span>What happened, and what should happen instead?</span><textarea name="details" rows="5" required placeholder="Example: After saving a sales return, I expected the old bill number to appear..."></textarea></label><footer><button type="button" class="secondary" data-staff-test-close>Cancel</button><button type="submit" class="primary">Save &amp; share</button></footer></form></div>`);
+  bindStaffTestModalEvents();
+  document.querySelector("[data-staff-feedback-form] input")?.focus();
+}
+
+function bindStaffTestModalEvents() {
+  document.querySelectorAll("[data-staff-test-close]").forEach((button) => button.addEventListener("click", () => document.querySelector("[data-staff-test-modal]")?.remove()));
+  document.querySelectorAll("[data-staff-check]").forEach((input) => input.addEventListener("change", () => { const completed = JSON.parse(localStorage.getItem(STAFF_CHECKLIST_KEY) || "{}"); completed[input.dataset.staffCheck] = input.checked; localStorage.setItem(STAFF_CHECKLIST_KEY, JSON.stringify(completed)); }));
+  document.querySelector("[data-staff-test-action='reset']")?.addEventListener("click", () => { if (confirm("Reset all demo transactions and checklist progress on this device?")) { localStorage.removeItem("goldland-state"); localStorage.removeItem(STAFF_CHECKLIST_KEY); location.reload(); } });
+  document.querySelector("[data-staff-feedback-form]")?.addEventListener("submit", (event) => { event.preventDefault(); saveAndShareStaffFeedback(event.currentTarget); });
+}
+
+async function saveAndShareStaffFeedback(form) {
+  const data = new FormData(form);
+  const record = { id: crypto.randomUUID(), version: STAFF_TEST_VERSION, screen: currentStaffTestScreen(), staffName: String(data.get("staffName") || "").trim(), result: data.get("result"), priority: data.get("priority"), details: String(data.get("details") || "").trim(), createdAt: new Date().toISOString() };
+  const records = JSON.parse(localStorage.getItem(STAFF_FEEDBACK_KEY) || "[]"); records.unshift(record); localStorage.setItem(STAFF_FEEDBACK_KEY, JSON.stringify(records));
+  const summary = `Goldland feedback\nVersion: ${record.version}\nScreen: ${record.screen}\nTester: ${record.staffName}\nResult: ${record.result}\nPriority: ${record.priority}\nDetails: ${record.details}`;
+  try { if (navigator.share) await navigator.share({ title: `Goldland: ${record.screen}`, text: summary }); else if (navigator.clipboard) { await navigator.clipboard.writeText(summary); toast("Feedback saved and copied. Send it to the project owner."); } else toast("Feedback saved in this browser."); } catch (error) { if (error?.name !== "AbortError") toast("Feedback saved in this browser."); }
+  document.querySelector("[data-staff-test-modal]")?.remove(); render();
+}
 
 function rate(type, grade, price, time, reason) {
   return { id: crypto.randomUUID(), type, grade, price, time, reason, user: "Goldland", date: "2026-05-16" };
@@ -4102,6 +4164,7 @@ function loginScreen() {
 
 function appShell() {
   return `
+    ${staffTestingChrome()}
     <main class="shell">
       ${sidebar()}
       <section class="workspace">
@@ -20831,6 +20894,7 @@ function select(name, label, options, selectedValue = "") {
 
 function bindEvents() {
   bindDraggableSalesDatePopup();
+  document.querySelectorAll("[data-staff-test-action]").forEach((button) => button.addEventListener("click", () => { if (button.dataset.staffTestAction === "guide") openStaffTestGuide(); if (button.dataset.staffTestAction === "feedback") openStaffFeedback(); }));
   document.querySelector(".content")?.addEventListener("submit", (event) => {
     if (event.target.matches("[data-day-lock-login], [data-day-lock-form], [data-financial-save-form]")) return;
     const dateField = event.target.querySelector('input[name="date"], input[name="entryDate"], input[data-entry-date], input[type="date"]');
