@@ -4,10 +4,11 @@ const PURCHASE_ITEMS = ["Purchase Invoice", "Purchase Return", "Diamond Purchase
 const WORK_ORDER_ITEMS = ["Smith", "Jeweller", "Refining", "Sample", "Polishing", "Service / Job", "Complimentary Item"];
 const ACCOUNT_ITEMS = ["Account Ledger", "Cash Receipt", "Cash Payment", "Bank Deposit", "Bank Withdrawal", "Journal Voucher", "PDC Transactions", "Direct Entry", "Expense Entry", "Bill Wise Collection", "Bill Wise Payment", "Discount in Credit Note", "Discount in Debit Note", "Custom Voucher"];
 const MANAGEMENT_ITEMS = ["Customers", "Suppliers", "Smiths", "Refiners", "Employees", "Item Category", "Miscellaneous", "Item Creation", "Account Creation"];
+const BARCODE_ITEMS = ["Barcode Entry", "Barcode List", "Barcode Printing", "Barcode Edit"];
 const SCHEME_ITEMS = ["Scheme Master", "Scheme Members", "Scheme Collection", "Scheme Refund/Close", "Scheme Collection Report", "Scheme Member Ledger"];
 const SCHEME_REPORT_ITEMS = ["Scheme Members List", "Scheme Collection Report", "Scheme Members Balance", "New Schemes By Agent-By Date", "Collection Paid/Unpaid"];
 const UTILITY_ITEMS = ["Day Lock", "Barcode Verification", "Barcode Checking", "System Diagnostics", "Audit & Event Logs", "Backup & Restore", "Data Integrity Check", "Print Setup"];
-const EXPANDABLE_NAVS = new Set(["Sales", "Purchase", "Stock", "Work Orders", "Accounts", "Management", "Financial Reports", "Reports", "Schemes", "Utilities"]);
+const EXPANDABLE_NAVS = new Set(["Sales", "Purchase", "Stock", "Barcode", "Work Orders", "Accounts", "Management", "Financial Reports", "Reports", "Schemes", "Utilities"]);
 const FINANCIAL_REPORT_ITEMS = [
   "Cash Book", "Bank Book", "Ledger", "Voucher Reports", "Trial Balance",
   "Trading Account", "Trading & Profit and Loss", "Profit or Loss Account",
@@ -25,7 +26,7 @@ const BUSINESS_REPORT_GROUPS = [
   { id: "utilities", label: "Utilities & Expenses", activities: ["Utilities", "Other Expenses"] }
 ];
 const OPENING_STOCK_VIEW = "Opening Stock Account Entry";
-const STOCK_ITEMS = ["Stock Register", "Barcode Entry", OPENING_STOCK_VIEW, "Stock Adjustments", "Item Transfer", "Gold Deposit", "Gold Withdrawal"];
+const STOCK_ITEMS = ["Stock Register", OPENING_STOCK_VIEW, "Stock Adjustments", "Item Transfer", "Gold Deposit", "Gold Withdrawal"];
 const STOCK_CURRENT_REPORTS = ["Item Wise", "Barcode Wise", "Category Wise", "Product Wise", "Diamond Stock", "Type Wise"];
 const SALES_REPORT_OPTIONS = [
   "Item Wise",
@@ -565,6 +566,9 @@ let salesView = "Sales Invoice";
 let salesOrderView = "Sales Order";
 let purchaseView = "Purchase Invoice";
 let stockView = "Stock Register";
+let barcodeView = "Barcode Entry";
+let selectedBarcodeListItem = "";
+let barcodeListFilter = { type: "Code", value: "" };
 let workOrderView = "Smith";
 let smithWorkView = "Smith";
 let accountView = "Account Ledger";
@@ -4145,6 +4149,12 @@ function sidebar() {
             ${stockItems.map((item) => `<button class="subnav-item ${active === "Stock" && stockView === item ? "active" : ""}" data-stock-section="${item}">${item}</button>`).join("")}
           </div>
         </div>
+        <div class="nav-group ${isGroupOpen("Barcode") ? "open" : ""}">
+          <button class="nav ${active === "Barcode" ? "active" : ""}" data-nav="Barcode">${icon("Stock")}<span>Barcode</span><span class="chevron">v</span></button>
+          <div class="subnav">
+            ${BARCODE_ITEMS.map((item) => `<button class="subnav-item ${active === "Barcode" && barcodeView === item ? "active" : ""}" data-barcode-section="${item}">${item}</button>`).join("")}
+          </div>
+        </div>
         <div class="nav-group ${isGroupOpen("Work Orders") ? "open" : ""}">
           <button class="nav ${active === "Work Orders" ? "active" : ""}" data-nav="Work Orders">${icon("Work Orders")}<span>Work Orders</span><span class="chevron">v</span></button>
           <div class="subnav">
@@ -4214,7 +4224,7 @@ function topbar() {
     .filter((item) => item.type === "Gold")
     .map((item) => `${item.grade} ${money(item.price)}/g`)
     .join(" | ");
-  const title = active === "Management" ? managementView : active === "Sales" ? salesView : active === "Purchase" ? purchaseView : active === "Stock" ? stockView : active === "Work Orders" ? (workOrderView === "Complimentary Item" ? complimentaryView : workOrderView) : active === "Accounts" ? accountView : active === "Schemes" ? schemeView : active === "Utilities" ? utilityView : active === "Financial Reports" ? selectedFinancialReport || "Financial Reports" : active === "Reports" ? selectedReport || "Reports" : active;
+  const title = active === "Management" ? managementView : active === "Sales" ? salesView : active === "Purchase" ? purchaseView : active === "Stock" ? stockView : active === "Barcode" ? barcodeView : active === "Work Orders" ? (workOrderView === "Complimentary Item" ? complimentaryView : workOrderView) : active === "Accounts" ? accountView : active === "Schemes" ? schemeView : active === "Utilities" ? utilityView : active === "Financial Reports" ? selectedFinancialReport || "Financial Reports" : active === "Reports" ? selectedReport || "Reports" : active;
 
   return `
     <header class="topbar">
@@ -4322,6 +4332,7 @@ function route() {
   if (active === "Billing") return sales();
   if (active === "Transactions") return transactions();
   if (active === "Stock") return stock();
+  if (active === "Barcode") return barcodeModule();
   if (active === "Work Orders") return workOrders();
   if (active === "Management") return management();
   if (active === "Schemes") return schemes();
@@ -5580,6 +5591,96 @@ function stock() {
     ${moduleSwitcher("Stock", STOCK_ITEMS, stockView, "data-stock-section")}
     ${activeScreen}
   `;
+}
+
+function barcodeModule() {
+  if (barcodeView === "Barcode List") return barcodeListScreen();
+  const rows = barcodeCurrentInventory();
+  const descriptions = {
+    "Barcode Entry": "Create barcode records for newly received or manually entered stock items.",
+    "Barcode List": "Browse all current barcode records and their stock details.",
+    "Barcode Printing": "Select barcode records and prepare jewellery labels for printing.",
+    "Barcode Edit": "Find an existing barcode and update its item or weight details."
+  };
+  const list = table(
+    ["Barcode", "Item", "Nos", "Gross", "Stone", "Net", "Location", "Status"],
+    rows.map((row) => [row.barcode, row.itemName, row.nos, grams(row.gross), grams(row.stone), grams(row.net), row.location, row.status || "In Stock"])
+  );
+  const controls = barcodeView === "Barcode Entry"
+    ? `<button class="primary" data-action="open-stock">Create Barcode</button>`
+    : barcodeView === "Barcode Printing"
+      ? `<button class="primary" data-action="print-page">Print Barcodes</button>`
+      : `<label class="command"><span>Find</span><input placeholder="Scan or enter barcode..." /></label>`;
+  return `${moduleSwitcher("Barcode", BARCODE_ITEMS, barcodeView, "data-barcode-section")}
+    <section class="panel">
+      <div class="panel-head"><div><h2>${escapeHtml(barcodeView)}</h2><p>${escapeHtml(descriptions[barcodeView])}</p></div><div class="panel-actions">${controls}</div></div>
+      ${list}
+    </section>`;
+}
+
+function barcodeListScreen() {
+  if (false && !selectedBarcodeListItem) {
+    return `${moduleSwitcher("Barcode", BARCODE_ITEMS, barcodeView, "data-barcode-section")}
+      <section class="panel">
+        <div class="panel-head"><div><h2>Barcode List</h2><p>Double-click an item to display all barcode details.</p></div></div>
+        ${tableWithRowAttrs(
+          ["Item Name", "ID", "Category", "Type", "Nos", "Net Weight"],
+          ITEM_WISE_CLOSING_STOCK.map((item) => ({
+            attrs: `data-barcode-list-item="${escapeHtml(item.itemId)}" title="Double-click to open barcode details"`,
+            cells: [escapeHtml(item.name), escapeHtml(item.itemId), escapeHtml(item.itemType), item.itemType === "Gold" ? "22ct" : escapeHtml(item.itemType), item.nos, grams(item.netWeight)]
+          }))
+        )}
+      </section>`;
+  }
+
+  const item = ITEM_WISE_CLOSING_STOCK.find((row) => row.itemId === selectedBarcodeListItem);
+  let itemRows = selectedBarcodeListItem ? BARCODE_WISE_CLOSING_STOCK.filter((row) => row.iid === selectedBarcodeListItem || row.name === item?.name) : [];
+  if (selectedBarcodeListItem && !itemRows.length && item) {
+    const count = Math.min(14, Math.max(1, Math.abs(Number(item.nos || 1))));
+    const averageNet = Math.abs(Number(item.netWeight || 0)) / count;
+    itemRows = Array.from({ length: count }, (_, index) => ({
+      iid: item.itemId, name: item.name, itemCategory: item.itemType, type: item.itemType === "Gold" ? "22ct" : item.itemType,
+      barcode: `${item.itemId}${String(index + 1).padStart(6, "0")}`, description: "", nos: index % 3,
+      gross: averageNet, stone: 0, net: averageNet, stnChr: 0, vaPerc: index % 3 === 1 ? 12 : 9,
+      mcPerGrm: 0, mc: 0, otherCharge: 0, totalMC: 0, smithName: "", pmc: 0
+    }));
+  }
+  const filterValue = String(barcodeListFilter.value || "").trim().toLowerCase();
+  const detailRows = !filterValue ? itemRows : itemRows.filter((row) => barcodeListFilter.type === "Barcode"
+    ? String(row.barcode || "").toLowerCase().includes(filterValue)
+    : `${row.iid || ""} ${row.name || ""}`.toLowerCase().includes(filterValue));
+  const columns = ["X", "P", "EntryNo", "ID", "Name", "Barcode", "Bis_Uid", "Description", "Nos", "GrossWeight", "StoneWeight", "NetWeight", "StnCharge", "VA_Perc", "MCperGrm", "MC", "OtherCharge", "TotalMC", "Smith", "PMCperGrm", "PurchaseMC", "Dmdcarat", "DmdPcs", "DmdSRate", "DmdPuRate", "DmdSRate1", "dmdsellrate1", "DmdSaleamt", "ClrStn", "ClrStnRate"];
+  const rows = detailRows.map((row, index) => [
+    "✖", "□", row.entryNo || 0, row.iid, escapeHtml(row.name), escapeHtml(row.barcode), escapeHtml(row.bisUid || ""), escapeHtml(row.description || ""), row.nos,
+    grams(row.gross), grams(row.stone), grams(row.net), moneyValue(row.stnChr || 0), numericValue(row.vaPerc || 0, 2), numericValue(row.mcPerGrm || 0, 3), moneyValue(row.mc || 0), moneyValue(row.otherCharge || 0), moneyValue(row.totalMC || row.mc || 0), escapeHtml(row.smithName || ""), numericValue(row.pmc || 0, 3), moneyValue(row.purchaseMC || 0), numericValue(row.dmdCarat || 0, 3), row.dmdPcs || 0, moneyValue(row.dmdSRate || 0), moneyValue(row.dmdPuRate || 0), moneyValue(row.dmdSRate1 || 0), moneyValue(row.dmdSellRate1 || 0), moneyValue(row.dmdSaleAmt || 0), numericValue(row.clrStn || 0, 3), moneyValue(row.clrStnRate || 0)
+  ]);
+  const itemGrid = tableWithRowAttrs(["Item_Name", "ID", "Category", "Type"], ITEM_WISE_CLOSING_STOCK.map((row) => ({
+    attrs: `class="${row.itemId === selectedBarcodeListItem ? "selected" : ""}" data-barcode-list-item="${escapeHtml(row.itemId)}" title="Double-click to show barcodes"`,
+    cells: [escapeHtml(row.name), escapeHtml(row.itemId), escapeHtml(row.itemType), row.itemType === "Gold" ? "22ct" : escapeHtml(row.itemType)]
+  })));
+  return `${moduleSwitcher("Barcode", BARCODE_ITEMS, barcodeView, "data-barcode-section")}
+    <section class="classic-barcode-window" aria-label="Barcode List">
+      <header class="classic-window-title">Barcode List</header>
+      <div class="classic-barcode-top">
+        <div class="classic-barcode-items">${itemGrid}<small>Double-click an item to display its barcode rows.</small></div>
+        <div class="classic-barcode-filters">
+          <label><span>Item Type</span><select data-barcode-filter-type><option ${barcodeListFilter.type === "Code" ? "selected" : ""}>Code</option><option ${barcodeListFilter.type === "Barcode" ? "selected" : ""}>Barcode</option></select></label>
+          <label><span>${barcodeListFilter.type === "Barcode" ? "Barcode" : "Item Code"}</span><input class="lookup" data-barcode-filter-value value="${escapeHtml(barcodeListFilter.value)}" /></label>
+          <label><span>Item Name</span><input readonly value="${escapeHtml(item?.name || "")}" /></label>
+          <label class="net-weight"><span>Net Weight</span><input readonly value="${item ? grams(item.netWeight) : ""}" /></label>
+          <div class="classic-barcode-buttons"><button data-action="barcode-list-show">Show</button><button data-action="print-page">Print</button></div>
+        </div>
+      </div>
+      <div class="classic-barcode-options"><label><input type="checkbox" /> View All Barcode</label><label><input type="checkbox" /> Refresh Data</label></div>
+      <div class="classic-barcode-grid">${selectedBarcodeListItem ? (rows.length ? table(columns, rows) : `<div class="empty-master">No barcode records match this filter.</div>`) : `<div class="classic-barcode-empty">Double-click an item above to show its barcode list.</div>`}</div>
+    </section>`;
+  return `${moduleSwitcher("Barcode", BARCODE_ITEMS, barcodeView, "data-barcode-section")}
+    <section class="panel barcode-list-detail">
+      <div class="panel-head"><div><button class="secondary" data-action="barcode-list-back">← Items</button><h2>Barcode List — ${escapeHtml(item?.name || selectedBarcodeListItem)}</h2></div><div class="panel-actions"><button class="secondary" data-action="barcode-list-show">Show</button><button class="primary" data-action="print-page">Print</button></div></div>
+      <div class="form-grid compact-form"><label><span>Item Type</span><select data-barcode-filter-type><option ${barcodeListFilter.type === "Code" ? "selected" : ""}>Code</option><option ${barcodeListFilter.type === "Barcode" ? "selected" : ""}>Barcode</option></select></label><label><span>${barcodeListFilter.type === "Barcode" ? "Barcode" : "Item Code"}</span><input data-barcode-filter-value value="${escapeHtml(barcodeListFilter.value)}" placeholder="${barcodeListFilter.type === "Barcode" ? "Enter barcode" : "Enter item code or name"}" /></label><label><span>Item Name</span><input readonly value="${escapeHtml(item?.name || "")}" /></label><label><span>Net Weight</span><input readonly value="${grams(item?.netWeight || 0)}" /></label></div>
+      <div class="panel-actions"><label><input type="checkbox" /> View All Barcode</label><label><input type="checkbox" /> Refresh Data</label></div>
+      ${rows.length ? table(columns, rows) : `<div class="empty-master">No barcode records found for this item.</div>`}
+    </section>`;
 }
 
 function stockRegisterScreen() {
@@ -20509,6 +20610,7 @@ function menuSearchItems() {
     ...SALES_ITEMS.map((label) => ({ label, module: "Sales", group: "Sales", target: `sales:${label}` })),
     ...PURCHASE_ITEMS.map((label) => ({ label, module: "Purchase", group: "Purchase", target: `purchase:${label}` })),
     ...STOCK_ITEMS.map((label) => ({ label, module: "Stock", group: "Stock", target: `stock:${label}` })),
+    ...BARCODE_ITEMS.map((label) => ({ label, module: "Barcode", group: "Barcode", target: `barcode:${label}` })),
     ...WORK_ORDER_ITEMS.map((label) => ({ label, module: "Work Orders", group: "Work Orders", target: `work:${label}` })),
     ...ACCOUNT_ITEMS.map((label) => ({ label, module: "Accounts", group: "Accounts", target: `account:${label}` })),
     ...MANAGEMENT_ITEMS.map((label) => ({ label, module: "Management", group: "Management", target: `management:${label}` }))
@@ -20566,6 +20668,11 @@ function openMenuTarget(target) {
     active = "Stock";
     expandedNavGroups.add("Stock");
     stockView = value;
+  }
+  if (kind === "barcode") {
+    active = "Barcode";
+    expandedNavGroups.add("Barcode");
+    barcodeView = value;
   }
   if (kind === "work") {
     active = "Work Orders";
@@ -21369,6 +21476,36 @@ function bindEvents() {
       active = "Stock";
       expandedNavGroups.add("Stock");
       stockView = button.dataset.stockSection;
+      renderScreen();
+    });
+  });
+
+  document.querySelectorAll("[data-barcode-section]").forEach((button) => {
+    button.addEventListener("click", () => {
+      active = "Barcode";
+      expandedNavGroups.add("Barcode");
+      barcodeView = button.dataset.barcodeSection;
+      if (barcodeView !== "Barcode List") selectedBarcodeListItem = "";
+      renderScreen();
+    });
+  });
+  document.querySelectorAll("[data-barcode-list-item]").forEach((row) => row.addEventListener("dblclick", () => {
+    selectedBarcodeListItem = row.dataset.barcodeListItem;
+    barcodeListFilter = { type: "Code", value: "" };
+    renderScreen();
+  }));
+  document.querySelector("[data-barcode-filter-type]")?.addEventListener("change", (event) => {
+    barcodeListFilter = { type: event.currentTarget.value, value: "" };
+    renderScreen();
+  });
+  document.querySelector("[data-barcode-filter-value]")?.addEventListener("input", (event) => { barcodeListFilter.value = event.currentTarget.value; });
+  document.querySelector("[data-barcode-filter-value]")?.addEventListener("keydown", (event) => { if (event.key === "Enter") { event.preventDefault(); renderScreen(); } });
+
+  document.querySelectorAll("[data-barcode-section]").forEach((button) => {
+    button.addEventListener("click", () => {
+      active = "Barcode";
+      expandedNavGroups.add("Barcode");
+      barcodeView = button.dataset.barcodeSection;
       renderScreen();
     });
   });
@@ -25884,6 +26021,9 @@ function removeDiscount(button) {
 
 function handleAction(action, source) {
   if (blockedByDayLock(action)) return;
+  if (action === "print-page") { window.print(); return; }
+  if (action === "barcode-list-back") { selectedBarcodeListItem = ""; render(); return; }
+  if (action === "barcode-list-show") { barcodeListFilter.value = document.querySelector("[data-barcode-filter-value]")?.value || ""; render(); return; }
   if (action.startsWith("financial-")) {
     handleFinancialReportAction(action);
     return;
