@@ -9592,7 +9592,6 @@ body:has(.staff-test-banner) .shell { padding-top: 34px; }
 .staff-feedback-empty { display: grid; place-items: center; gap: 6px; min-height: 190px; color: #63706a; text-align: center; }
 .staff-focused-mode .sidebar nav > .nav-group { display: none; }
 .staff-focused-mode .sidebar nav > .nav-group:has([data-nav="Sales"]), .staff-focused-mode .sidebar nav > .nav-group:has([data-nav="Management"]) { display: block; }
-.staff-focused-mode [data-management="Smiths"], .staff-focused-mode [data-management="Refiners"], .staff-focused-mode [data-management="Item Category"], .staff-focused-mode [data-management="Miscellaneous"], .staff-focused-mode [data-management="Account Creation"] { display: none !important; }
 .staff-welcome { max-width: 980px; margin: 12px auto; padding: 34px; border: 1px solid #d9e5df; border-radius: 20px; background: linear-gradient(145deg, #fff 0%, #f2f8f5 100%); }
 .staff-welcome h2 { margin: 12px 0 7px; font-size: 30px; color: #193f35; }
 .staff-welcome > p { margin: 0 0 26px; color: #5b6d66; font-size: 16px; }

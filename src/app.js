@@ -4,7 +4,10 @@ const STAFF_FEEDBACK_KEY = "goldland-staff-feedback";
 const STAFF_CHECKLIST_KEY = "goldland-staff-checklist";
 const STAFF_CLEAN_DATA_VERSION = "1";
 const STAFF_TEST_CHECKLIST = [
-  ["Masters", "Create and find a customer, supplier and item"],
+  ["Management", "Create, find and edit a customer and supplier"],
+  ["Management", "Review smith, refiner and employee masters"],
+  ["Management", "Review item categories and miscellaneous dropdown values"],
+  ["Management", "Create one demo item and one demo account"],
   ["Sales", "Create, save, find and edit a sales invoice"],
   ["Sales", "Check return, order, advance and refund flows"],
   ["Purchase", "Create a purchase and purchase return"],
@@ -4606,7 +4609,7 @@ function handleBarcodeVerificationCommand(command) {
 
 function dashboard() {
   return `
-    <section class="staff-welcome panel"><span class="staff-round-pill">Testing round 1</span><h2>Start with Masters, then test Sales</h2><p>This test version contains only a few clearly marked demo records. Use made-up information for anything you add.</p><div class="staff-start-steps"><button data-management="Customers"><b>1</b><span><strong>Customers</strong>Open Management and check customer creation, search and edit.</span></button><button data-management="Item Creation"><b>2</b><span><strong>Items</strong>Review the three demo items and try creating one item.</span></button><button data-sales-section="Sales Invoice"><b>3</b><span><strong>Sales invoice</strong>Create, save, find, edit and print one demo invoice.</span></button><button data-staff-test-action="feedback"><b>4</b><span><strong>Send feedback</strong>Report unclear fields or missing steps from the exact screen.</span></button></div><aside><strong>Demo records included</strong><span>2 customers · 1 supplier · 3 jewellery items · 3 stock tags · 1 completed example invoice</span></aside></section>
+    <section class="staff-welcome panel"><span class="staff-round-pill">Testing round 1</span><h2>Complete Management first, then test Sales</h2><p>Every Management screen is available. Work through it in two small groups so the review stays clear.</p><div class="staff-start-steps"><button data-management="Customers"><b>1</b><span><strong>People &amp; parties</strong>Test Customers, Suppliers, Smiths, Refiners and Employees.</span></button><button data-management="Item Category"><b>2</b><span><strong>Configuration</strong>Test Item Category, Miscellaneous, Item Creation and Account Creation.</span></button><button data-sales-section="Sales Invoice"><b>3</b><span><strong>Sales</strong>After Management is reviewed, create, find, edit and print a demo invoice.</span></button><button data-staff-test-action="feedback"><b>4</b><span><strong>Send feedback</strong>Report unclear fields or missing steps from the exact screen.</span></button></div><aside><strong>Recommended order</strong><span>Customers → Suppliers → Smiths → Refiners → Employees → Item Category → Miscellaneous → Item Creation → Account Creation → Sales</span></aside></section>
   `;
 }
 
