@@ -2,6 +2,7 @@ const ACCESS_PASSWORD = "goldland2026";
 const STAFF_TEST_VERSION = "STAFF-TEST 0.1";
 const STAFF_FEEDBACK_KEY = "goldland-staff-feedback";
 const STAFF_CHECKLIST_KEY = "goldland-staff-checklist";
+const STAFF_CLEAN_DATA_VERSION = "1";
 const STAFF_TEST_CHECKLIST = [
   ["Masters", "Create and find a customer, supplier and item"],
   ["Sales", "Create, save, find and edit a sales invoice"],
@@ -566,7 +567,7 @@ const seed = {
 const DMD_RETURN_TYPES = ["Sales Return", "Opening Stock", "Local Purchase"];
 
 let state = null;
-state = loadState();
+state = prepareCleanStaffDemo(loadState());
 state = ensureDemoData(state);
 let active = "Dashboard";
 let expandedNavGroups = new Set();
@@ -714,6 +715,47 @@ let classicColumnMenu = null;
 let classicColumnFilters = {};
 let classicColumnSorts = {};
 let authenticated = sessionStorage.getItem("goldland-authenticated") === "true";
+
+function prepareCleanStaffDemo(current) {
+  if (!window.location) return current;
+  if (localStorage.getItem("goldland-staff-clean-data-version") === STAFF_CLEAN_DATA_VERSION) return current;
+  const clean = {
+    ...current,
+    demoDataVersion: DEMO_DATA_VERSION,
+    rates: [
+      rate("Gold", "24K", 10120, "09:00", "Demo opening rate"),
+      rate("Gold", "22K", 9280, "09:00", "Demo opening rate"),
+      rate("Gold", "18K", 7590, "09:00", "Demo opening rate"),
+      rate("Silver", "999", 128, "09:00", "Demo opening rate")
+    ],
+    parties: [
+      normalizeParty({ customerCode: "C0001", name: "Anu Demo Customer", type: "Customer", phone: "9000000001", address: "Demo Town", status: "Active" }),
+      normalizeParty({ customerCode: "C0002", name: "Rahul Demo Customer", type: "Customer", phone: "9000000002", address: "Demo Town", status: "Active" }),
+      normalizeParty({ customerCode: "S0001", name: "Malabar Demo Supplier", type: "Supplier", phone: "9000000011", address: "Demo Market", status: "Active" })
+    ],
+    staffs: [
+      normalizeStaff({ staffId: "STF001", employeeId: "STF001", name: "Demo Cashier", phone: "9000000021", status: "Active", handled: 1, sales: 42850 }),
+      normalizeStaff({ staffId: "STF002", employeeId: "STF002", name: "Demo Manager", phone: "9000000022", status: "Active", handled: 0, sales: 0 })
+    ],
+    itemMasters: [
+      normalizeItemMaster({ itemId: "R", itemName: "GOLD RING", subGroup: "GLD", product: "Gold", hsnTax: "7113 / 3%", typeWastage: "22ct", va: 4.5, mcGram: 850, ornament: true, barcodeCompulsory: true }),
+      normalizeItemMaster({ itemId: "C", itemName: "GOLD CHAIN", subGroup: "GLD", product: "Gold", hsnTax: "7113 / 3%", typeWastage: "22ct", va: 5, mcGram: 900, ornament: true, barcodeCompulsory: true }),
+      normalizeItemMaster({ itemId: "DBR", itemName: "DIAMOND RING", subGroup: "DMD", product: "Diamond", hsnTax: "7113 / 3%", typeWastage: "18ct", va: 0, mcGram: 1200, ornament: true, barcodeCompulsory: true })
+    ],
+    stock: [
+      normalizeStock({ item: "Gold Ring", purity: "22K", huid: "DEMO-HUID-001", qty: 1, gross: 4.850, opening: 4.850, addition: 0, deduction: 0, closing: 4.850, status: "Ready" }),
+      normalizeStock({ item: "Gold Chain", purity: "22K", huid: "DEMO-HUID-002", qty: 1, gross: 9.720, opening: 9.720, addition: 0, deduction: 0, closing: 9.720, status: "Ready" }),
+      normalizeStock({ item: "Diamond Ring", purity: "18K", huid: "DEMO-DIA-001", qty: 1, gross: 3.640, opening: 3.640, addition: 0, deduction: 0, closing: 3.640, status: "Ready" })
+    ],
+    bills: [normalizeBill({ id: "DEMO-SALE-001", entryNo: "S00001", billNo: "DEMO-001", date: "15-08-2026", time: "10:30", customer: "Anu Demo Customer", customerId: "C0001", staffId: "STF001", staffName: "Demo Cashier", phone: "9000000001", address: "Demo Town", type: "Sale", itemCategory: "B2C", amount: 42850, paid: 42850, balance: 0, discount: 0, taxAmount: 1248, line: { barcode: "DEMO-HUID-001", itemName: "Gold Ring", description: "22K demo gold ring", qty: 1, gross: 4.850, stone: 0.150, net: 4.700, rate: 9280, va: 4.5, makingCharge: 850, taxPct: 3, amount: 42850 } })],
+    accounts: [normalizeAccount({ date: "15-08-2026", vouNo: "DEMO-001", ledger: "Cash in Hand", particular: "Demo sale receipt", debit: 42850, credit: 0, balance: 42850, crdr: "Dr" })],
+    salesOrders: [], dmdReturns: [], dmdWholesales: [], dmdStonePurchases: [], diamondPurchases: [], diamondPurchaseReturns: [], directPurchases: [], directPurchaseReturns: [], orderAdvances: [], orderAdvanceRefunds: [], workLogs: [], itemTransfers: [], schemes: [], schemeCollections: [], schemeClosures: [], bankDeposits: [], bankWithdrawals: [], pdcBankSubmissions: [], pdcIssues: [], pdcRequests: [], pdcReceipts: [], pdcChequeBounces: [], pdcChequeRequests: [], cashReceipts: [], cashPayments: [], journalVouchers: [], directEntries: [], expenseEntries: [], customVouchers: [], smithWorkOrders: [], cashWeightSmiths: [], jewellerWorkOrders: [], cashWeightJewellers: [], stockAdjustments: [], openingStockEntries: [], goldDeposits: [], goldWithdrawals: [], sampleIssues: [], sampleReturns: [], polishingEntries: [], serviceJobs: [], serviceClosures: [], refineryIssues: [], refineryReturns: [], refineryFinalReturns: [], meltingIssues: [], meltingReturns: [], complimentaryPurchases: [], complimentaryIssues: [], billwiseCollections: [], billwisePayments: [], billwiseCreditDiscounts: [], billwiseDebitDiscounts: [], audit: [audit("Prepared clean staff testing data", "09:00")]
+  };
+  localStorage.setItem("goldland-state", JSON.stringify(clean));
+  localStorage.setItem("goldland-staff-clean-data-version", STAFF_CLEAN_DATA_VERSION);
+  localStorage.removeItem(STAFF_CHECKLIST_KEY);
+  return clean;
+}
 
 function currentStaffTestScreen() {
   if (active === "Sales") return salesView;
@@ -4198,7 +4240,7 @@ function loginScreen() {
 function appShell() {
   return `
     ${staffTestingChromeV2()}
-    <main class="shell">
+    <main class="shell staff-focused-mode">
       ${sidebar()}
       <section class="workspace">
         ${topbar()}
@@ -4563,41 +4605,8 @@ function handleBarcodeVerificationCommand(command) {
 }
 
 function dashboard() {
-  const t = totals();
-  const lowStock = state.stock.filter((item) => item.status !== "Ready").length;
-  const pendingWork = state.workLogs.filter((log) => log.status !== "Closed" && log.status !== "Received").length;
-  const receivable = state.bills.reduce((sum, bill) => sum + Number(bill.balance || 0), 0);
-  const activeStaff = state.staffs.filter((staff) => staff.status === "Active").length;
-  const topStaff = state.staffs.slice().sort((a, b) => b.sales - a.sales)[0];
   return `
-    <section class="grid overview">
-      ${metric("Today sales", money(t.sales), "+8.4% vs yesterday")}
-      ${metric("Purchases", money(t.purchases), "old gold and supplier")}
-      ${metric("Cash position", money(t.cash), "after current day book")}
-      ${metric("Gold stock", grams(t.stockWeight), "all purities")}
-      ${metric("Scheme dues", money(t.schemeDue), "collection follow-up")}
-      ${metric("Receivable", money(receivable), "customer balances")}
-      ${metric("Pending work", pendingWork, "smith/jeweller/refiner")}
-      ${metric("Active staffs", activeStaff, `${topStaff?.name || "No staff"} leading today`)}
-    </section>
-    <section class="split">
-      <div class="panel">
-        <div class="panel-head">
-          <h2>Business Snapshot</h2>
-        </div>
-        ${table(["Area", "Status", "Value", "Next Step"], [
-          ["Billing", "Open", money(t.sales), "Print pending customer copies"],
-          ["Stock", lowStock ? "Review" : "Clear", `${lowStock} items`, "Check low review and draft stock"],
-          ["Schemes", "Follow-up", money(t.schemeDue), "Collect member dues"],
-          ["Accounts", "Day close", money(t.cash), "Verify cash and bank entries"],
-          ["Workflows", "Pending", `${pendingWork} entries`, "Receive or reconcile issued items"]
-        ])}
-      </div>
-      <div class="panel">
-        <div class="panel-head"><h2>Staff Performance</h2></div>
-        ${table(["Staff ID", "Name", "Bills", "Sales"], state.staffs.map((staff) => [staff.staffId, staff.name, staff.handled, money(staff.sales)]))}
-      </div>
-    </section>
+    <section class="staff-welcome panel"><span class="staff-round-pill">Testing round 1</span><h2>Start with Masters, then test Sales</h2><p>This test version contains only a few clearly marked demo records. Use made-up information for anything you add.</p><div class="staff-start-steps"><button data-management="Customers"><b>1</b><span><strong>Customers</strong>Open Management and check customer creation, search and edit.</span></button><button data-management="Item Creation"><b>2</b><span><strong>Items</strong>Review the three demo items and try creating one item.</span></button><button data-sales-section="Sales Invoice"><b>3</b><span><strong>Sales invoice</strong>Create, save, find, edit and print one demo invoice.</span></button><button data-staff-test-action="feedback"><b>4</b><span><strong>Send feedback</strong>Report unclear fields or missing steps from the exact screen.</span></button></div><aside><strong>Demo records included</strong><span>2 customers · 1 supplier · 3 jewellery items · 3 stock tags · 1 completed example invoice</span></aside></section>
   `;
 }
 

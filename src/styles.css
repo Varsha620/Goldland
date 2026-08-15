@@ -9590,6 +9590,21 @@ body:has(.staff-test-banner) .shell { padding-top: 34px; }
 .staff-feedback-records button.danger { color: #a32121; border-color: #e0aaaa; background: #fff1f0; }
 .staff-feedback-priority { padding: 4px 7px; border-radius: 999px; color: #743800; background: #ffe3ad; font-size: 12px; font-weight: 800; }
 .staff-feedback-empty { display: grid; place-items: center; gap: 6px; min-height: 190px; color: #63706a; text-align: center; }
+.staff-focused-mode .sidebar nav > .nav-group { display: none; }
+.staff-focused-mode .sidebar nav > .nav-group:has([data-nav="Sales"]), .staff-focused-mode .sidebar nav > .nav-group:has([data-nav="Management"]) { display: block; }
+.staff-focused-mode [data-management="Smiths"], .staff-focused-mode [data-management="Refiners"], .staff-focused-mode [data-management="Item Category"], .staff-focused-mode [data-management="Miscellaneous"], .staff-focused-mode [data-management="Account Creation"] { display: none !important; }
+.staff-welcome { max-width: 980px; margin: 12px auto; padding: 34px; border: 1px solid #d9e5df; border-radius: 20px; background: linear-gradient(145deg, #fff 0%, #f2f8f5 100%); }
+.staff-welcome h2 { margin: 12px 0 7px; font-size: 30px; color: #193f35; }
+.staff-welcome > p { margin: 0 0 26px; color: #5b6d66; font-size: 16px; }
+.staff-round-pill { display: inline-flex; padding: 6px 10px; border-radius: 999px; color: #744000; background: #ffe7b8; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; }
+.staff-start-steps { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.staff-start-steps button { display: grid; grid-template-columns: 36px 1fr; gap: 12px; align-items: start; padding: 18px; border: 1px solid #d8e2de; border-radius: 12px; color: #2c3b35; background: #fff; text-align: left; cursor: pointer; }
+.staff-start-steps button:hover { border-color: #7cab98; box-shadow: 0 6px 18px #214c3a18; }
+.staff-start-steps button > b { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; color: #fff; background: #28745a; }
+.staff-start-steps button span { display: grid; gap: 4px; color: #65746e; }
+.staff-start-steps button strong { color: #244c3e; font-size: 16px; }
+.staff-welcome > aside { display: grid; gap: 4px; margin-top: 18px; padding: 14px 16px; border-radius: 10px; color: #5b6b65; background: #eaf3ef; }
+@media (max-width: 760px) { .staff-start-steps { grid-template-columns: 1fr; } .staff-welcome { padding: 22px; } }
 @media (max-width: 720px) { .staff-test-banner { justify-content: space-between; font-size: 11px; } .staff-test-banner span { display: none; } .staff-test-actions { right: 10px; bottom: 10px; } .staff-test-actions button { padding: 0 10px; } }
 @media print { .staff-test-banner, .staff-test-actions, .staff-test-backdrop { display: none !important; } body:has(.staff-test-banner) .shell { padding-top: 0; } }
 .diamond-sales-mode { display: flex; gap: 46px; align-items: center; padding: 0 18px; font-size: 16px; }
