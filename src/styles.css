@@ -9580,6 +9580,16 @@ body:has(.staff-test-banner) .shell { padding-top: 34px; }
 .staff-feedback-form > label { display: grid; gap: 6px; margin: 14px 22px; font-weight: 700; }
 .staff-feedback-form input, .staff-feedback-form select, .staff-feedback-form textarea { width: 100%; padding: 10px; border: 1px solid #aeb8b3; border-radius: 7px; background: #fff; font: inherit; }
 .staff-feedback-context { display: flex; justify-content: space-between; gap: 20px; margin: 20px 22px; padding: 12px 14px; border-radius: 8px; background: #eef5f2; }
+.staff-feedback-records { display: grid; gap: 12px; padding: 0 22px 22px; }
+.staff-feedback-records article { padding: 15px; border: 1px solid #ded9ce; border-radius: 10px; background: #fff; }
+.staff-feedback-records article > div, .staff-feedback-records article > footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.staff-feedback-records h3 { margin: 10px 0 4px; }
+.staff-feedback-records p { margin: 4px 0 10px; color: #4d5a55; }
+.staff-feedback-records article > footer { justify-content: flex-end; margin-top: 13px; }
+.staff-feedback-records button { padding: 7px 10px; border: 1px solid #a8b2ad; border-radius: 6px; background: #f5f7f6; cursor: pointer; }
+.staff-feedback-records button.danger { color: #a32121; border-color: #e0aaaa; background: #fff1f0; }
+.staff-feedback-priority { padding: 4px 7px; border-radius: 999px; color: #743800; background: #ffe3ad; font-size: 12px; font-weight: 800; }
+.staff-feedback-empty { display: grid; place-items: center; gap: 6px; min-height: 190px; color: #63706a; text-align: center; }
 @media (max-width: 720px) { .staff-test-banner { justify-content: space-between; font-size: 11px; } .staff-test-banner span { display: none; } .staff-test-actions { right: 10px; bottom: 10px; } .staff-test-actions button { padding: 0 10px; } }
 @media print { .staff-test-banner, .staff-test-actions, .staff-test-backdrop { display: none !important; } body:has(.staff-test-banner) .shell { padding-top: 0; } }
 .diamond-sales-mode { display: flex; gap: 46px; align-items: center; padding: 0 18px; font-size: 16px; }

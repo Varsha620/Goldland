@@ -768,6 +768,39 @@ function rate(type, grade, price, time, reason) {
   return { id: crypto.randomUUID(), type, grade, price, time, reason, user: "Goldland", date: "2026-05-16" };
 }
 
+function staffTestingChromeV2() {
+  const count = JSON.parse(localStorage.getItem(STAFF_FEEDBACK_KEY) || "[]").length;
+  return `<div class="staff-test-banner" role="status"><strong>TESTING VERSION</strong><span>Demo data only - do not enter real customer or financial information</span><small>${STAFF_TEST_VERSION}</small></div><div class="staff-test-actions" aria-label="Staff testing tools"><button type="button" data-staff-test-action="guide">Test guide</button><button type="button" data-staff-test-action="feedback">New feedback</button><button type="button" data-staff-test-action="feedback-list">My feedback${count ? ` (${count})` : ""}</button></div>`;
+}
+
+function openStaffFeedbackList() {
+  const records = JSON.parse(localStorage.getItem(STAFF_FEEDBACK_KEY) || "[]");
+  document.body.insertAdjacentHTML("beforeend", `<div class="staff-test-backdrop" data-staff-test-modal><section class="staff-test-modal staff-feedback-list" role="dialog" aria-modal="true"><header><div><small>${STAFF_TEST_VERSION}</small><h2>My feedback</h2></div><button type="button" aria-label="Close" data-staff-test-close>x</button></header><p>These reports are saved only in this browser. Edit, delete, or share them before clearing browser data.</p><div class="staff-feedback-records">${records.length ? records.map((record) => `<article><div><span class="staff-feedback-priority">${escapeHtml(record.priority)}</span><small>${escapeHtml(new Date(record.createdAt).toLocaleString("en-IN"))}</small></div><h3>${escapeHtml(record.screen)}</h3><p><b>${escapeHtml(record.result)}</b> - ${escapeHtml(record.details)}</p><small>Tester: ${escapeHtml(record.staffName)}</small><footer><button type="button" data-feedback-share="${escapeHtml(record.id)}">Copy / Share</button><button type="button" data-feedback-edit="${escapeHtml(record.id)}">Edit</button><button type="button" class="danger" data-feedback-delete="${escapeHtml(record.id)}">Delete</button></footer></article>`).join("") : `<div class="staff-feedback-empty"><strong>No feedback saved yet</strong><span>Open the screen you want to review, then select New feedback.</span></div>`}</div><footer><button type="button" class="primary" data-staff-test-close>Close</button></footer></section></div>`);
+  bindStaffTestManagerEvents();
+}
+
+function openStaffFeedbackEditor(recordId) {
+  const records = JSON.parse(localStorage.getItem(STAFF_FEEDBACK_KEY) || "[]"), record = records.find((item) => item.id === recordId);
+  if (!record) return;
+  const results = ["Cannot complete", "Works but needs changes", "Works correctly", "Not used by our shop"], priorities = ["Blocking", "Important", "Optional suggestion"];
+  document.body.insertAdjacentHTML("beforeend", `<div class="staff-test-backdrop" data-staff-test-modal><form class="staff-test-modal staff-feedback-form" data-staff-feedback-edit-form data-feedback-id="${escapeHtml(record.id)}"><header><div><small>${STAFF_TEST_VERSION}</small><h2>Edit feedback</h2></div><button type="button" aria-label="Close" data-staff-test-close>x</button></header><div class="staff-feedback-context"><span>Screen</span><strong>${escapeHtml(record.screen)}</strong></div><label><span>Your name</span><input name="staffName" required value="${escapeHtml(record.staffName)}" /></label><label><span>Result</span><select name="result">${results.map((item) => `<option ${item === record.result ? "selected" : ""}>${item}</option>`).join("")}</select></label><label><span>Priority</span><select name="priority">${priorities.map((item) => `<option ${item === record.priority ? "selected" : ""}>${item}</option>`).join("")}</select></label><label><span>What happened, and what should happen instead?</span><textarea name="details" rows="5" required>${escapeHtml(record.details)}</textarea></label><footer><button type="button" class="secondary" data-staff-test-close>Cancel</button><button type="submit" class="primary">Save changes</button></footer></form></div>`);
+  bindStaffTestManagerEvents();
+}
+
+async function copyOrShareStaffFeedback(record) {
+  if (!record) return;
+  const summary = `Goldland feedback\nVersion: ${record.version}\nScreen: ${record.screen}\nTester: ${record.staffName}\nResult: ${record.result}\nPriority: ${record.priority}\nDetails: ${record.details}`;
+  try { if (navigator.share) await navigator.share({ title: `Goldland: ${record.screen}`, text: summary }); else if (navigator.clipboard) { await navigator.clipboard.writeText(summary); toast("Feedback copied. Send it to the project owner."); } } catch (error) { if (error?.name !== "AbortError") toast("Could not share this feedback."); }
+}
+
+function bindStaffTestManagerEvents() {
+  document.querySelectorAll("[data-staff-test-close]").forEach((button) => button.addEventListener("click", () => document.querySelector("[data-staff-test-modal]")?.remove()));
+  document.querySelectorAll("[data-feedback-edit]").forEach((button) => button.addEventListener("click", () => { document.querySelector("[data-staff-test-modal]")?.remove(); openStaffFeedbackEditor(button.dataset.feedbackEdit); }));
+  document.querySelectorAll("[data-feedback-share]").forEach((button) => button.addEventListener("click", () => copyOrShareStaffFeedback(JSON.parse(localStorage.getItem(STAFF_FEEDBACK_KEY) || "[]").find((item) => item.id === button.dataset.feedbackShare))));
+  document.querySelectorAll("[data-feedback-delete]").forEach((button) => button.addEventListener("click", () => { if (!confirm("Delete this feedback report?")) return; const records = JSON.parse(localStorage.getItem(STAFF_FEEDBACK_KEY) || "[]").filter((item) => item.id !== button.dataset.feedbackDelete); localStorage.setItem(STAFF_FEEDBACK_KEY, JSON.stringify(records)); document.querySelector("[data-staff-test-modal]")?.remove(); openStaffFeedbackList(); }));
+  document.querySelector("[data-staff-feedback-edit-form]")?.addEventListener("submit", (event) => { event.preventDefault(); const form = event.currentTarget, data = new FormData(form), records = JSON.parse(localStorage.getItem(STAFF_FEEDBACK_KEY) || "[]"), updated = records.map((record) => record.id === form.dataset.feedbackId ? { ...record, staffName: String(data.get("staffName") || "").trim(), result: data.get("result"), priority: data.get("priority"), details: String(data.get("details") || "").trim(), updatedAt: new Date().toISOString() } : record); localStorage.setItem(STAFF_FEEDBACK_KEY, JSON.stringify(updated)); document.querySelector("[data-staff-test-modal]")?.remove(); render(); toast("Feedback changes saved."); });
+}
+
 function audit(action, time = nowTime()) {
   return { id: crypto.randomUUID(), user: "Goldland", action, time, date: "2026-05-16" };
 }
@@ -4164,7 +4197,7 @@ function loginScreen() {
 
 function appShell() {
   return `
-    ${staffTestingChrome()}
+    ${staffTestingChromeV2()}
     <main class="shell">
       ${sidebar()}
       <section class="workspace">
@@ -20894,7 +20927,7 @@ function select(name, label, options, selectedValue = "") {
 
 function bindEvents() {
   bindDraggableSalesDatePopup();
-  document.querySelectorAll("[data-staff-test-action]").forEach((button) => button.addEventListener("click", () => { if (button.dataset.staffTestAction === "guide") openStaffTestGuide(); if (button.dataset.staffTestAction === "feedback") openStaffFeedback(); }));
+  document.querySelectorAll("[data-staff-test-action]").forEach((button) => button.addEventListener("click", () => { if (button.dataset.staffTestAction === "guide") openStaffTestGuide(); if (button.dataset.staffTestAction === "feedback") openStaffFeedback(); if (button.dataset.staffTestAction === "feedback-list") openStaffFeedbackList(); }));
   document.querySelector(".content")?.addEventListener("submit", (event) => {
     if (event.target.matches("[data-day-lock-login], [data-day-lock-form], [data-financial-save-form]")) return;
     const dateField = event.target.querySelector('input[name="date"], input[name="entryDate"], input[data-entry-date], input[type="date"]');
