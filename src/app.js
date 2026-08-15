@@ -793,7 +793,7 @@ function openStaffFeedback() {
 function bindStaffTestModalEvents() {
   document.querySelectorAll("[data-staff-test-close]").forEach((button) => button.addEventListener("click", () => document.querySelector("[data-staff-test-modal]")?.remove()));
   document.querySelectorAll("[data-staff-check]").forEach((input) => input.addEventListener("change", () => { const completed = JSON.parse(localStorage.getItem(STAFF_CHECKLIST_KEY) || "{}"); completed[input.dataset.staffCheck] = input.checked; localStorage.setItem(STAFF_CHECKLIST_KEY, JSON.stringify(completed)); }));
-  document.querySelector("[data-staff-test-action='reset']")?.addEventListener("click", () => { if (confirm("Reset all demo transactions and checklist progress on this device?")) { localStorage.removeItem("goldland-state"); localStorage.removeItem(STAFF_CHECKLIST_KEY); location.reload(); } });
+  document.querySelector("[data-staff-test-action='reset']")?.addEventListener("click", () => { if (confirm("Reset all demo transactions and checklist progress on this device?")) { localStorage.removeItem("goldland-state"); localStorage.removeItem("goldland-staff-clean-data-version"); localStorage.removeItem(STAFF_CHECKLIST_KEY); location.reload(); } });
   document.querySelector("[data-staff-feedback-form]")?.addEventListener("submit", (event) => { event.preventDefault(); saveAndShareStaffFeedback(event.currentTarget); });
 }
 
