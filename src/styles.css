@@ -9564,6 +9564,9 @@ body:has(.staff-test-banner) .shell { padding-top: 34px; }
 .staff-test-actions { position: fixed; right: 18px; bottom: 18px; z-index: 120; display: flex; gap: 8px; padding: 7px; border: 1px solid #d7b783; border-radius: 12px; background: #fff9ed; box-shadow: 0 8px 28px #2c1b0b35; }
 .staff-test-actions button { min-height: 38px; padding: 0 14px; border: 0; border-radius: 8px; color: #fff; background: #8a4b08; font-weight: 800; cursor: pointer; }
 .staff-test-actions button:first-child { color: #6c3b08; background: #f8dfb4; }
+.staff-test-actions .staff-tools-toggle { min-width: 38px; padding: 0 10px; color: #6c3b08; background: #f8dfb4; font-size: 17px; }
+.staff-test-actions.collapsed { padding: 4px; }
+.staff-test-actions.collapsed button:not(.staff-tools-toggle) { display: none; }
 .staff-test-backdrop { position: fixed; inset: 0; z-index: 300; display: grid; place-items: center; padding: 20px; background: #15211dcc; }
 .staff-test-modal { width: min(610px, 100%); max-height: calc(100vh - 40px); overflow: auto; border: 1px solid #c8b084; border-radius: 16px; color: #26312d; background: #fff; box-shadow: 0 24px 80px #0007; }
 .staff-test-modal > header { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px; color: #fff; background: #6d3c0a; }

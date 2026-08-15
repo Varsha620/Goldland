@@ -815,7 +815,50 @@ function rate(type, grade, price, time, reason) {
 
 function staffTestingChromeV2() {
   const count = JSON.parse(localStorage.getItem(STAFF_FEEDBACK_KEY) || "[]").length;
-  return `<div class="staff-test-banner" role="status"><strong>TESTING VERSION</strong><span>Demo data only - do not enter real customer or financial information</span><small>${STAFF_TEST_VERSION}</small></div><div class="staff-test-actions" aria-label="Staff testing tools"><button type="button" data-staff-test-action="guide">Test guide</button><button type="button" data-staff-test-action="feedback">New feedback</button><button type="button" data-staff-test-action="feedback-list">My feedback${count ? ` (${count})` : ""}</button></div>`;
+  const collapsed = localStorage.getItem("goldland-staff-tools-collapsed") === "true";
+  return `<div class="staff-test-banner" role="status"><strong>TESTING VERSION</strong><span>Demo data only - do not enter real customer or financial information</span><small>${STAFF_TEST_VERSION}</small></div><div class="staff-test-actions ${collapsed ? "collapsed" : ""}" aria-label="Staff testing tools"><button type="button" data-staff-test-action="guide">Test guide</button><button type="button" data-staff-test-action="feedback">New feedback</button><button type="button" data-staff-test-action="feedback-list">My feedback${count ? ` (${count})` : ""}</button><button type="button" class="staff-tools-toggle" data-staff-test-action="toggle-tools" title="${collapsed ? "Show" : "Minimize"} testing tools">${collapsed ? "+ Testing tools" : "−"}</button></div>`;
+}
+
+function activeSalesRecordCollection() {
+  if (salesView === "Sales Order") return state.salesOrders ||= [];
+  if (salesView === "DMD Return/DMD OP") return state.dmdReturns ||= [];
+  if (salesView === "DMD Sales WholeSales") return state.dmdWholesales ||= [];
+  return state.bills ||= [];
+}
+
+function newSalesRecord() {
+  if (salesView === "DMD Return/DMD OP") return normalizeDmdReturnBill({ id: crypto.randomUUID(), entryNo: `DR${Date.now().toString().slice(-5)}`, date: new Date().toLocaleDateString("en-GB"), preparedBy: staffNameOptions()[0], customer: "", ornamentLines: [], stoneLines: [] });
+  if (salesView === "DMD Sales WholeSales") return normalizeDmdWholesaleBill({ id: crypto.randomUUID(), entryNo: `DW${Date.now().toString().slice(-5)}`, date: new Date().toLocaleDateString("en-GB"), preparedBy: staffNameOptions()[0], customer: "", ornamentLines: [], diamondLines: [] });
+  const type = salesView === "Sales Order" ? "Sales Order" : salesView === "Sales Return" ? "Sales Return" : "Sale";
+  const record = normalizeBill({ id: crypto.randomUUID(), entryNo: `S${Date.now().toString().slice(-5)}`, billNo: `DEMO-${Date.now().toString().slice(-5)}`, date: new Date().toLocaleDateString("en-GB"), time: nowTime(), type, customer: "", customerId: "", phone: "", address: "", staffName: staffNameOptions()[0], agent: agentNameOptions()[0] || "", itemCategory: "B2C", sections: { sales: [], exchange: [], return: [] }, amount: 0, paid: 0, balance: 0 });
+  if (type === "Sales Order") record.sections = { sales: [], exchange: [], return: [] };
+  return record;
+}
+
+function startNewSalesBill() {
+  const collection = activeSalesRecordCollection();
+  collection.unshift(newSalesRecord());
+  saveState(); render(); toast(`New ${salesView} ready.`);
+}
+
+function navigateSalesBill(direction) {
+  const collection = activeSalesRecordCollection();
+  if (collection.length < 2) { toast("No other saved bill available."); return; }
+  if (direction === "previous") collection.push(collection.shift()); else collection.unshift(collection.pop());
+  saveState(); render(); toast(`${direction === "previous" ? "Previous" : "Next"} bill loaded.`);
+}
+
+function deleteActiveSalesBill() {
+  const collection = activeSalesRecordCollection();
+  if (!collection.length) { toast("No bill selected."); return; }
+  if (!confirm(`Delete the current ${salesView} demo record?`)) return;
+  collection.shift();
+  if (!collection.length) collection.push(newSalesRecord());
+  saveState(); render(); toast("Bill deleted. A clean entry is ready.");
+}
+
+function activeSalesRecord() {
+  return activeSalesRecordCollection()[0] || null;
 }
 
 function openStaffFeedbackList() {
@@ -4096,6 +4139,7 @@ function defaultOrderAdvanceDraft(type = "advance") {
     date: new Date().toLocaleDateString("en-GB"),
     time: nowTimeWithSeconds(),
     preparedBy: state?.staffs?.[0]?.name || seed.staffs?.[0]?.name || "",
+    agent: agentNameOptions()[0] || "",
     paymentMode: "Cash",
     cashBank: "Cash in Hand",
     advanceAmount: 0,
@@ -4691,6 +4735,7 @@ function orderAdvanceEntryPanel(type, draft, summary) {
         ${orderAdvanceDualField(type, "Entry No, Ref No", "entryNo", "refNo", draft.entryNo, draft.refNo, "text")}
         ${orderAdvanceDateTimeField(type, draft)}
         ${orderAdvanceSelectField(type, "Prepared By", "preparedBy", draft.preparedBy, staffNameOptions())}
+        ${orderAdvanceSelectField(type, "Agent", "agent", draft.agent, agentNameOptions())}
         ${isRefund ? "" : orderAdvanceSelectField(type, "Payment Mode", "paymentMode", draft.paymentMode, ["Cash", "Credit", "Bank", "Mixed"])}
         ${isRefund ? "" : orderAdvanceSelectField(type, "Cash/Bank", "cashBank", draft.cashBank, cashBankOptions())}
         ${isRefund ? orderAdvanceAmountField(type, "Refund Amount", "refundAmount", draft.refundAmount) : ""}
@@ -4874,6 +4919,7 @@ function billing() {
   return `
     <section class="classic-billing-shell clean-entry-shell panel">
       <div class="entry-actions body-toolbar">
+        ${toolbarButton("New", "new-sales-bill")}
         ${toolbarButton("Save (F9)", "save-current-bill")}
         ${toolbarButton("Edit", "edit-current-bill")}
         ${toolbarButton("Delete", "void-bill")}
@@ -4947,6 +4993,7 @@ function salesOrder() {
   return `
     <section class="classic-billing-shell clean-entry-shell panel sales-order-shell">
       <div class="entry-actions body-toolbar">
+        ${toolbarButton("New", "new-sales-bill")}
         ${toolbarButton("Refresh", "refresh")}
         ${toolbarButton("Save", "save-current-bill")}
         ${toolbarButton("Edit", "edit-current-bill")}
@@ -5015,6 +5062,7 @@ function salesReturn() {
   return `
     <section class="classic-billing-shell clean-entry-shell panel">
       <div class="entry-actions body-toolbar">
+        ${toolbarButton("New", "new-sales-bill")}
         ${toolbarButton("Refresh", "refresh")}
         ${toolbarButton("Save", "save-current-bill")}
         ${toolbarButton("Edit", "edit-current-bill")}
@@ -7684,6 +7732,7 @@ function dmdReturn() {
   return `
     <section class="classic-billing-shell clean-entry-shell panel dmd-return-shell">
       <div class="entry-actions body-toolbar">
+        ${toolbarButton("New", "new-sales-bill")}
         ${toolbarButton("Save F9", "save-dmd-return")}
         ${toolbarButton("Refresh", "refresh")}
         ${toolbarButton("Edit", "edit-current-bill")}
@@ -7711,6 +7760,7 @@ function dmdWholesale() {
   return `
     <section class="classic-billing-shell clean-entry-shell panel dmd-wholesale-shell">
       <div class="entry-actions body-toolbar">
+        ${toolbarButton("New", "new-sales-bill")}
         ${toolbarButton("Refresh", "refresh")}
         ${toolbarButton("Save", "save-dmd-wholesale")}
         ${toolbarButton("Edit", "edit-current-bill")}
@@ -18952,7 +19002,7 @@ function classicBillHeader(bill) {
       <div class="classic-fields left">
         ${classicField("Entry No, Ref No", bill.entryNo)}
         ${classicField("Date, Time", bill.date)}
-        ${classicField("Staff,Agent", `${bill.staffName || "-"} (${bill.staffId || "-"})`)}
+        <label class="classic-field split-field"><span>Staff, Agent</span><span class="field-pair">${staffDropdownCell("staffName", bill.staffName || "")}${agentDropdownCell("agent", bill.agent || "")}</span></label>
         ${classicField("Item Category", bill.itemCategory || "B2C", "select")}
       </div>
       <div class="classic-center-fields">
@@ -18981,6 +19031,7 @@ function salesOrderHeader(order) {
         <label class="classic-field split-field"><span>Order No, Ref No</span><span class="field-pair"><input value="${order.entryNo || "2221"}" /><input value="${order.refNo || ""}" /></span></label>
         <label class="classic-field split-field"><span>Date, Time</span><span class="field-pair"><input type="date" value="${dateValue}" title="${order.date || ""}" /><input value="${order.time || nowTime()}" readonly /></span></label>
         <label class="classic-field split-field"><span>Prepared By, Type</span><span class="field-pair">${staffDropdownCell("staffName", order.staffName || "")}<select data-header-field="paymentMode"><option ${paymentMode === "Cash" ? "selected" : ""}>Cash</option><option ${paymentMode === "Credit" ? "selected" : ""}>Credit</option><option ${paymentMode === "Bank" ? "selected" : ""}>Bank</option></select></span></label>
+        <label class="classic-field"><span>Agent</span>${agentDropdownCell("agent", order.agent || "")}</label>
         ${classicField("Introducer", order.introducer || "")}
       </div>
       <div class="classic-fields right">
@@ -19274,6 +19325,7 @@ function transactionHeader(kind, bill, options = {}) {
         ${classicField("Date, Time", new Date().toLocaleDateString("en-GB"))}
         ${kind === "Purchase" || kind === "Purchase Return" ? classicField(modeLabel, "Cash / B2C", "text") : ""}
         <label class="classic-field"><span>${preparedLabel}</span>${staffDropdownCell("staffName", bill?.staffName || bill?.preparedBy || "")}</label>
+        <label class="classic-field"><span>Agent</span>${agentDropdownCell("agent", bill?.agent || "")}</label>
       </div>
       <div class="classic-fields right">
         ${classicField(partyLabel, party)}
@@ -19300,6 +19352,11 @@ function classicTransactionTable(kind, entryColumns, entryRow, columns, rows) {
 function staffDropdownCell(field, selected = "") {
   const options = staffNameOptions();
   return `<select class="classic-input" data-header-field="${field}">${options.map((name) => `<option ${name === selected ? "selected" : ""}>${name}</option>`).join("")}</select>`;
+}
+
+function agentDropdownCell(field, selected = "") {
+  const options = agentNameOptions();
+  return `<select class="classic-input" data-header-field="${field}">${options.map((name) => `<option ${name === selected ? "selected" : ""}>${name || "Select agent"}</option>`).join("")}</select>`;
 }
 
 function itemCatalogRows() {
@@ -19366,6 +19423,7 @@ function dmdReturnHeader(bill) {
         ${classicField("Entry No, Ref No", bill.entryNo)}
         ${classicField("Date, Time", bill.date)}
         <label class="classic-field"><span>Prepared By</span>${staffDropdownCell("preparedBy", bill.preparedBy)}</label>
+        <label class="classic-field"><span>Agent</span>${agentDropdownCell("agent", bill.agent || "")}</label>
         <div class="radio-row">
           ${["Cash", "Credit", "Bank"].map((mode) => `<label><input type="radio" name="dmdReturnMode" ${bill.paymentMode === mode ? "checked" : ""} />${mode}</label>`).join("")}
         </div>
@@ -19398,6 +19456,7 @@ function dmdWholesaleHeader(bill) {
         ${customerLookupField("Customer", "customer", bill.customer)}
         ${customerLookupField("Party Name", "customer", bill.partyName)}
         <label class="classic-field"><span>Prepared By</span>${staffDropdownCell("preparedBy", bill.preparedBy)}</label>
+        <label class="classic-field"><span>Agent</span>${agentDropdownCell("agent", bill.agent || "")}</label>
         ${customerQuickAddButton()}
       </div>
     </div>
@@ -20939,7 +20998,8 @@ function select(name, label, options, selectedValue = "") {
 
 function bindEvents() {
   bindDraggableSalesDatePopup();
-  document.querySelectorAll("[data-staff-test-action]").forEach((button) => button.addEventListener("click", () => { if (button.dataset.staffTestAction === "guide") openStaffTestGuide(); if (button.dataset.staffTestAction === "feedback") openStaffFeedback(); if (button.dataset.staffTestAction === "feedback-list") openStaffFeedbackList(); }));
+  document.querySelectorAll("[data-staff-test-action]").forEach((button) => button.addEventListener("click", () => { if (button.dataset.staffTestAction === "guide") openStaffTestGuide(); if (button.dataset.staffTestAction === "feedback") openStaffFeedback(); if (button.dataset.staffTestAction === "feedback-list") openStaffFeedbackList(); if (button.dataset.staffTestAction === "toggle-tools") { const collapsed = localStorage.getItem("goldland-staff-tools-collapsed") === "true"; localStorage.setItem("goldland-staff-tools-collapsed", String(!collapsed)); render(); } }));
+  document.querySelectorAll("[data-header-field]").forEach((field) => field.addEventListener("change", () => { const record = activeSalesRecord(); if (!record || active !== "Sales") return; record[field.dataset.headerField] = field.value; if (["staffName", "preparedBy"].includes(field.dataset.headerField)) { record.staffName = field.value; record.preparedBy = field.value; record.staffId = state.staffs.find((staff) => staff.name === field.value)?.staffId || record.staffId || ""; } saveState(); toast(`${field.dataset.headerField === "agent" ? "Agent" : "Staff"} updated.`); }));
   document.querySelector(".content")?.addEventListener("submit", (event) => {
     if (event.target.matches("[data-day-lock-login], [data-day-lock-form], [data-financial-save-form]")) return;
     const dateField = event.target.querySelector('input[name="date"], input[name="entryDate"], input[data-entry-date], input[type="date"]');
@@ -26618,7 +26678,10 @@ function handleAction(action, source) {
   }
   if (action === "save-current-bill") {
     saveState();
-    toast("Bill saved. Press Enter in the entry row to add products.");
+    toast("Bill saved. Select New to enter the next bill.");
+  }
+  if (action === "new-sales-bill") {
+    startNewSalesBill(); return;
   }
   if (action === "edit-current-bill") {
     openExistingRecordPicker();
@@ -26639,9 +26702,14 @@ function handleAction(action, source) {
     toast(`Sales Order ${order.entryNo || order.id} marked Finished.`);
     return;
   }
-  if (["void-bill", "repost-bill", "previous-bill", "next-bill", "billing-settings", "billing-notes", "refresh", "close-billing"].includes(action)) {
-    toast("Billing action ready for detailed workflow.");
-  }
+  if (action === "previous-bill") { navigateSalesBill("previous"); return; }
+  if (action === "next-bill") { navigateSalesBill("next"); return; }
+  if (action === "void-bill") { deleteActiveSalesBill(); return; }
+  if (action === "refresh") { if (active === "Sales") startNewSalesBill(); else render(); return; }
+  if (action === "close-billing") { active = "Dashboard"; render(); return; }
+  if (action === "repost-bill") { state.audit.unshift(audit(`Reposted ${activeSalesRecord()?.billNo || salesView}`)); saveState(); toast("Bill reposted to the demo audit log."); return; }
+  if (action === "billing-settings") { toast("Billing settings are managed from the approved production configuration."); return; }
+  if (action === "billing-notes") { toast(activeSalesRecord()?.remark || "No notes added to this bill."); return; }
   if (action === "print-now") {
     window.print();
     state.audit.unshift(audit(`Printed customer copy for ${state.bills[0]?.id || "bill"}`));
