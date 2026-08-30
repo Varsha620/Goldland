@@ -5316,8 +5316,7 @@ function billFinancials(bill) {
   const rateDifference = Number(bill.totals?.rateDifference || 0);
   const paymentBreakup = normalizePaymentBreakup(bill.paymentBreakup);
   const paymentTotal = paymentBreakup.cash + paymentBreakup.gpay + paymentBreakup.card + paymentBreakup.bank + paymentBreakup.other;
-  const baseCashReceived = paymentTotal > 0 ? Number(bill.paid || 0) : Number(bill.totals?.cashReceived || bill.paid || 0);
-  const cashReceived = baseCashReceived + paymentTotal;
+  const cashReceived = paymentTotal > 0 ? paymentTotal : Number(bill.totals?.cashReceived || bill.paid || 0);
   const discountTotal = flatDiscount + coupon;
   const totalAdjustments = exchangeTotal + returnTotal + salesOrder + discountTotal;
   const taxTotal = ["sales", "return", "exchange"].reduce((sum, section) => {
@@ -7356,7 +7355,7 @@ function cashBankDropdown(field, value, attr) {
 }
 
 function staffCodeForName(name) {
-  const staff = (state.staffs || []).find((item) => item.name === name);
+  const staff = (state?.staffs || seed.staffs || []).find((item) => item.name === name);
   return staff?.employeeId || staff?.staffId || "";
 }
 
@@ -19299,6 +19298,7 @@ function classicBillingSection(title, rows, entryColumns, entryMapper, columns, 
     <section class="classic-entry-area billing-section">
       <div class="classic-entry-grid">
         ${table(entryColumns, [entryMapper(normalizedFirst)])}
+        <button type="button" class="primary add-bill-item-button" data-action="add-bill-item">+ Add Item</button>
       </div>
       <div class="classic-subtabs">
         ${isSalesSection ? `<button class="active" type="button" data-classic-subtab="sales">Sales</button><button type="button" data-classic-subtab="diamond">Diamond</button>` : `<span class="active">${title}</span>`}
@@ -20530,6 +20530,9 @@ function billingTotals(bill) {
     balance: financials.balance,
     refundAmount: financials.refundAmount
   };
+  const payment = normalizePaymentBreakup(bill.paymentBreakup);
+  const enteredPaymentTotal = payment.cash + payment.gpay + payment.card + payment.bank + payment.other;
+  const displayedCash = enteredPaymentTotal > 0 ? payment.cash : Number(bill.totals?.cashReceived || bill.paid || 0);
   return `
     <div class="billing-bottom">
       <div class="adjustments">
@@ -20538,7 +20541,6 @@ function billingTotals(bill) {
         ${readout("Exchange", money(adj.exchange))}
         ${readout("SalesORD (F5)", money(adj.salesOrder))}
         ${removableReadout("Coupon", money(adj.coupon), "remove-discount", "coupon")}
-        ${cardReadout(money(adj.card))}
         ${readout("Discount Total", money(financials.discountTotal))}
         ${readout("Total Deductions", money(adj.totalAdjustments))}
       </div>
@@ -20557,12 +20559,17 @@ function billingTotals(bill) {
       <div class="adjustments total-block">
         <h4>Payment</h4>
         ${readout("Invoice Total", signedMoney(totals.invoiceTotal))}
+        <label class="readout editable-readout"><span>Discount</span><input data-sales-payment-field="flatDiscount" type="number" min="0" step="0.01" value="${moneyValue(totals.flatDiscount)}" /></label>
+        <label class="readout editable-readout"><span>Cash Received</span><input data-sales-payment-field="cash" type="number" min="0" step="0.01" value="${moneyValue(displayedCash)}" /></label>
+        <label class="readout editable-readout"><span>Card Payment</span><input data-sales-payment-field="card" type="number" min="0" step="0.01" value="${moneyValue(payment.card)}" /></label>
+        <label class="readout editable-readout"><span>GPay / UPI</span><input data-sales-payment-field="gpay" type="number" min="0" step="0.01" value="${moneyValue(payment.gpay)}" /></label>
+        <label class="readout editable-readout"><span>Bank Transfer</span><input data-sales-payment-field="bank" type="number" min="0" step="0.01" value="${moneyValue(payment.bank)}" /></label>
         ${readout("Status", financials.paymentLabel)}
         ${readout("Ledger Balance", money(totals.ledgerBalance))}
-        ${readout("Bill Amount (R.off)", money(totals.billAmountRoundOff))}
-        ${readout("Cash Received", money(totals.cashReceived))}
+        ${readout("Round-off", money(totals.billAmountRoundOff))}
+        ${readout("Total Received", money(totals.cashReceived))}
         ${financials.refundAmount > 0 ? readout("Refund Amount", money(financials.refundAmount)) : ""}
-        ${readout("Balance", money(totals.balance))}
+        ${readout(financials.refundAmount > 0 ? "Change / Refund Due" : "Balance Due", money(totals.balance))}
       </div>
     </div>
   `;
@@ -21678,6 +21685,7 @@ function bindEvents() {
   setupSavedLineEditing();
   setupBillEnterNavigation();
   setupBillCustomerLookup();
+  setupSalesPaymentFields();
   setupDmdReturnScreens();
   setupOrderAdvanceScreens();
   setupSmithWorkScreens();
@@ -23878,7 +23886,15 @@ function setupEntryGridCalculations() {
       input.addEventListener("keydown", (event) => {
         if (event.key !== "Enter") return;
         event.preventDefault();
-        moveToNextBillField(input, () => appendEntryLine(row));
+        const rowFields = [...row.querySelectorAll("[data-line-field]")].filter((field) => !field.disabled && !field.readOnly);
+        const fieldIndex = rowFields.indexOf(input);
+        const nextField = rowFields[fieldIndex + 1];
+        if (nextField) {
+          nextField.focus();
+          nextField.select?.();
+        } else {
+          appendEntryLine(row);
+        }
       });
     });
     recalc();
@@ -23896,6 +23912,25 @@ function setupBillEnterNavigation() {
       });
     });
   });
+}
+
+function setupSalesPaymentFields() {
+  document.querySelectorAll("[data-sales-payment-field]").forEach((field) => field.addEventListener("change", () => {
+    const bill = state.bills?.[0];
+    if (!bill) return;
+    const key = field.dataset.salesPaymentField;
+    const value = Math.max(0, parseEntryNumber(field.value));
+    if (key === "flatDiscount") {
+      bill.discount = value;
+      bill.totals = { ...bill.totals, flatDiscount: value };
+    } else {
+      bill.paymentBreakup = { ...normalizePaymentBreakup(bill.paymentBreakup), [key]: value };
+      bill.paid = 0;
+    }
+    applyBillFinancials(bill);
+    saveState();
+    render();
+  }));
 }
 
 function billEntryFields(scope) {
@@ -24670,6 +24705,7 @@ function updatePolishingStonePreview(row, line) {
 }
 
 function appendEntryLine(row) {
+  const contentScrollTop = document.querySelector(".content")?.scrollTop ?? null;
   if (row.closest(".smith-work-entry")) {
     appendSmithWorkLine(row);
     return;
@@ -24788,7 +24824,7 @@ function appendEntryLine(row) {
   applyBillFinancials(bill);
   state.audit.unshift(audit(`Added ${line.itemName} to ${storeSection} bill`));
   saveState();
-  render();
+  render({ contentScrollTop });
   toast("Item added to bill.");
 }
 
@@ -26070,6 +26106,11 @@ function handleAction(action, source) {
   if (action === "close-modal") return closeModal();
   if (action === "open-rate") return openRateModal();
   if (action === "delete-line") return deleteLine(source);
+  if (action === "add-bill-item") {
+    const row = source.closest(".classic-entry-area")?.querySelector(".classic-entry-grid tbody tr");
+    if (row) appendEntryLine(row);
+    return;
+  }
   if (action === "remove-discount") return removeDiscount(source);
   if (action === "save-card-transactions") return saveCardTransactions();
   if (action === "open-bill") return openBillModal();
