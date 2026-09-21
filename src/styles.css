@@ -5112,6 +5112,15 @@ tbody tr:hover td {
   border-bottom: 2px solid #b694b8;
 }
 
+.linked-diamond-context {
+  margin: 0 0 6px;
+  padding: 7px 10px;
+  border-left: 4px solid #a97818;
+  background: #fff7df;
+  color: #4c3914;
+  font-size: 12px;
+}
+
 .classic-entry-grid th {
   background: #dec5dc;
   color: #2a2730;

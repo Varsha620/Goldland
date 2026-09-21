@@ -643,6 +643,7 @@ let complimentaryIssueDraft = null;
 let complimentaryPurchaseSelectedRow = 0;
 let complimentaryIssueSelectedRow = 0;
 let existingRecordPickerItems = [];
+let pendingDiamondHandoff = null;
 let customVoucherDraft = null;
 let customVoucherEntryDraft = null;
 let customVoucherConfirmDelete = true;
@@ -2178,6 +2179,7 @@ function normalizeDmdStoneLine(line = {}) {
     id: line.id || crypto.randomUUID(),
     itemId: line.itemId || line.idCode || "",
     itemName: line.itemName || line.item || line.name || "",
+    barcode: line.barcode || "",
     nos: Number(line.nos || line.qty || 1),
     colorType: line.colorType || "",
     colorScale: line.colorScale || "",
@@ -7775,6 +7777,7 @@ function dmdWholesale() {
       </div>
       ${dmdReturnHeader(bill)}
       ${classicTransactionTable("dmd-wholesale-entry", dmdWholeSalesClassicEntryColumns(), dmdReturnEntryRow(defaultDmdReturnLine()), dmdWholeSalesClassicColumns(), bill.lines.map(dmdWholeSalesClassicRow))}
+      ${classicTransactionTable("dmd-wholesale-stone", dmdStoneEntryColumns(), dmdStoneEntryRow(defaultDmdStoneLine()), dmdStoneColumns(), bill.diamondLines.map(dmdStoneRow))}
       ${dmdReturnTotals(totals, bill)}
     </section>
   `;
@@ -19009,7 +19012,7 @@ function classicBillHeader(bill) {
         <label class="classic-checkbox"><input type="checkbox" ${bill.prepareEinvoice ? "checked" : ""} /> <span>Prepare eINVOICE</span></label>
       </div>
       <div class="classic-fields right">
-        ${customerLookupField("Cust ID", "customerId", bill.customerId || "")}
+        ${partyIdLookupField("Cust ID", bill, bill.customerId || "")}
         ${customerLookupField("Customer Name", "customer", bill.customer || "")}
         ${customerLookupField("Address", "address", bill.address || "")}
         ${customerLookupField("Phone", "phone", bill.phone || "")}
@@ -19034,7 +19037,7 @@ function salesOrderHeader(order) {
         ${classicField("Introducer", order.introducer || "")}
       </div>
       <div class="classic-fields right">
-        <label class="classic-field party-check-field"><span>Cust ID</span><span class="field-pair party-pair"><input type="checkbox" ${order.customerId ? "checked" : ""} /><input data-customer-field="customerId" data-customer-lookup value="${order.customerId || ""}" list="customer-lookup-options" /></span></label>
+        ${partyIdLookupField("Cust ID", order, order.customerId || "")}
         ${customerLookupField("Customer Name", "customer", order.customer || "")}
         ${customerLookupField("Address", "address", order.address || "")}
         ${customerLookupField("Phone", "phone", order.phone || "")}
@@ -19057,6 +19060,10 @@ function customerLookupField(label, field, value = "") {
   return `<label class="classic-field"><span>${label}</span><input data-customer-field="${field}"${lookup} value="${value ?? ""}" /></label>`;
 }
 
+function partyIdLookupField(label, bill = {}, value = "") {
+  return `<label class="classic-field party-check-field"><span>${label}</span><span class="field-pair party-pair"><input type="checkbox" data-party-lookup-toggle ${bill.partyChecked ? "checked" : ""} title="Show every party type" /><input data-customer-field="customerId" data-customer-lookup value="${value ?? ""}" list="customer-lookup-options" /></span></label>`;
+}
+
 function customerQuickAddButton() {
   return `<button type="button" class="text-button customer-quick-add" data-action="quick-add-customer">New Customer</button>${customerLookupDatalist()}`;
 }
@@ -19068,7 +19075,9 @@ function customerLookupDatalist() {
 
 function customerLookupOptions() {
   const values = [];
-  (state.parties || []).filter((party) => party.type === "Customer").forEach((party) => {
+  const bill = currentCustomerBill(document.querySelector(".classic-billing-shell, .transaction-entry-header"));
+  const includeAll = Boolean(bill?.partyChecked);
+  (state.parties || []).filter((party) => includeAll || party.type === "Customer").forEach((party) => {
     [party.customerCode, party.id, party.name, party.phone, party.mobile].filter(Boolean).forEach((value) => values.push(String(value)));
   });
   return [...new Set(values)];
@@ -19093,7 +19102,7 @@ function purchaseInvoiceHeader(bill) {
         <label class="classic-field"><span>Prepared By</span>${staffDropdownCell("staffName", bill?.staffName || bill?.preparedBy || "")}</label>
       </div>
       <div class="classic-fields right">
-        <label class="classic-field party-check-field"><span>Party</span><span class="field-pair party-pair"><input type="checkbox" ${bill?.partyChecked ? "checked" : ""} /><input data-customer-field="customerId" data-customer-lookup value="${bill?.customerId || ""}" list="customer-lookup-options" /></span></label>
+        ${partyIdLookupField("Party ID", bill, bill?.customerId || bill?.partyId || "")}
         ${customerLookupField("Name", "customer", bill?.customer || bill?.partyName || "")}
         ${customerLookupField("Address", "address", bill?.address || "")}
         ${customerLookupField("Phone", "phone", bill?.phone || "")}
@@ -19118,8 +19127,9 @@ function purchaseReturnHeader(bill) {
         <label class="classic-field split-field"><span>Mode, Location</span><span class="field-pair"><select data-header-field="paymentMode"><option ${mode === "Cash" ? "selected" : ""}>Cash</option><option ${mode === "Credit" ? "selected" : ""}>Credit</option></select><select data-header-field="location">${locationOptions.map((option) => `<option ${option === location ? "selected" : ""}>${option}</option>`).join("")}</select></span></label>
       </div>
       <div class="classic-fields right">
-        <label class="classic-field party-check-field"><span>Party Name</span><span class="field-pair party-pair"><input type="checkbox" ${bill?.partyChecked ? "checked" : ""} /><input value="${bill?.partyName || bill?.customer || ""}" /></span></label>
-        ${classicField("Address", bill?.address || "")}
+        ${partyIdLookupField("Party ID", bill, bill?.customerId || bill?.partyId || "")}
+        ${customerLookupField("Party Name", "customer", bill?.partyName || bill?.customer || "")}
+        ${customerLookupField("Address", "address", bill?.address || "")}
         <label class="classic-field"><span>Prepared By</span>${staffDropdownCell("preparedBy", bill?.preparedBy || bill?.staffName || "")}</label>
       </div>
     </div>
@@ -19141,7 +19151,7 @@ function directPurchaseHeader(bill, options = {}) {
         <label class="classic-field"><span>Prepared By</span>${staffDropdownCell("preparedBy", bill.preparedBy || "")}</label>
       </div>
       <div class="classic-fields right">
-        <label class="classic-field party-check-field"><span>Party</span><span class="field-pair party-pair"><input type="checkbox" ${bill.partyChecked ? "checked" : ""} /><input value="${bill.partyId || ""}" /></span></label>
+        ${partyIdLookupField("Party ID", bill, bill.partyId || bill.customerId || "")}
         ${customerLookupField("Name", "customer", bill.partyName || "")}
         ${customerLookupField("Address", "address", bill.address || "")}
         ${customerLookupField("Phone", "phone", bill.phone || "")}
@@ -19328,10 +19338,11 @@ function transactionHeader(kind, bill, options = {}) {
         <label class="classic-field"><span>Agent</span>${agentDropdownCell("agent", bill?.agent || "")}</label>
       </div>
       <div class="classic-fields right">
-        ${classicField(partyLabel, party)}
-        ${classicField(nameLabel, party)}
-        ${classicField("Address", bill?.address || "")}
-        ${classicField("Phone", bill?.phone || "")}
+        ${partyIdLookupField(partyLabel === nameLabel ? "Party ID" : partyLabel, bill, bill?.customerId || bill?.partyId || "")}
+        ${customerLookupField(nameLabel, "customer", party)}
+        ${customerLookupField("Address", "address", bill?.address || "")}
+        ${customerLookupField("Phone", "phone", bill?.phone || "")}
+        ${customerLookupDatalist()}
       </div>
     </div>
   `;
@@ -19429,7 +19440,7 @@ function dmdReturnHeader(bill) {
         </div>
       </div>
       <div class="classic-fields right">
-        ${customerLookupField("Cust ID", "customerId", bill.customerId)}
+        ${partyIdLookupField("Cust ID", bill, bill.customerId)}
         ${customerLookupField("Customer Name", "customer", bill.customer)}
         ${classicField("GSTIN", bill.gstin)}
         ${classicField("Pan Card No", bill.panCardNo)}
@@ -19453,6 +19464,7 @@ function dmdWholesaleHeader(bill) {
         <label class="classic-field"><span>Return Type</span><select data-dmd-return-field="returnType">${DMD_RETURN_TYPES.map((type) => `<option ${type === (bill.returnType || "Sales Return") ? "selected" : ""}>${type}</option>`).join("")}</select></label>
       </div>
       <div class="classic-fields right">
+        ${partyIdLookupField("Cust ID", bill, bill.customerId || bill.partyId || "")}
         ${customerLookupField("Customer", "customer", bill.customer)}
         ${customerLookupField("Party Name", "customer", bill.partyName)}
         <label class="classic-field"><span>Prepared By</span>${staffDropdownCell("preparedBy", bill.preparedBy)}</label>
@@ -21684,6 +21696,7 @@ function bindEvents() {
   setupEntryGridCalculations();
   setupSavedLineEditing();
   setupBillEnterNavigation();
+  enhanceUniversalPartyLookups();
   setupBillCustomerLookup();
   setupSalesPaymentFields();
   setupDmdReturnScreens();
@@ -21705,6 +21718,7 @@ function bindEvents() {
   setupJournalVoucherScreen();
   setupDirectEntryScreen();
   setupExpenseEntryScreen();
+  applyPendingDiamondHandoff();
 
   document.onkeydown = (event) => {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
@@ -23646,11 +23660,21 @@ function setupDmdReturnScreens() {
 }
 
 function setupBillCustomerLookup() {
+  document.querySelectorAll("[data-party-lookup-toggle]").forEach((checkbox) => {
+    checkbox.addEventListener("change", () => {
+      const bill = currentCustomerBill(checkbox.closest(".classic-billing-shell, .transaction-entry-header"));
+      if (!bill) return;
+      bill.partyChecked = checkbox.checked;
+      saveState();
+      render();
+    });
+  });
   document.querySelectorAll("[data-customer-field]").forEach((field) => {
     field.addEventListener("input", () => updateCurrentCustomerField(field));
     field.addEventListener("change", () => {
       updateCurrentCustomerField(field);
-      const match = findCustomerLookupMatch(field.value);
+      const bill = currentCustomerBill(field.closest(".classic-billing-shell, .transaction-entry-header"));
+      const match = findCustomerLookupMatch(field.value, Boolean(bill?.partyChecked));
       if (match) {
         applyCustomerToCurrentBill(match, field.closest(".classic-billing-shell, .transaction-entry-header"));
         render();
@@ -23658,7 +23682,8 @@ function setupBillCustomerLookup() {
     });
     field.addEventListener("keydown", (event) => {
       if (event.key !== "Enter") return;
-      const match = findCustomerLookupMatch(field.value);
+      const bill = currentCustomerBill(field.closest(".classic-billing-shell, .transaction-entry-header"));
+      const match = findCustomerLookupMatch(field.value, Boolean(bill?.partyChecked));
       if (!match) return;
       event.preventDefault();
       applyCustomerToCurrentBill(match, field.closest(".classic-billing-shell, .transaction-entry-header"));
@@ -23684,11 +23709,11 @@ function updateCurrentCustomerField(field) {
   }
 }
 
-function findCustomerLookupMatch(value = "") {
+function findCustomerLookupMatch(value = "", includeAll = false) {
   const key = String(value || "").trim().toLowerCase();
   if (!key) return null;
   return (state.parties || []).find((party) => {
-    if (party.type !== "Customer") return false;
+    if (!includeAll && party.type !== "Customer") return false;
     return [party.customerCode, party.id, party.name, party.phone, party.mobile].some((candidate) => String(candidate || "").trim().toLowerCase() === key);
   }) || null;
 }
@@ -24034,9 +24059,120 @@ function loadSavedLineIntoEntry(row) {
   }
   const entryRow = row.closest(".classic-entry-area")?.querySelector(".classic-entry-grid tbody tr");
   if (!entryRow) return;
+  entryRow.dataset.editLineScope = row.dataset.editLineScope || "transaction";
+  entryRow.dataset.editLineKind = row.dataset.editLineKind || "";
+  entryRow.dataset.editLineSection = row.dataset.editLineSection || "";
+  entryRow.dataset.editLineIndex = row.dataset.editLineIndex || "0";
   fillEntryRow(entryRow, line);
+  const addButton = row.closest(".classic-entry-area")?.querySelector("[data-action='add-bill-item']");
+  if (addButton) addButton.textContent = "Update Item";
   entryRow.querySelector("[data-line-field]")?.focus();
-  toast("Row loaded into the entry line. Make changes and press Enter to add corrected row.");
+  toast("Row loaded into the entry line. Make changes and press Enter to update it.");
+}
+
+function enhanceUniversalPartyLookups() {
+  const scope = document.querySelector(".classic-billing-shell");
+  if (!scope) return;
+  let datalist = scope.querySelector("#customer-lookup-options");
+  if (!datalist) {
+    scope.insertAdjacentHTML("beforeend", customerLookupDatalist());
+    datalist = scope.querySelector("#customer-lookup-options");
+  }
+  scope.querySelectorAll(".transaction-entry-header label, .classic-bill-header label").forEach((label) => {
+    const labelText = String(label.querySelector(":scope > span")?.textContent || "").trim().toLowerCase();
+    const isId = /(cust|customer|party).*\bid\b/.test(labelText) || labelText === "party";
+    const isName = /(customer|party).*name/.test(labelText) || labelText === "customer" || labelText === "name";
+    if (!isId && !isName) return;
+    const input = [...label.querySelectorAll("input")].find((field) => field.type !== "checkbox");
+    if (!input) return;
+    input.setAttribute("list", "customer-lookup-options");
+    input.dataset.customerLookup = "";
+    input.dataset.customerField ||= isId ? "customerId" : "customer";
+    if (isId && !label.querySelector("[data-party-lookup-toggle]")) {
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.dataset.partyLookupToggle = "";
+      checkbox.title = "Show every party type";
+      checkbox.checked = Boolean(currentCustomerBill(scope)?.partyChecked);
+      input.before(checkbox);
+    }
+  });
+}
+
+function editableCollectionForEntryRow(row) {
+  const index = Number(row.dataset.editLineIndex);
+  if (!Number.isInteger(index) || index < 0) return null;
+  if (row.dataset.editLineScope === "bill") {
+    return state.bills?.[0]?.sections?.[row.dataset.editLineSection || "sales"] || null;
+  }
+  const kind = row.dataset.editLineKind || row.closest(".classic-entry-area")?.dataset.entryKind || "";
+  if (kind.startsWith("sales-order")) {
+    const section = salesOrderView === "Exchange" ? "exchange" : salesOrderView === "Return" ? "return" : "sales";
+    return salesOrderBill()?.sections?.[section] || null;
+  }
+  const collections = {
+    "purchase-entry": purchaseBill()?.sections?.exchange,
+    "purchase-return": purchaseBill()?.sections?.exchange,
+    "direct-purchase": state.directPurchases?.[0]?.lines,
+    "direct-purchase-return": state.directPurchaseReturns?.[0]?.lines,
+    "diamond-purchase-ornament": state.diamondPurchases?.[0]?.ornamentLines,
+    "diamond-purchase-stone": state.diamondPurchases?.[0]?.diamondLines,
+    "diamond-purchase-return-ornament": state.diamondPurchaseReturns?.[0]?.ornamentLines,
+    "diamond-purchase-return-stone": state.diamondPurchaseReturns?.[0]?.diamondLines,
+    "dmd-stone-purchase": state.dmdStonePurchases?.[0]?.lines,
+    "dmd-return-ornament": state.dmdReturns?.[0]?.ornamentLines,
+    "dmd-return-stone": state.dmdReturns?.[0]?.diamondLines,
+    "dmd-wholesale-entry": state.dmdWholesales?.[0]?.lines,
+    "dmd-wholesale-stone": state.dmdWholesales?.[0]?.diamondLines,
+    "stock-adjustment-entry": stockAdjustmentDraft?.lines,
+    "gold-deposit-entry": (stockView === "Gold Withdrawal" ? goldWithdrawalDraft : goldDepositDraft)?.lines,
+    "service-job-entry": activeServiceDraft()?.lines,
+    "sample-entry": (sampleWorkView === "Sample Return" ? sampleReturnDraft : sampleIssueDraft)?.lines,
+    "polishing-item-entry": polishingDraft?.lines,
+    "polishing-stone-entry": polishingDraft?.stones,
+    "refinery-issue-entry": refineryIssueDraft?.lines,
+    "melting-issue-entry": meltingIssueDraft?.lines,
+    "smith-work-entry": smithWorkDraft?.lines,
+    "cash-smith-entry": cashWeightSmithDraft?.lines,
+    "jeweller-work-entry": jewellerWorkDraft?.lines,
+    "cash-jeweller-entry": cashWeightJewellerDraft?.lines
+  };
+  return collections[kind] || null;
+}
+
+function upsertEntryLine(row, collection, line) {
+  const editingCollection = editableCollectionForEntryRow(row);
+  const editingIndex = Number(row.dataset.editLineIndex);
+  if (editingCollection && Number.isInteger(editingIndex) && editingIndex >= 0 && editingIndex < editingCollection.length) {
+    editingCollection.splice(editingIndex, 1, line);
+    return "updated";
+  }
+  collection.push(line);
+  return "added";
+}
+
+function scheduleDiamondHandoff(targetKind, sourceLine) {
+  pendingDiamondHandoff = { targetKind, sourceLine: structuredClone(sourceLine) };
+}
+
+function applyPendingDiamondHandoff() {
+  if (!pendingDiamondHandoff) return;
+  const { targetKind, sourceLine } = pendingDiamondHandoff;
+  pendingDiamondHandoff = null;
+  const entryRow = document.querySelector(`.classic-entry-area.${targetKind} .classic-entry-grid tbody tr`);
+  if (!entryRow) return;
+  entryRow.dataset.linkedItemId = sourceLine.itemId || sourceLine.itemCode || "";
+  entryRow.dataset.linkedItemName = sourceLine.itemDescription || sourceLine.itemName || "";
+  entryRow.dataset.linkedBarcode = sourceLine.barcode || "";
+  const grid = entryRow.closest(".classic-entry-grid");
+  grid?.insertAdjacentHTML("afterbegin", `<div class="linked-diamond-context"><strong>Diamond details for:</strong> ${escapeHtml(entryRow.dataset.linkedItemId || "-")} — ${escapeHtml(entryRow.dataset.linkedItemName || "Item")}${entryRow.dataset.linkedBarcode ? ` · ${escapeHtml(entryRow.dataset.linkedBarcode)}` : ""}</div>`);
+  fillEntryRow(entryRow, sourceLine);
+  const fields = [...entryRow.querySelectorAll("[data-line-field]")].filter((field) => !field.disabled && !field.readOnly);
+  const firstIncomplete = fields.find((field) => !String(field.value || "").trim() || Number(field.value) === 0) || fields[0];
+  firstIncomplete?.focus();
+  firstIncomplete?.select?.();
+  entryRow.scrollIntoView({ behavior: "smooth", block: "center" });
+  toast("Item saved. Enter its diamond details below.");
 }
 
 function editableLineForRow(row) {
@@ -24057,11 +24193,24 @@ function editableLineForRow(row) {
   if (kind === "dmd-return-ornament") return state.dmdReturns?.[0]?.ornamentLines?.[index] || null;
   if (kind === "dmd-return-stone") return state.dmdReturns?.[0]?.diamondLines?.[index] || null;
   if (kind === "dmd-wholesale-entry") return state.dmdWholesales?.[0]?.lines?.[index] || null;
+  if (kind === "dmd-wholesale-stone") return state.dmdWholesales?.[0]?.diamondLines?.[index] || null;
   if (kind === "diamond-purchase-ornament") return state.diamondPurchases?.[0]?.ornamentLines?.[index] || null;
   if (kind === "diamond-purchase-stone") return state.diamondPurchases?.[0]?.diamondLines?.[index] || null;
   if (kind === "diamond-purchase-return-ornament") return state.diamondPurchaseReturns?.[0]?.ornamentLines?.[index] || null;
   if (kind === "diamond-purchase-return-stone") return state.diamondPurchaseReturns?.[0]?.diamondLines?.[index] || null;
   if (kind === "dmd-stone-purchase") return state.dmdStonePurchases?.[0]?.lines?.[index] || null;
+  if (kind === "stock-adjustment-entry") return stockAdjustmentDraft?.lines?.[index] || null;
+  if (kind === "gold-deposit-entry") return (stockView === "Gold Withdrawal" ? goldWithdrawalDraft : goldDepositDraft)?.lines?.[index] || null;
+  if (kind === "service-job-entry") return activeServiceDraft()?.lines?.[index] || null;
+  if (kind === "sample-entry") return (sampleWorkView === "Sample Return" ? sampleReturnDraft : sampleIssueDraft)?.lines?.[index] || null;
+  if (kind === "polishing-item-entry") return polishingDraft?.lines?.[index] || null;
+  if (kind === "polishing-stone-entry") return polishingDraft?.stones?.[index] || null;
+  if (kind === "refinery-issue-entry") return refineryIssueDraft?.lines?.[index] || null;
+  if (kind === "melting-issue-entry") return meltingIssueDraft?.lines?.[index] || null;
+  if (kind === "smith-work-entry") return smithWorkDraft?.lines?.[index] || null;
+  if (kind === "cash-smith-entry") return cashWeightSmithDraft?.lines?.[index] || null;
+  if (kind === "jeweller-work-entry") return jewellerWorkDraft?.lines?.[index] || null;
+  if (kind === "cash-jeweller-entry") return cashWeightJewellerDraft?.lines?.[index] || null;
   return null;
 }
 
@@ -24522,6 +24671,9 @@ function readDmdStoneEntryLine(row) {
   const readNumber = (field) => parseEntryNumber(row.querySelector(`[data-line-field="${field}"]`)?.value);
   const readText = (field) => row.querySelector(`[data-line-field="${field}"]`)?.value || "";
   const line = normalizeDmdStoneLine({
+    itemId: row.dataset.linkedItemId || "",
+    itemName: row.dataset.linkedItemName || "",
+    barcode: row.dataset.linkedBarcode || "",
     colorType: readText("colorType"),
     colorScale: readText("colorScale"),
     shape: readText("shape"),
@@ -24819,13 +24971,13 @@ function appendEntryLine(row) {
   const storeSection = row.closest(".purchase-entry, .purchase-return") ? "exchange" : section === "order" ? "sales" : section;
   bill.sections ||= { sales: [], exchange: [], return: [] };
   bill.sections[storeSection] ||= [];
-  bill.sections[storeSection].push(line);
+  const result = upsertEntryLine(row, bill.sections[storeSection], line);
   bill.line = line;
   applyBillFinancials(bill);
   state.audit.unshift(audit(`Added ${line.itemName} to ${storeSection} bill`));
   saveState();
   render({ contentScrollTop });
-  toast("Item added to bill.");
+  toast(`Item ${result} in bill.`);
 }
 
 function appendSmithWorkLine(row) {
@@ -24835,7 +24987,7 @@ function appendSmithWorkLine(row) {
     return;
   }
   smithWorkDraft = normalizeSmithWorkOrder(smithWorkDraft || defaultSmithWorkOrder());
-  smithWorkDraft.lines.push(line);
+  upsertEntryLine(row, smithWorkDraft.lines, line);
   state.audit.unshift(audit(`Added ${line.itemName || "Smith item"} to Smith work order`));
   render();
   toast("Smith item added.");
@@ -24848,7 +25000,7 @@ function appendCashWeightSmithLine(row) {
     return;
   }
   cashWeightSmithDraft = normalizeCashWeightSmith(cashWeightSmithDraft || defaultCashWeightSmith());
-  cashWeightSmithDraft.lines.push(line);
+  upsertEntryLine(row, cashWeightSmithDraft.lines, line);
   state.audit.unshift(audit("Added cash for weight Smith line"));
   render();
   toast("Cash for weight line added.");
@@ -24861,7 +25013,7 @@ function appendJewellerWorkLine(row) {
     return;
   }
   jewellerWorkDraft = normalizeJewellerWorkOrder(jewellerWorkDraft || defaultJewellerWorkOrder());
-  jewellerWorkDraft.lines.push(line);
+  upsertEntryLine(row, jewellerWorkDraft.lines, line);
   state.audit.unshift(audit(`Added ${line.itemName || "Jeweller item"} to Jeweller work order`));
   render();
   toast("Jeweller item added.");
@@ -24874,7 +25026,7 @@ function appendCashWeightJewellerLine(row) {
     return;
   }
   cashWeightJewellerDraft = normalizeCashWeightJeweller(cashWeightJewellerDraft || defaultCashWeightJeweller());
-  cashWeightJewellerDraft.lines.push(line);
+  upsertEntryLine(row, cashWeightJewellerDraft.lines, line);
   state.audit.unshift(audit("Added cash for weight Jeweller line"));
   render();
   toast("Cash for weight Jeweller line added.");
@@ -24889,10 +25041,10 @@ function appendSampleLine(row) {
   const type = sampleWorkView === "Sample Return" ? "Return" : "Issue";
   if (type === "Return") {
     sampleReturnDraft = normalizeSample(sampleReturnDraft || defaultSample("Return"), "Return");
-    sampleReturnDraft.lines.push(line);
+    upsertEntryLine(row, sampleReturnDraft.lines, line);
   } else {
     sampleIssueDraft = normalizeSample(sampleIssueDraft || defaultSample("Issue"), "Issue");
-    sampleIssueDraft.lines.push(line);
+    upsertEntryLine(row, sampleIssueDraft.lines, line);
   }
   state.audit.unshift(audit(`Added ${line.itemName || line.barcode || "sample item"} to Sample ${type}`));
   render();
@@ -24906,7 +25058,7 @@ function appendPolishingLine(row) {
     return;
   }
   polishingDraft = normalizePolishingEntry(polishingDraft || defaultPolishingEntry());
-  polishingDraft.lines.push(line);
+  upsertEntryLine(row, polishingDraft.lines, line);
   state.audit.unshift(audit(`Added ${line.itemName || line.barcode || "polishing item"} to Polishing`));
   render();
   toast("Polishing item added.");
@@ -24919,7 +25071,7 @@ function appendPolishingStone(row) {
     return;
   }
   polishingDraft = normalizePolishingEntry(polishingDraft || defaultPolishingEntry());
-  polishingDraft.stones.push(line);
+  upsertEntryLine(row, polishingDraft.stones, line);
   state.audit.unshift(audit("Added polishing stone detail"));
   render();
   toast("Polishing stone detail added.");
@@ -24934,7 +25086,7 @@ function appendStockAdjustmentLine(row) {
     return;
   }
   stockAdjustmentDraft = normalizeStockAdjustment(stockAdjustmentDraft || defaultStockAdjustment());
-  stockAdjustmentDraft.lines.push(line);
+  upsertEntryLine(row, stockAdjustmentDraft.lines, line);
   state.audit.unshift(audit(`Added stock adjustment line ${line.itemName || line.barcode || ""}`.trim()));
   render();
   toast("Stock adjustment line added.");
@@ -24951,10 +25103,10 @@ function appendGoldDepositLine(row) {
   }
   if (type === "Withdrawal") {
     goldWithdrawalDraft = normalizeGoldDeposit(goldWithdrawalDraft || defaultGoldDeposit(type), type);
-    goldWithdrawalDraft.lines.push(line);
+    upsertEntryLine(row, goldWithdrawalDraft.lines, line);
   } else {
     goldDepositDraft = normalizeGoldDeposit(goldDepositDraft || defaultGoldDeposit(type), type);
-    goldDepositDraft.lines.push(line);
+    upsertEntryLine(row, goldDepositDraft.lines, line);
   }
   state.audit.unshift(audit(`Added ${line.itemName || "gold item"} to ${type}`));
   render();
@@ -24970,7 +25122,7 @@ function appendRefineryIssueLine(row) {
     return;
   }
   refineryIssueDraft = normalizeRefineryIssue(refineryIssueDraft || defaultRefineryIssue());
-  refineryIssueDraft.lines.push(line);
+  upsertEntryLine(row, refineryIssueDraft.lines, line);
   state.audit.unshift(audit(`Added refinery issue line ${line.itemName || line.itemId || ""}`.trim()));
   render();
   toast("Refinery issue item added.");
@@ -24985,7 +25137,7 @@ function appendMeltingIssueLine(row) {
     return;
   }
   meltingIssueDraft = normalizeMeltingIssue(meltingIssueDraft || defaultMeltingIssue());
-  meltingIssueDraft.lines.push(line);
+  upsertEntryLine(row, meltingIssueDraft.lines, line);
   state.audit.unshift(audit(`Added melting issue line ${line.itemName || line.itemId || ""}`.trim()));
   render();
   toast("Melting issue item added.");
@@ -25410,7 +25562,7 @@ function appendServiceLine(row) {
     return;
   }
   const draft = activeServiceDraft(type);
-  draft.lines.push(line);
+  upsertEntryLine(row, draft.lines, line);
   setServiceDraft(type, draft);
   state.audit.unshift(audit(`Added ${line.itemName || "service item"} to ${type.toLowerCase()} service job`));
   render();
@@ -25788,7 +25940,7 @@ function appendDirectPurchaseLine(row) {
   }
   state.directPurchases ||= [normalizeDirectPurchaseBill()];
   const bill = normalizeDirectPurchaseBill(state.directPurchases[0]);
-  bill.lines.push(line);
+  upsertEntryLine(row, bill.lines, line);
   state.directPurchases[0] = bill;
   state.audit.unshift(audit(`Added ${line.itemName} to direct purchase`));
   saveState();
@@ -25804,7 +25956,7 @@ function appendDirectPurchaseReturnLine(row) {
   }
   state.directPurchaseReturns ||= [normalizeDirectPurchaseReturnBill()];
   const bill = normalizeDirectPurchaseReturnBill(state.directPurchaseReturns[0]);
-  bill.lines.push(line);
+  upsertEntryLine(row, bill.lines, line);
   state.directPurchaseReturns[0] = bill;
   state.audit.unshift(audit(`Added ${line.itemName} to direct purchase return`));
   saveState();
@@ -25819,7 +25971,7 @@ function appendDmdReturnLine(row) {
     return;
   }
   state.dmdReturns ||= [normalizeDmdReturnBill()];
-  state.dmdReturns[0].lines.push(line);
+  upsertEntryLine(row, state.dmdReturns[0].lines, line);
   state.audit.unshift(audit(`Added ${line.itemName} to DMD return`));
   saveState();
   render();
@@ -25834,9 +25986,10 @@ function appendDmdReturnOrnamentLine(row) {
   }
   state.dmdReturns ||= [normalizeDmdReturnBill()];
   const bill = normalizeDmdReturnBill(state.dmdReturns[0]);
-  bill.ornamentLines.push(line);
+  upsertEntryLine(row, bill.ornamentLines, line);
   state.dmdReturns[0] = bill;
   state.audit.unshift(audit(`Added ${line.itemName} to DMD return`));
+  scheduleDiamondHandoff("dmd-return-stone", line);
   saveState();
   render();
   toast("DMD return item added.");
@@ -25850,7 +26003,7 @@ function appendDmdReturnStoneLine(row) {
   }
   state.dmdReturns ||= [normalizeDmdReturnBill()];
   const bill = normalizeDmdReturnBill(state.dmdReturns[0]);
-  bill.diamondLines.push(line);
+  upsertEntryLine(row, bill.diamondLines, line);
   state.dmdReturns[0] = bill;
   state.audit.unshift(audit("Added diamond stone to DMD return"));
   saveState();
@@ -25865,8 +26018,9 @@ function appendDmdWholesaleLine(row) {
     return;
   }
   state.dmdWholesales ||= [normalizeDmdWholesaleBill()];
-  state.dmdWholesales[0].ornamentLines.push(line);
+  upsertEntryLine(row, state.dmdWholesales[0].ornamentLines, line);
   state.audit.unshift(audit(`Added ${line.itemName} to DMD wholesale`));
+  scheduleDiamondHandoff("dmd-wholesale-stone", line);
   saveState();
   render();
   toast("DMD wholesale item added.");
@@ -25880,9 +26034,10 @@ function appendDmdWholesaleClassicLine(row) {
   }
   state.dmdWholesales ||= [normalizeDmdWholesaleBill()];
   const bill = normalizeDmdWholesaleBill(state.dmdWholesales[0]);
-  bill.lines.push(line);
+  upsertEntryLine(row, bill.lines, line);
   state.dmdWholesales[0] = bill;
   state.audit.unshift(audit(`Added ${line.itemName} to DMD wholesale`));
+  scheduleDiamondHandoff("dmd-wholesale-stone", line);
   saveState();
   render();
   toast("DMD wholesale item added.");
@@ -25895,7 +26050,7 @@ function appendDmdStoneLine(row) {
     return;
   }
   state.dmdWholesales ||= [normalizeDmdWholesaleBill()];
-  state.dmdWholesales[0].diamondLines.push(line);
+  upsertEntryLine(row, state.dmdWholesales[0].diamondLines, line);
   state.audit.unshift(audit("Added diamond stone to DMD wholesale"));
   saveState();
   render();
@@ -25910,9 +26065,10 @@ function appendDiamondPurchaseOrnamentLine(row) {
   }
   state.diamondPurchases ||= [normalizeDiamondPurchaseBill()];
   const bill = normalizeDiamondPurchaseBill(state.diamondPurchases[0]);
-  bill.ornamentLines.push(line);
+  upsertEntryLine(row, bill.ornamentLines, line);
   state.diamondPurchases[0] = bill;
   state.audit.unshift(audit(`Added ${line.itemName} to diamond purchase`));
+  scheduleDiamondHandoff("diamond-purchase-stone", line);
   saveState();
   render();
   toast("Diamond purchase item added.");
@@ -25926,7 +26082,7 @@ function appendDiamondPurchaseStoneLine(row) {
   }
   state.diamondPurchases ||= [normalizeDiamondPurchaseBill()];
   const bill = normalizeDiamondPurchaseBill(state.diamondPurchases[0]);
-  bill.diamondLines.push(line);
+  upsertEntryLine(row, bill.diamondLines, line);
   state.diamondPurchases[0] = bill;
   state.audit.unshift(audit("Added stone to diamond purchase"));
   saveState();
@@ -25942,9 +26098,10 @@ function appendDiamondPurchaseReturnOrnamentLine(row) {
   }
   state.diamondPurchaseReturns ||= [normalizeDiamondPurchaseReturnBill()];
   const bill = normalizeDiamondPurchaseReturnBill(state.diamondPurchaseReturns[0]);
-  bill.ornamentLines.push(line);
+  upsertEntryLine(row, bill.ornamentLines, line);
   state.diamondPurchaseReturns[0] = bill;
   state.audit.unshift(audit(`Added ${line.itemName} to diamond purchase return`));
+  scheduleDiamondHandoff("diamond-purchase-return-stone", line);
   saveState();
   render();
   toast("Diamond purchase return item added.");
@@ -25958,7 +26115,7 @@ function appendDiamondPurchaseReturnStoneLine(row) {
   }
   state.diamondPurchaseReturns ||= [normalizeDiamondPurchaseReturnBill()];
   const bill = normalizeDiamondPurchaseReturnBill(state.diamondPurchaseReturns[0]);
-  bill.diamondLines.push(line);
+  upsertEntryLine(row, bill.diamondLines, line);
   state.diamondPurchaseReturns[0] = bill;
   state.audit.unshift(audit("Added stone to diamond purchase return"));
   saveState();
@@ -25974,7 +26131,7 @@ function appendDmdStonePurchaseLine(row) {
   }
   state.dmdStonePurchases ||= [normalizeDmdStonePurchaseBill()];
   const bill = normalizeDmdStonePurchaseBill(state.dmdStonePurchases[0]);
-  bill.lines.push(line);
+  upsertEntryLine(row, bill.lines, line);
   state.dmdStonePurchases[0] = bill;
   state.audit.unshift(audit("Added stone to DMD stone purchase"));
   saveState();
@@ -27504,6 +27661,8 @@ function existingRecordsForCurrentScreen(filter = "current") {
 
   if (active === "Sales") {
     if (salesView === "Sales Order") (state.salesOrders || []).forEach((order) => add("Sales Order", "salesOrders", order, { view: "Sales Order" }));
+    else if (salesView === "DMD Return/DMD OP") (state.dmdReturns || []).forEach((bill) => add("DMD Return/DMD OP", "dmdReturns", bill, { view: salesView }));
+    else if (salesView === "DMD Sales WholeSales") (state.dmdWholesales || []).forEach((bill) => add("DMD Sales WholeSales", "dmdWholesales", bill, { view: salesView }));
     else (state.bills || []).filter((bill) => salesView === "Sales Return" ? bill.sections?.return?.length : !String(bill.type || "").toLowerCase().includes("purchase")).forEach((bill) => add(salesView, "bills", bill, { view: salesView }));
   } else if (active === "Purchase") {
     if (purchaseView === "Direct Purchase") (state.directPurchases || []).forEach((bill) => add("Direct Purchase", "directPurchases", bill, { view: purchaseView }));
@@ -27537,6 +27696,14 @@ function loadExistingRecord(key) {
     active = "Sales";
     expandedNavGroups.add("Sales");
     salesView = "Sales Order";
+  } else if (item.storage === "dmdReturns") {
+    active = "Sales";
+    expandedNavGroups.add("Sales");
+    salesView = "DMD Return/DMD OP";
+  } else if (item.storage === "dmdWholesales") {
+    active = "Sales";
+    expandedNavGroups.add("Sales");
+    salesView = "DMD Sales WholeSales";
   } else if (item.storage === "complimentaryPurchases") {
     complimentaryPurchaseDraft = normalizeComplimentaryPurchase(structuredClone(record));
     complimentaryPurchaseSelectedRow = 0;
