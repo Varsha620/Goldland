@@ -9605,7 +9605,12 @@ body:has(.staff-test-banner) .shell { padding-top: 34px; }
 .staff-feedback-priority { padding: 4px 7px; border-radius: 999px; color: #743800; background: #ffe3ad; font-size: 12px; font-weight: 800; }
 .staff-feedback-empty { display: grid; place-items: center; gap: 6px; min-height: 190px; color: #63706a; text-align: center; }
 .staff-focused-mode .sidebar nav > .nav-group { display: none; }
-.staff-focused-mode .sidebar nav > .nav-group:has([data-nav="Sales"]), .staff-focused-mode .sidebar nav > .nav-group:has([data-nav="Management"]) { display: block; }
+.staff-focused-mode .sidebar nav > .nav-group:has([data-nav="Sales"]),
+.staff-focused-mode .sidebar nav > .nav-group:has([data-nav="Purchase"]),
+.staff-focused-mode .sidebar nav > .nav-group:has([data-nav="Stock"]),
+.staff-focused-mode .sidebar nav > .nav-group:has([data-nav="Management"]) { display: block; }
+.staff-test-new-menu small { margin-left: auto; padding: 2px 5px; border-radius: 4px; color: #6b3300; background: #ffd166; font-size: 9px; font-weight: 900; letter-spacing: .04em; }
+.staff-test-new-menu .chevron { margin-left: 0; }
 .staff-welcome { max-width: 980px; margin: 12px auto; padding: 34px; border: 1px solid #d9e5df; border-radius: 20px; background: linear-gradient(145deg, #fff 0%, #f2f8f5 100%); }
 .staff-welcome h2 { margin: 12px 0 7px; font-size: 30px; color: #193f35; }
 .staff-welcome > p { margin: 0 0 26px; color: #5b6d66; font-size: 16px; }

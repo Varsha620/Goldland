@@ -1,4 +1,4 @@
-# Goldland Staff Testing — Version 0.1
+# Goldland Staff Testing — Version 0.2
 
 This release is for reviewing screens and workflows only. It is not the live shop system.
 
@@ -28,6 +28,11 @@ Use these results consistently:
 - Do not use this release for real billing, accounting or customer information.
 - The version shown at the top of the app must be included with all feedback.
 
-## First testing assignment
+## Current testing assignment
 
-Test **Masters** and **Sales** first. Do not attempt every module at once. After these two modules are reviewed and corrected, proceed to Purchase and Stock.
+Continue checking **Management** and **Sales**, and now test the two newly added complete menus: **Purchase** and **Stock**.
+
+- Purchase includes Purchase Invoice, Purchase Return, Diamond Purchase, Diamond Purchase Return, Direct Purchase, Direct Purchase Return and DMD Stone Purchase.
+- Stock includes Stock Register, Opening Stock Account Entry, Stock Adjustments, Item Transfer, Gold Deposit and Gold Withdrawal.
+
+These testing menus use the same complete submenu lists and workflows as the main version. Other modules remain hidden from this focused testing round, but are retained in the test branch for later rounds.

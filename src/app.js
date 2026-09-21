@@ -1,5 +1,5 @@
 const ACCESS_PASSWORD = "goldland2026";
-const STAFF_TEST_VERSION = "STAFF-TEST 0.1";
+const STAFF_TEST_VERSION = "STAFF-TEST 0.2";
 const STAFF_FEEDBACK_KEY = "goldland-staff-feedback";
 const STAFF_CHECKLIST_KEY = "goldland-staff-checklist";
 const STAFF_CLEAN_DATA_VERSION = "1";
@@ -4325,13 +4325,13 @@ function sidebar() {
           </div>
         </div>
         <div class="nav-group ${isGroupOpen("Purchase") ? "open" : ""}">
-          <button class="nav ${active === "Purchase" ? "active" : ""}" data-nav="Purchase">${icon("Transactions")}<span>Purchase</span><span class="chevron">⌄</span></button>
+          <button class="nav staff-test-new-menu ${active === "Purchase" ? "active" : ""}" data-nav="Purchase">${icon("Transactions")}<span>Purchase</span><small>NEW TEST</small><span class="chevron">⌄</span></button>
           <div class="subnav">
             ${PURCHASE_ITEMS.map((item) => `<button class="subnav-item ${active === "Purchase" && purchaseView === item ? "active" : ""}" data-purchase-section="${item}">${item}</button>`).join("")}
           </div>
         </div>
         <div class="nav-group ${isGroupOpen("Stock") ? "open" : ""}">
-          <button class="nav ${active === "Stock" ? "active" : ""}" data-nav="Stock">${icon("Stock")}<span>Stock</span><span class="chevron">v</span></button>
+          <button class="nav staff-test-new-menu ${active === "Stock" ? "active" : ""}" data-nav="Stock">${icon("Stock")}<span>Stock</span><small>NEW TEST</small><span class="chevron">v</span></button>
           <div class="subnav">
             ${stockItems.map((item) => `<button class="subnav-item ${active === "Stock" && stockView === item ? "active" : ""}" data-stock-section="${item}">${item}</button>`).join("")}
           </div>
@@ -4666,7 +4666,7 @@ function handleBarcodeVerificationCommand(command) {
 
 function dashboard() {
   return `
-    <section class="staff-welcome panel"><span class="staff-round-pill">Testing round 1</span><h2>Complete Management first, then test Sales</h2><p>Every Management screen is available. Work through it in two small groups so the review stays clear.</p><div class="staff-start-steps"><button data-management="Customers"><b>1</b><span><strong>People &amp; parties</strong>Test Customers, Suppliers, Smiths, Refiners and Employees.</span></button><button data-management="Item Category"><b>2</b><span><strong>Configuration</strong>Test Item Category, Miscellaneous, Item Creation and Account Creation.</span></button><button data-sales-section="Sales Invoice"><b>3</b><span><strong>Sales</strong>After Management is reviewed, create, find, edit and print a demo invoice.</span></button><button data-staff-test-action="feedback"><b>4</b><span><strong>Send feedback</strong>Report unclear fields or missing steps from the exact screen.</span></button></div><aside><strong>Recommended order</strong><span>Customers → Suppliers → Smiths → Refiners → Employees → Item Category → Miscellaneous → Item Creation → Account Creation → Sales</span></aside></section>
+    <section class="staff-welcome panel"><span class="staff-round-pill">Testing round 2</span><h2>Purchase and Stock are now ready for checking</h2><p>Continue reviewing Management and Sales, then test every workflow in the two newly added complete menus.</p><div class="staff-start-steps"><button data-management="Customers"><b>1</b><span><strong>Management</strong>Recheck customers, suppliers and configuration where needed.</span></button><button data-sales-section="Sales Invoice"><b>2</b><span><strong>Sales</strong>Verify item editing, party lookup, payments and diamond entry.</span></button><button data-purchase-section="Purchase Invoice"><b>3</b><span><strong>Purchase</strong>Test invoices, returns, diamond and direct-purchase workflows.</span></button><button data-stock-section="Stock Register"><b>4</b><span><strong>Stock</strong>Test register, opening stock, adjustments, transfers and gold deposit flows.</span></button><button data-staff-test-action="feedback"><b>5</b><span><strong>Send feedback</strong>Report unclear fields or missing steps from the exact screen.</span></button></div><aside><strong>Recommended order</strong><span>Management → Sales → Purchase → Stock → Send feedback</span></aside></section>
   `;
 }
 
