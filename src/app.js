@@ -1394,6 +1394,7 @@ function normalizeBill(bill) {
     prepareEinvoice: Boolean(bill.prepareEinvoice),
     date: bill.date || "16-05-2026",
     time: bill.time || nowTime(),
+    partyChecked: Boolean(bill.partyChecked),
     customerId: bill.customerId || "",
     customerCode: bill.customerCode || bill.customerId || "",
     customerCity: bill.customerCity || "",
@@ -1788,6 +1789,8 @@ function normalizeDiamondPurchaseBill(bill = {}) {
     invoiceDate: bill.invoiceDate || new Date().toLocaleDateString("en-GB"),
     paymentMode: bill.paymentMode || "Credit",
     itemCategory: bill.itemCategory || "B2C",
+    partyChecked: Boolean(bill.partyChecked),
+    partyId: bill.partyId || "",
     supplierSmith: bill.supplierSmith || "",
     partyName: bill.partyName || "",
     preparedBy: bill.preparedBy || state?.staffs?.[0]?.name || seed.staffs[0]?.name || "",
@@ -1812,6 +1815,8 @@ function normalizeDiamondPurchaseReturnBill(bill = {}) {
     time: bill.time || nowTime(),
     invoiceNo: bill.invoiceNo || "",
     invoiceDate: bill.invoiceDate || new Date().toLocaleDateString("en-GB"),
+    partyChecked: Boolean(bill.partyChecked),
+    partyId: bill.partyId || "",
     supplierSmith: bill.supplierSmith || "",
     preparedBy: bill.preparedBy || state?.staffs?.[0]?.name || seed.staffs[0]?.name || "",
     postToSmith: Boolean(bill.postToSmith),
@@ -1835,6 +1840,8 @@ function normalizeDmdStonePurchaseBill(bill = {}) {
     invoiceDate: bill.invoiceDate || new Date().toLocaleDateString("en-GB"),
     paymentMode: bill.paymentMode || bill.invoiceMode || "Credit",
     itemCategory: bill.itemCategory || bill.type || "B2C",
+    partyChecked: Boolean(bill.partyChecked),
+    partyId: bill.partyId || "",
     supplierSmith: bill.supplierSmith || "",
     partyName: bill.partyName || "",
     preparedBy: bill.preparedBy || state?.staffs?.[0]?.name || seed.staffs[0]?.name || "",
@@ -5877,6 +5884,7 @@ function stockAdjustmentScreen() {
         ${toolbarButton("Close", "close-stock-adjustment")}
       </div>
       ${stockAdjustmentHeader(record)}
+      ${stockAdjustmentSummary(record)}
       ${classicTransactionTable("stock-adjustment-entry", stockAdjustmentEntryColumns(), stockAdjustmentEntryRow(defaultStockAdjustmentLine()), stockAdjustmentColumns(), record.lines.map(stockAdjustmentRow))}
     </section>
   `;
@@ -19074,12 +19082,34 @@ function customerLookupDatalist() {
 
 function customerLookupOptions() {
   const values = [];
-  const bill = currentCustomerBill(document.querySelector(".classic-billing-shell, .transaction-entry-header"));
+  const scope = document.querySelector(".classic-billing-shell, .transaction-entry-header");
+  const bill = currentCustomerBill(scope);
   const includeAll = Boolean(bill?.partyChecked);
-  (state.parties || []).filter((party) => includeAll || party.type === "Customer").forEach((party) => {
+  const types = partyLookupTypes(scope);
+  (state.parties || []).filter((party) => includeAll || types.includes(party.type)).forEach((party) => {
     [party.customerCode, party.id, party.name, party.phone, party.mobile].filter(Boolean).forEach((value) => values.push(String(value)));
   });
   return [...new Set(values)];
+}
+
+function stockAdjustmentSummary(record) {
+  const totals = (record.lines || []).reduce((sum, line) => ({
+    nos: sum.nos + Number(line.closingNos || 0),
+    gross: sum.gross + Number(line.closingGross || 0),
+    stone: sum.stone + Number(line.closingStone || 0),
+    net: sum.net + Number(line.closingNet || 0)
+  }), { nos: 0, gross: 0, stone: 0, net: 0 });
+  return `<div class="stock-adjustment-summary"><strong>Closing totals</strong><span>Nos ${numericValue(totals.nos, 0)}</span><span>Gross ${grams(totals.gross)}</span><span>Stone ${grams(totals.stone)}</span><span>Net ${grams(totals.net)}</span><small>Scroll each table sideways to view every field →</small></div>`;
+}
+
+function partyLookupTypes(scope) {
+  if (scope?.closest?.(".diamond-purchase-shell, .dmd-stone-purchase-shell") || (active === "Purchase" && ["Diamond Purchase", "Diamond Purchase Return", "DMD Stone Purchase"].includes(purchaseView))) return ["Supplier", "Smith"];
+  if (scope?.closest?.(".purchase-entry-shell") || active === "Purchase") return ["Supplier"];
+  if (scope?.closest?.(".jeweller-work-shell") || (active === "Work Orders" && workOrderView === "Jeweller")) return ["Jeweller"];
+  if (scope?.closest?.(".refinery-work-shell") || (active === "Work Orders" && workOrderView === "Refining")) return ["Refiner"];
+  if (scope?.closest?.(".smith-work-shell") || (active === "Work Orders" && workOrderView === "Smith")) return ["Smith"];
+  if (scope?.closest?.(".gold-deposit-shell") || (active === "Stock" && ["Gold Deposit", "Gold Withdrawal"].includes(stockView))) return ["Customer", "Supplier", "Smith", "Jeweller", "Refiner"];
+  return ["Customer"];
 }
 
 function classicSelectField(label, field, value, options) {
@@ -19173,8 +19203,8 @@ function diamondPurchaseHeader(bill) {
         <label class="classic-field split-field"><span>Invoice Mode, Type</span><span class="field-pair"><select><option ${bill.paymentMode === "Credit" ? "selected" : ""}>Credit</option><option ${bill.paymentMode === "Cash" ? "selected" : ""}>Cash</option><option ${bill.paymentMode === "Bank" ? "selected" : ""}>Bank</option></select><select><option ${bill.itemCategory === "B2C" ? "selected" : ""}>B2C</option><option ${bill.itemCategory === "B2B" ? "selected" : ""}>B2B</option></select></span></label>
       </div>
       <div class="classic-fields right">
-        <label class="classic-field"><span>Supplier / Smith</span><select>${partyOptions.map((option) => `<option ${option === bill.supplierSmith ? "selected" : ""}>${option}</option>`).join("")}</select></label>
-        ${classicField("Party Name", bill.partyName || "")}
+        ${partyIdLookupField("Party ID", bill, bill.partyId || "")}
+        ${customerLookupField("Supplier / Smith", "customer", bill.supplierSmith || bill.partyName || "")}
         <label class="classic-field"><span>Prepared By</span>${staffDropdownCell("preparedBy", bill.preparedBy || "")}</label>
         <div class="radio-row smith-transfer-row"><span>Post To Smith transfer?</span><label><input type="radio" name="diamondSmithTransfer" ${bill.postToSmith ? "checked" : ""} />Yes</label><label><input type="radio" name="diamondSmithTransfer" ${!bill.postToSmith ? "checked" : ""} />No</label></div>
       </div>
@@ -19194,7 +19224,8 @@ function diamondPurchaseReturnHeader(bill) {
         <label class="classic-field split-field"><span>Invoice No, Date</span><span class="field-pair"><input value="${bill.invoiceNo || ""}" /><input type="date" value="${invoiceDate}" /></span></label>
       </div>
       <div class="classic-fields right">
-        <label class="classic-field"><span>Supplier / Smith</span><select>${partyOptions.map((option) => `<option ${option === bill.supplierSmith ? "selected" : ""}>${option}</option>`).join("")}</select></label>
+        ${partyIdLookupField("Party ID", bill, bill.partyId || "")}
+        ${customerLookupField("Supplier / Smith", "customer", bill.supplierSmith || "")}
         <label class="classic-field"><span>Prepared By</span>${staffDropdownCell("preparedBy", bill.preparedBy || "")}</label>
         <div class="radio-row smith-transfer-row"><span>Post To Smith transfer?</span><label><input type="radio" name="diamondReturnSmithTransfer" ${bill.postToSmith ? "checked" : ""} />Yes</label><label><input type="radio" name="diamondReturnSmithTransfer" ${!bill.postToSmith ? "checked" : ""} />No</label></div>
       </div>
@@ -19215,8 +19246,8 @@ function dmdStonePurchaseHeader(bill) {
         <label class="classic-field split-field"><span>Invoice Mode, Type</span><span class="field-pair"><select><option ${bill.paymentMode === "Credit" ? "selected" : ""}>Credit</option><option ${bill.paymentMode === "Cash" ? "selected" : ""}>Cash</option><option ${bill.paymentMode === "Bank" ? "selected" : ""}>Bank</option></select><select><option ${bill.itemCategory === "B2C" ? "selected" : ""}>B2C</option><option ${bill.itemCategory === "B2B" ? "selected" : ""}>B2B</option></select></span></label>
       </div>
       <div class="classic-fields right">
-        <label class="classic-field"><span>Supplier / Smith</span><select>${partyOptions.map((option) => `<option ${option === bill.supplierSmith ? "selected" : ""}>${option}</option>`).join("")}</select></label>
-        ${classicField("Party Name", bill.partyName || "")}
+        ${partyIdLookupField("Party ID", bill, bill.partyId || "")}
+        ${customerLookupField("Supplier / Smith", "customer", bill.supplierSmith || bill.partyName || "")}
         <label class="classic-field"><span>Prepared By</span>${staffDropdownCell("preparedBy", bill.preparedBy || "")}</label>
       </div>
     </div>
@@ -23699,7 +23730,7 @@ function setupBillCustomerLookup() {
     field.addEventListener("change", () => {
       updateCurrentCustomerField(field);
       const bill = currentCustomerBill(field.closest(".classic-billing-shell, .transaction-entry-header"));
-      const match = findCustomerLookupMatch(field.value, Boolean(bill?.partyChecked));
+      const match = findCustomerLookupMatch(field.value, Boolean(bill?.partyChecked), partyLookupTypes(field));
       if (match) {
         applyCustomerToCurrentBill(match, field.closest(".classic-billing-shell, .transaction-entry-header"));
         render();
@@ -23708,7 +23739,7 @@ function setupBillCustomerLookup() {
     field.addEventListener("keydown", (event) => {
       if (event.key !== "Enter") return;
       const bill = currentCustomerBill(field.closest(".classic-billing-shell, .transaction-entry-header"));
-      const match = findCustomerLookupMatch(field.value, Boolean(bill?.partyChecked));
+      const match = findCustomerLookupMatch(field.value, Boolean(bill?.partyChecked), partyLookupTypes(field));
       if (!match) return;
       event.preventDefault();
       applyCustomerToCurrentBill(match, field.closest(".classic-billing-shell, .transaction-entry-header"));
@@ -23748,6 +23779,7 @@ function updateCurrentCustomerField(field) {
   if (key === "customer") {
     bill.customer = value;
     bill.partyName = value;
+    if (field.closest(".diamond-purchase-shell, .dmd-stone-purchase-shell")) bill.supplierSmith = value;
   } else if (key === "customerId") {
     bill.customerId = value;
     bill.customerCode = value;
@@ -23757,22 +23789,31 @@ function updateCurrentCustomerField(field) {
   }
 }
 
-function findCustomerLookupMatch(value = "", includeAll = false) {
+function findCustomerLookupMatch(value = "", includeAll = false, types = ["Customer"]) {
   const key = String(value || "").trim().toLowerCase();
   if (!key) return null;
   return (state.parties || []).find((party) => {
-    if (!includeAll && party.type !== "Customer") return false;
+    if (!includeAll && !types.includes(party.type)) return false;
     return [party.customerCode, party.id, party.name, party.phone, party.mobile].some((candidate) => String(candidate || "").trim().toLowerCase() === key);
   }) || null;
 }
 
 function currentCustomerBill(scope) {
   if (scope?.closest?.(".sales-order-shell") || scope?.classList?.contains("sales-order-header")) return salesOrderBill();
+  if (scope?.closest?.(".diamond-purchase-return-shell")) return state.diamondPurchaseReturns?.[0];
+  if (scope?.closest?.(".diamond-purchase-shell")) return state.diamondPurchases?.[0];
+  if (scope?.closest?.(".dmd-stone-purchase-shell")) return state.dmdStonePurchases?.[0];
   if (scope?.closest?.(".direct-purchase-return-shell")) return state.directPurchaseReturns?.[0];
   if (scope?.closest?.(".direct-purchase-shell")) return state.directPurchases?.[0];
   if (scope?.closest?.(".dmd-return-shell")) return state.dmdReturns?.[0];
   if (scope?.closest?.(".dmd-wholesale-shell")) return state.dmdWholesales?.[0];
   if (scope?.closest?.(".purchase-entry-shell")) return purchaseBill();
+  if (scope?.closest?.(".gold-deposit-shell")) return stockView === "Gold Withdrawal" ? goldWithdrawalDraft : goldDepositDraft;
+  if (scope?.closest?.(".service-job-shell")) return activeServiceDraft();
+  if (scope?.closest?.(".cash-weight-smith-shell")) return cashWeightSmithDraft;
+  if (scope?.closest?.(".cash-weight-jeweller-shell")) return cashWeightJewellerDraft;
+  if (scope?.closest?.(".jeweller-work-shell")) return jewellerWorkDraft;
+  if (scope?.closest?.(".smith-work-shell")) return smithWorkDraft;
   return state.bills?.[0] || null;
 }
 
@@ -23785,6 +23826,7 @@ function applyCustomerToCurrentBill(customer, scope) {
   bill.partyId = code;
   bill.customer = customer.name || "";
   bill.partyName = customer.name || "";
+  if (scope?.closest?.(".diamond-purchase-shell, .dmd-stone-purchase-shell")) bill.supplierSmith = customer.name || "";
   bill.address = customer.address || "";
   bill.phone = customer.phone || customer.mobile || "";
   bill.customerMobile = customer.mobile || customer.phone || "";
@@ -24117,13 +24159,14 @@ function enhanceUniversalPartyLookups() {
     input.setAttribute("list", "customer-lookup-options");
     input.dataset.customerLookup = "";
     input.dataset.customerField ||= isId ? "customerId" : "customer";
-    if (isId && !label.querySelector("[data-party-lookup-toggle]")) {
+    if ((isId || (isName && !scope.querySelector("[data-party-lookup-toggle]"))) && !label.querySelector("[data-party-lookup-toggle]")) {
       const checkbox = document.createElement("input");
       checkbox.type = "checkbox";
       checkbox.dataset.partyLookupToggle = "";
       checkbox.title = "Show every party type";
       checkbox.checked = Boolean(currentCustomerBill(scope)?.partyChecked);
       input.before(checkbox);
+      if (!isId) label.classList.add("party-check-field");
     }
   });
 }
