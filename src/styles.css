@@ -9573,11 +9573,19 @@ tbody tr:hover td {
 .staff-test-banner small { opacity: .85; }
 body:has(.staff-test-banner) .shell { padding-top: 34px; }
 .staff-test-actions { position: fixed; right: 18px; bottom: 18px; z-index: 120; display: flex; gap: 8px; padding: 7px; border: 1px solid #d7b783; border-radius: 12px; background: #fff9ed; box-shadow: 0 8px 28px #2c1b0b35; }
+.staff-tools-drag-handle { display: grid; place-items: center; min-width: 22px; color: #8a4b08; cursor: grab; touch-action: none; user-select: none; font-size: 20px; }
+.staff-tools-drag-handle:active { cursor: grabbing; }
 .staff-test-actions button { min-height: 38px; padding: 0 14px; border: 0; border-radius: 8px; color: #fff; background: #8a4b08; font-weight: 800; cursor: pointer; }
 .staff-test-actions button:first-child { color: #6c3b08; background: #f8dfb4; }
 .staff-test-actions .staff-tools-toggle { min-width: 38px; padding: 0 10px; color: #6c3b08; background: #f8dfb4; font-size: 17px; }
 .staff-test-actions.collapsed { padding: 4px; }
 .staff-test-actions.collapsed button:not(.staff-tools-toggle) { display: none; }
+.stock-adjustment-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 8px 12px; background: #edf6ee; border-bottom: 1px solid #9fb9a1; font-size: 12px; }
+.stock-adjustment-summary strong { color: #245b35; }
+.stock-adjustment-summary small { margin-left: auto; color: #526554; }
+.stock-adjustment-entry .table-wrap { overflow-x: auto; scrollbar-width: auto; }
+.stock-adjustment-entry .classic-detail-grid { min-height: 0; }
+.stock-adjustment-entry .classic-detail-grid .table-wrap { max-height: 340px; }
 .staff-test-backdrop { position: fixed; inset: 0; z-index: 300; display: grid; place-items: center; padding: 20px; background: #15211dcc; }
 .staff-test-modal { width: min(610px, 100%); max-height: calc(100vh - 40px); overflow: auto; border: 1px solid #c8b084; border-radius: 16px; color: #26312d; background: #fff; box-shadow: 0 24px 80px #0007; }
 .staff-test-modal > header { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px; color: #fff; background: #6d3c0a; }
@@ -9611,6 +9619,41 @@ body:has(.staff-test-banner) .shell { padding-top: 34px; }
 .staff-focused-mode .sidebar nav > .nav-group:has([data-nav="Management"]) { display: block; }
 .staff-test-new-menu small { margin-left: auto; padding: 2px 5px; border-radius: 4px; color: #6b3300; background: #ffd166; font-size: 9px; font-weight: 900; letter-spacing: .04em; }
 .staff-test-new-menu .chevron { margin-left: 0; }
+
+/* Purchase headers must fit the workspace beside the navigation panel. */
+.purchase-entry-shell .transaction-entry-header {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 18px;
+  max-width: 100%;
+}
+.purchase-entry-shell .transaction-entry-header .classic-fields {
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+}
+.purchase-entry-shell .transaction-entry-header .classic-field {
+  grid-template-columns: minmax(110px, 142px) minmax(0, 1fr);
+  min-width: 0;
+}
+.purchase-entry-shell .transaction-entry-header .field-pair {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.purchase-entry-shell .transaction-entry-header .party-pair {
+  grid-template-columns: 24px minmax(0, 1fr);
+}
+.purchase-entry-shell .transaction-entry-header .classic-field > span:first-child {
+  white-space: normal;
+}
+.purchase-entry-shell .transaction-entry-header input,
+.purchase-entry-shell .transaction-entry-header select {
+  width: 100%;
+  min-width: 0;
+}
+@media (max-width: 1050px) {
+  .purchase-entry-shell .transaction-entry-header { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 560px) {
+  .purchase-entry-shell .transaction-entry-header .classic-field { grid-template-columns: minmax(0, 1fr); }
+}
 .staff-welcome { max-width: 980px; margin: 12px auto; padding: 34px; border: 1px solid #d9e5df; border-radius: 20px; background: linear-gradient(145deg, #fff 0%, #f2f8f5 100%); }
 .staff-welcome h2 { margin: 12px 0 7px; font-size: 30px; color: #193f35; }
 .staff-welcome > p { margin: 0 0 26px; color: #5b6d66; font-size: 16px; }
