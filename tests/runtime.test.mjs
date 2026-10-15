@@ -1798,3 +1798,109 @@ assert.equal(utilitiesCheck.locked, true, "Day Lock did not block an in-range da
 assert.equal(utilitiesCheck.open, false, "Day Lock incorrectly blocked an out-of-range date");
 
 console.log("Goldland runtime and demo-data tests passed.");
+
+const dmdPurchaseRegression = vm.runInContext(`(() => {
+  const stone = normalizeDmdPurchaseStoneLine({ caratCent: 12.5, purchaseRate: 80.25, sellingRate: 120, amount: 9999 });
+  const bill = normalizeDiamondPurchaseBill({ gstPct: 0, addition: 100, discount: 25, cashPayment: 200, diamondLines: [stone] });
+  const totals = diamondPurchaseFinancials(bill);
+  saveDmdPurchaseStock(bill); saveDmdPurchaseStock(bill);
+  const stock = state.stock.filter(item => item.purchaseSource === bill.id);
+  const result = { stone, totals, stockCount: stock.length, stock: stock[0], barcode: bill.diamondLines[0].barcode, loose: dmdStonePurchaseFinancials({lines:[stone],addition:10,discount:5}) };
+  state.stock = state.stock.filter(item => item.purchaseSource !== bill.id);
+  return result;
+})()`, context);
+assert.equal(dmdPurchaseRegression.stone.amount, 1003.13, 'Purchase amount must use cent times purchase rate, rounded to paise');
+assert.equal(dmdPurchaseRegression.totals.invoiceTotal, 1078.13, 'Editable adjustments and zero GST must affect invoice total');
+assert.equal(Number(dmdPurchaseRegression.totals.balance.toFixed(2)), 878.13);
+assert.equal(dmdPurchaseRegression.stockCount, 1, 'Repeated saves must not duplicate stock');
+assert.equal(dmdPurchaseRegression.stock.diamondAmount, 1500, 'Stock must retain selling value');
+assert.equal(dmdPurchaseRegression.stock.barcode, dmdPurchaseRegression.barcode);
+assert(dmdPurchaseRegression.barcode.startsWith('DMD-'));
+assert.equal(dmdPurchaseRegression.loose.invoiceTotal, 1008.13);
+assert.equal(vm.runInContext('diamondPurchaseFinancials({ornamentLines:[{goldAmount:1000,vaAmount:20,stoneAmount:30,purchaseMaking:40,salesAmt:9999}],diamondLines:[{caratCent:10,purchaseRate:5,sellingRate:20}],gstPct:0}).invoiceTotal', context), 1140, 'Gold must use purchase making and diamond must be counted once');
+
+const editedDmdRow = vm.runInContext(`(() => {
+ const original = normalizeDmdPurchaseStoneLine({id:'edit-stone',itemId:'ring-1',itemName:'Diamond ring',barcode:'DMD-EDIT',caratCent:10,purchaseRate:80,sellingRate:120});
+ state.diamondPurchases = [normalizeDiamondPurchaseBill({diamondLines:[original]})];
+ const bill = normalizeDiamondPurchaseBill(state.diamondPurchases[0]);
+ const row = {dataset:{editLineKind:'diamond-purchase-stone',editLineIndex:'0'}};
+ const changed = normalizeDmdPurchaseStoneLine({caratCent:12,purchaseRate:90,sellingRate:130});
+ const result = upsertEntryLine(row,bill.diamondLines,changed);
+ state.diamondPurchases[0] = bill;
+ return {result,count:bill.diamondLines.length,line:bill.diamondLines[0]};
+})()`, context);
+assert.equal(editedDmdRow.result,'updated');
+assert.equal(editedDmdRow.count,1);
+assert.equal(editedDmdRow.line.id,'edit-stone');
+assert.equal(editedDmdRow.line.barcode,'DMD-EDIT');
+assert.equal(editedDmdRow.line.itemId,'ring-1');
+assert.equal(editedDmdRow.line.amount,1080);
+assert(vm.runInContext('dmdAdjustmentField("Addition","addition",0)',context).includes('class="readout editable-readout dmd-adjustment-readout"'));
+
+const resetAfterSaveChecks = vm.runInContext(`(() => {
+ const cases = [];
+ for (const view of ['Diamond Purchase','Diamond Purchase Return','DMD Stone Purchase','Direct Purchase','Direct Purchase Return','Purchase Invoice','Purchase Return']) {
+  active='Purchase'; purchaseView=view;
+  const definition=purchaseRecordDefinition();
+  const saved=definition ? definition[1]({entryNo:'900',partyName:'Saved supplier',addition:50,discount:10,cashPayment:100}) : normalizeBill({id:crypto.randomUUID(),entryNo:'900',type:view,customer:'Saved supplier',sections:{sales:[],exchange:[],return:[]}});
+  saved.partyName='Saved supplier';
+  if(definition) state[definition[0]]=[saved]; else state.bills=[saved];
+  resetSavedBillEntry();
+  const fresh=currentPurchaseRecord();
+  cases.push({view,freshId:fresh.id,savedId:saved.id,count:definition?state[definition[0]].length:state.bills.length,party:fresh.partyName||fresh.customer||'',addition:fresh.addition||0,diamondCount:fresh.diamondLines?.length||0,lines:fresh.lines?.length||0,savedParty:saved.partyName||saved.customer});
+ }
+ for(const view of ['Sales Invoice','Sales Return','Sales Order','DMD Return/DMD OP','DMD Sales WholeSales']) {
+  active='Sales'; salesView=view;
+  const records=currentSalesRecordCollection(); records.length=0;
+  resetSavedBillEntry(); const saved=records[0]; saved.customer='Saved customer'; saved.saved=true;
+  resetSavedBillEntry(); cases.push({view,freshId:records[0].id,savedId:saved.id,count:records.length,party:records[0].customer||'',addition:records[0].addition||0,diamondCount:records[0].diamondLines?.length||0,lines:records[0].lines?.length||0,savedParty:saved.customer});
+ }
+ return cases;
+})()`,context);
+for(const entry of resetAfterSaveChecks) {
+ assert.notEqual(entry.freshId,entry.savedId,entry.view+' must start a distinct entry');
+ assert.equal(entry.count,2,entry.view+' must retain saved history');
+ assert.equal(entry.party,'',entry.view+' must clear the party');
+ assert.equal(entry.addition,0); assert.equal(entry.diamondCount,0); assert.equal(entry.lines,0);
+ assert(entry.savedParty.startsWith('Saved'),entry.view+' must preserve saved party');
+}
+const stockSaveReset = vm.runInContext(`(() => {
+ stockAdjustmentDraft=defaultStockAdjustment();stockAdjustmentDraft.reason='First saved entry';
+ const originalId=stockAdjustmentDraft.id;saveStockAdjustment();
+ const saved=state.stockAdjustments.find(record=>record.id===originalId);
+ const nextId=stockAdjustmentDraft.id;
+ stockAdjustmentDraft.reason='Second saved entry';saveStockAdjustment();
+ return {originalId,nextId,currentId:stockAdjustmentDraft.id,firstReason:saved.reason,nextSaved:state.stockAdjustments.some(record=>record.id===nextId),lineCount:stockAdjustmentDraft.lines.length};
+})()`,context);
+assert.notEqual(stockSaveReset.originalId,stockSaveReset.nextId);
+assert.notEqual(stockSaveReset.nextId,stockSaveReset.currentId);
+assert.equal(stockSaveReset.firstReason,'First saved entry');
+assert(stockSaveReset.nextSaved);assert.equal(stockSaveReset.lineCount,0);
+const invalidSavePreserved=vm.runInContext(`(() => {goldDepositDraft=defaultGoldDeposit('Deposit');goldDepositDraft.lines=[];goldDepositDraft.partyName='Keep this draft';const id=goldDepositDraft.id;saveGoldDeposit('Deposit');return goldDepositDraft.id===id&&goldDepositDraft.partyName==='Keep this draft';})()`,context);
+assert(invalidSavePreserved,'Failed validation must preserve the form');
+
+const editableAdjustmentChecks = vm.runInContext(`(() => {
+ const purchase={addition:0,discount:0,cashPayment:0};
+ setBillAdjustment(purchase,'addition','100','purchase');setBillAdjustment(purchase,'discount','25','purchase');setBillAdjustment(purchase,'roundOff','-0.25','purchase');setBillAdjustment(purchase,'cashPayment','200','purchase');
+ const purchaseTotals=purchaseFinancials([{amount:1000,tax:30}],purchase);
+ const sale=normalizeBill({id:crypto.randomUUID(),sections:{sales:[{amount:1000}],exchange:[],return:[]}});
+ setBillAdjustment(sale,'addition','100','sales');setBillAdjustment(sale,'discount','25','sales');
+ const saleTotal=billFinancials(sale).invoiceTotal;
+ setBillAdjustment(sale,'discount','0','sales');
+ const zeroDiscount=billFinancials(sale).invoiceTotal;
+ const direct=normalizeDirectPurchaseBill({lines:[{amount:1000,itemTotal:1000}],addition:100,discount:25,roundOff:-0.25,cashPayment:200});
+ const dmd=normalizeDmdWholesaleBill({lines:[{amount:1000}],addition:100,discount:25,certification:10,huidCharge:5,gstPct:0,cash:0});
+ const dmdTotals=dmdWholeSalesClassicFinancials({...dmd,lines:[{amount:1000}]});
+ const returned=returnTotals(1000,{addition:100,discount:25,cashPayment:200});
+ return {purchaseTotals,saleTotal,zeroDiscount,directTotals:directPurchaseFinancials({...direct,lines:[{amount:1000}]}),dmdTotals,returned,normalizedDmd:dmd};
+})()`,context);
+assert.equal(editableAdjustmentChecks.purchaseTotals.invoiceTotal,1074.75);
+assert.equal(editableAdjustmentChecks.purchaseTotals.accountBalance,874.75);
+assert.equal(editableAdjustmentChecks.saleTotal,1075);
+assert.equal(editableAdjustmentChecks.zeroDiscount,1100,'Discount must be clearable to zero');
+assert.equal(editableAdjustmentChecks.directTotals.invoiceTotal,1074.75);
+assert.equal(editableAdjustmentChecks.dmdTotals.billAmount,1090);
+assert.equal(editableAdjustmentChecks.normalizedDmd.certification,10);
+assert.equal(editableAdjustmentChecks.normalizedDmd.gstPct,0);
+assert(editableAdjustmentChecks.returned.includes('1,075'));
+assert(editableAdjustmentChecks.returned.includes('data-bill-adjustment="discount"'));
