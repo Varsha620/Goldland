@@ -1,3 +1,4 @@
+let dmdDetailsTab = 'gold';
 const ACCESS_PASSWORD = "goldland2026";
 const SALES_ITEMS = ["Sales Invoice", "Sales Return", "DMD Return/DMD OP", "DMD Sales WholeSales", "Sales Order", "Additional Order Advance", "Order Advance Refund"];
 const PURCHASE_ITEMS = ["Purchase Invoice", "Purchase Return", "Diamond Purchase", "Diamond Purchase Return", "Direct Purchase", "Direct Purchase Return", "DMD Stone Purchase"];
@@ -1763,15 +1764,17 @@ function normalizeDmdWholesaleBill(bill = {}) {
     preparedBy: bill.preparedBy || state?.staffs?.[0]?.name || seed.staffs[0]?.name || "",
     customerAgent: bill.customerAgent || "",
     addToStock: bill.addToStock !== false,
+    certification: Number(bill.certification || 0),
+    huidCharge: Number(bill.huidCharge || 0),
     addition: Number(bill.addition || 0),
     discount: Number(bill.discount || 0),
-    gstPct: Number(bill.gstPct || 3),
+    gstPct: Number(bill.gstPct ?? 3),
     cashPayment: Number(bill.cashPayment || 0),
     paymentMode: bill.paymentMode || "Cash",
     gstin: bill.gstin || "",
     panCardNo: bill.panCardNo || "",
     tdsTcs: Number(bill.tdsTcs || 0),
-    cash: Number(bill.cash || bill.cashPayment || 0),
+    cash: Number(bill.cash ?? bill.cashPayment ?? 0),
     lines: (bill.lines?.length ? bill.lines : convertedLines).map(normalizeDmdReturnLine),
     ornamentLines: (bill.ornamentLines || []).map(normalizeDmdWholesaleLine),
     diamondLines: (bill.diamondLines || []).map(normalizeDmdStoneLine)
@@ -1797,12 +1800,12 @@ function normalizeDiamondPurchaseBill(bill = {}) {
     postToSmith: Boolean(bill.postToSmith),
     addition: Number(bill.addition || 0),
     discount: Number(bill.discount || 0),
-    gstPct: Number(bill.gstPct || 3),
+    gstPct: Number(bill.gstPct ?? 3),
     tcsPct: Number(bill.tcsPct || 0),
     tdsPct: Number(bill.tdsPct || 0),
     cashPayment: Number(bill.cashPayment || 0),
     ornamentLines: (bill.ornamentLines || []).map(normalizeDmdWholesaleLine),
-    diamondLines: (bill.diamondLines || []).map(normalizeDmdStoneLine)
+    diamondLines: (bill.diamondLines || []).map(normalizeDmdPurchaseStoneLine)
   };
 }
 
@@ -1822,7 +1825,7 @@ function normalizeDiamondPurchaseReturnBill(bill = {}) {
     postToSmith: Boolean(bill.postToSmith),
     addition: Number(bill.addition || 0),
     discount: Number(bill.discount || 0),
-    gstPct: Number(bill.gstPct || 3),
+    gstPct: Number(bill.gstPct ?? 3),
     cashPayment: Number(bill.cashPayment || 0),
     ornamentLines: (bill.ornamentLines || []).map(normalizeDiamondPurchaseReturnLine),
     diamondLines: (bill.diamondLines || []).map(normalizeDmdPurchaseStoneLine)
@@ -2021,14 +2024,14 @@ function normalizeDmdStoneLine(line = {}) {
     ct: line.ct || "Cnt",
     pcs: Number(line.pcs || 0),
     purchaseRate: Number(line.purchaseRate || 0),
-    sellingRate: Number(line.sellingRate || latestDiamondRate()),
+    sellingRate: Number(line.sellingRate ?? latestDiamondRate()),
     amount: Number(line.amount || 0)
   };
 }
 
 function normalizeDmdPurchaseStoneLine(line = {}) {
   const normalized = normalizeDmdStoneLine(line);
-  const amount = Number(normalized.amount || normalized.caratCent * normalized.purchaseRate || 0);
+  const amount = Math.round(normalized.caratCent * normalized.purchaseRate * 100) / 100;
   return { ...normalized, amount };
 }
 
@@ -4704,6 +4707,7 @@ function agentNameOptions(includeBlank = true) {
 }
 
 function currentSalesRecordCollection() {
+  if (active === "Purchase") { const definition = purchaseRecordDefinition(); if (definition) { state[definition[0]] ||= []; return state[definition[0]]; } return state.bills; }
   if (salesView === "Sales Order") { state.salesOrders ||= []; return state.salesOrders; }
   if (salesView === "DMD Return/DMD OP") { state.dmdReturns ||= []; return state.dmdReturns; }
   if (salesView === "DMD Sales WholeSales") { state.dmdWholesales ||= []; return state.dmdWholesales; }
@@ -5072,6 +5076,7 @@ function diamondPurchase() {
         <strong class="classic-rate">Gold Rate ${money(activeGoldRate())}</strong>
       </div>
       ${diamondPurchaseHeader(bill)}
+      <div class="dmd-detail-tabs" role="tablist"><button type="button" role="tab" data-dmd-tab="gold" aria-selected="true">Gold details</button><button type="button" role="tab" data-dmd-tab="diamond" aria-selected="false">Diamond details</button></div>
       ${classicTransactionTable("diamond-purchase-ornament", dmdWholesaleEntryColumns(), dmdWholesaleEntryRow(defaultDmdWholesaleLine()), dmdReturnOpColumns(), bill.ornamentLines.map(diamondPurchaseOrnamentRow))}
       ${classicTransactionTable("diamond-purchase-stone", dmdStoneEntryColumns(), dmdStoneEntryRow(defaultDmdStoneLine()), dmdStoneColumns(), bill.diamondLines.map(diamondPurchaseStoneRow))}
       ${diamondPurchaseTotals(totals)}
@@ -5096,6 +5101,7 @@ function diamondPurchaseReturn() {
         <strong class="classic-rate">Gold Rate ${money(activeGoldRate())}</strong>
       </div>
       ${diamondPurchaseReturnHeader(bill)}
+      <div class="dmd-detail-tabs" role="tablist"><button type="button" role="tab" data-dmd-tab="gold" aria-selected="true">Gold details</button><button type="button" role="tab" data-dmd-tab="diamond" aria-selected="false">Diamond details</button></div>
       ${classicTransactionTable("diamond-purchase-return-ornament", diamondPurchaseReturnEntryColumns(), diamondPurchaseReturnEntryRow(defaultDiamondPurchaseReturnLine()), diamondPurchaseReturnColumns(), bill.ornamentLines.map(diamondPurchaseReturnOrnamentRow))}
       ${classicTransactionTable("diamond-purchase-return-stone", dmdStoneEntryColumns(), dmdStoneEntryRow(defaultDmdStoneLine()), dmdStoneColumns(), bill.diamondLines.map(diamondPurchaseReturnStoneRow))}
       ${diamondPurchaseReturnTotals(totals)}
@@ -8949,7 +8955,7 @@ function saveSchemeCollection(separateVoucher = false) {
   const affectedMembers = new Set([...(previous?.lines || []), ...record.lines].map((line) => line.headId));
   if (index >= 0) state.schemeCollections[index] = record; else state.schemeCollections.unshift(record);
   affectedMembers.forEach(recalculateSchemeMemberInvestment);
-  schemeCollectionDraft = record; state.audit.unshift(audit(`Saved scheme collection voucher ${record.voucherNo}`)); saveState(); render(); toast(`Scheme collection${separateVoucher ? " and separate voucher" : ""} saved.`);
+  schemeCollectionDraft = record; state.audit.unshift(audit(`Saved scheme collection voucher ${record.voucherNo}`)); saveState(); schemeCollectionDraft = defaultSchemeCollection(); render(); toast(`Scheme collection${separateVoucher ? " and separate voucher" : ""} saved.`);
 }
 
 function deleteSchemeCollection() {
@@ -9190,7 +9196,7 @@ function saveSchemeClosure() {
   const affectedMembers = new Set([...(previous?.lines || []), ...record.lines].map((line) => line.headId));
   if (index >= 0) state.schemeClosures[index] = record; else state.schemeClosures.unshift(record);
   affectedMembers.forEach(recalculateSchemeMemberInvestment);
-  schemeClosureDraft = record; state.audit.unshift(audit(`Saved scheme refund/close voucher ${record.voucherNo}`)); saveState(); render(); toast("Scheme refund/close saved successfully.");
+  schemeClosureDraft = record; state.audit.unshift(audit(`Saved scheme refund/close voucher ${record.voucherNo}`)); saveState(); schemeClosureDraft = defaultSchemeClosure(); render(); toast("Scheme refund/close saved successfully.");
 }
 
 function deleteSchemeClosure() {
@@ -9311,7 +9317,7 @@ function saveSchemeMember(addLine = false) {
   const index = (state.schemes || []).findIndex((item) => item.memberId === record.memberId);
   if (index >= 0) state.schemes[index] = record; else state.schemes.push(record);
   selectedSchemeMemberId = record.memberId;
-  state.audit.unshift(audit(`${index >= 0 ? "Updated" : "Created"} scheme member ${record.memberId}`)); saveState(); render(); toast(`Scheme member ${index >= 0 ? "updated" : "saved"}.`);
+  state.audit.unshift(audit(`${index >= 0 ? "Updated" : "Created"} scheme member ${record.memberId}`)); saveState(); if (!addLine) selectedSchemeMemberId = ""; render(); toast(`Scheme member ${index >= 0 ? "updated" : "saved"}.`);
 }
 
 function deleteSchemeMember() {
@@ -9402,7 +9408,7 @@ function saveSchemeMaster() {
   if (index >= 0) state.schemeMasters[index] = record; else state.schemeMasters.push(record);
   selectedSchemeMasterId = record.schemeId;
   state.audit.unshift(audit(`${index >= 0 ? "Updated" : "Created"} scheme master ${record.schemeId}`));
-  saveState(); render(); toast(`Scheme ${record.schemeId} ${index >= 0 ? "updated" : "created"}.`);
+  saveState(); selectedSchemeMasterId = ""; render(); toast(`Scheme ${record.schemeId} ${index >= 0 ? "updated" : "created"}.`);
 }
 
 function deleteSchemeMaster() {
@@ -20216,20 +20222,15 @@ function purchaseRows() {
   return rows.map((row) => normalizeBillLine({ ...row, item: row.item || "OG", itemName: row.itemName || "OLD GOLD", rateLessPct: row.rateLessPct || 0, taxPct: row.taxPct || 0 }, 0, bill, "purchase"));
 }
 
-function purchaseFinancials(rows) {
-  const billAmount = sumLines(rows);
-  return {
-    billAmount,
-    addition: 0,
-    discount: 0,
-    gstVat: rows.reduce((sum, row) => sum + Number(row.tax || 0), 0),
-    cess: rows.reduce((sum, row) => sum + Number(row.cessAmount || 0), 0),
-    tdsTcs: 0,
-    invoiceTotal: billAmount,
-    roundOff: 0,
-    payment: billAmount,
-    accountBalance: 0
-  };
+function purchaseFinancials(rows, bill = purchaseBill()) {
+ const billAmount = sumLines(rows);
+ const addition = Number(bill?.addition || 0), discount = Number(bill?.discount || 0);
+ const gstVat = rows.reduce((sum,row)=>sum+Number(row.tax||0),0);
+ const cess = Number(bill?.cess || 0) + rows.reduce((sum,row)=>sum+Number(row.cessAmount||0),0);
+ const tdsTcs = Number(bill?.tdsTcs || 0), roundOff = Number(bill?.roundOff || 0);
+ const invoiceTotal = Math.max(0,billAmount+addition-discount+Number(bill?.cess||0)+tdsTcs)+roundOff;
+ const payment = Number(bill?.cashPayment ?? invoiceTotal);
+ return {billAmount,addition,discount,gstVat,cess,tdsTcs,invoiceTotal,roundOff,payment,accountBalance:invoiceTotal-payment};
 }
 
 function dmdReturnFinancials(bill) {
@@ -20256,8 +20257,8 @@ function dmdWholesaleFinancials(bill) {
 }
 
 function diamondPurchaseFinancials(bill) {
-  const ornamentAmount = (bill.ornamentLines || []).reduce((sum, line) => sum + Number(line.salesAmt || line.amount || 0), 0);
-  const diamondAmount = (bill.diamondLines || []).reduce((sum, line) => sum + Number(line.amount || (line.caratCent * line.purchaseRate) || 0), 0);
+  const ornamentAmount = (bill.ornamentLines || []).reduce((sum, line) => sum + Number(line.goldAmount || 0) + Number(line.vaAmount || 0) + Number(line.stoneAmount || 0) + Number(line.purchaseMaking || 0), 0);
+  const diamondAmount = (bill.diamondLines || []).reduce((sum, line) => sum + normalizeDmdPurchaseStoneLine(line).amount, 0);
   const billAmount = ornamentAmount + diamondAmount;
   const taxable = Math.max(0, billAmount + Number(bill.addition || 0) - Number(bill.discount || 0));
   const tcs = taxable * (Number(bill.tcsPct || 0) / 100);
@@ -20269,8 +20270,8 @@ function diamondPurchaseFinancials(bill) {
 }
 
 function diamondPurchaseReturnFinancials(bill) {
-  const ornamentAmount = (bill.ornamentLines || []).reduce((sum, line) => sum + Number(line.total || line.amount || 0), 0);
-  const diamondAmount = (bill.diamondLines || []).reduce((sum, line) => sum + Number(line.amount || (line.caratCent * line.purchaseRate) || 0), 0);
+  const ornamentAmount = (bill.ornamentLines || []).reduce((sum, line) => sum + Number(line.goldAmount || 0) + Number(line.stoneAmount || 0) + Number(line.purchaseMaking || 0), 0);
+  const diamondAmount = (bill.diamondLines || []).reduce((sum, line) => sum + normalizeDmdPurchaseStoneLine(line).amount, 0);
   const billAmount = ornamentAmount + diamondAmount;
   const taxable = Math.max(0, billAmount + Number(bill.addition || 0) - Number(bill.discount || 0));
   const gst = taxable * (Number(bill.gstPct || 0) / 100);
@@ -20280,7 +20281,7 @@ function diamondPurchaseReturnFinancials(bill) {
 }
 
 function dmdStonePurchaseFinancials(bill) {
-  const billAmount = (bill.lines || []).reduce((sum, line) => sum + Number(line.amount || (line.caratCent * line.purchaseRate) || 0), 0);
+  const billAmount = (bill.lines || []).reduce((sum, line) => sum + normalizeDmdPurchaseStoneLine(line).amount, 0);
   const addition = Number(bill.addition || 0);
   const discount = Number(bill.discount || 0);
   const invoiceTotal = Math.max(0, billAmount + addition - discount);
@@ -20306,12 +20307,13 @@ function directPurchaseFinancials(bill) {
 
 function dmdWholeSalesClassicFinancials(bill) {
   const salesTotal = (bill.lines || []).reduce((sum, line) => sum + Number(line.amount || 0), 0);
-  const gstAmount = salesTotal * (Number(bill.gstPct || bill.taxPct || 3) / 100);
-  const subTotal = salesTotal + Number(bill.addition || 0) - Number(bill.discount || 0);
+  const gstAmount = salesTotal * (Number(bill.gstPct ?? bill.taxPct ?? 3) / 100);
+  const certification = Number(bill.certification || 0), huidCharge = Number(bill.huidCharge || 0);
+  const subTotal = salesTotal + certification + huidCharge + Number(bill.addition || 0) - Number(bill.discount || 0);
   const billAmount = subTotal + gstAmount + Number(bill.tdsTcs || 0);
-  const cash = Number(bill.cash || bill.cashPayment || 0);
+  const cash = Number(bill.cash ?? bill.cashPayment ?? 0);
   const balance = billAmount - cash;
-  return { salesTotal, certification: 0, huidCharge: 0, gstAmount, addition: bill.addition, discount: bill.discount, subTotal, tdsTcs: bill.tdsTcs || 0, billAmount, cash, balance };
+  return { salesTotal, certification, huidCharge, gstAmount, addition: bill.addition, discount: bill.discount, subTotal, tdsTcs: bill.tdsTcs || 0, billAmount, cash, balance };
 }
 
 function diamondPurchaseTotals(totals) {
@@ -20321,14 +20323,17 @@ function diamondPurchaseTotals(totals) {
       <div></div>
       <div class="adjustments total-block">
         ${readout("Bill Amount", money(totals.billAmount))}
-        ${readout("Addition", money(totals.addition))}
-        ${readout("Discount", money(totals.discount))}
+        ${dmdAdjustmentField("Addition", "addition", totals.addition)}
+        ${dmdAdjustmentField("Discount", "discount", totals.discount)}
         ${readout("Diamond Amount", money(totals.diamondAmount))}
+        ${dmdAdjustmentField("TCS %", "tcsPct", state.diamondPurchases[0].tcsPct)}
         ${readout("TCS", money(totals.tcs))}
+        ${dmdAdjustmentField("TDS %", "tdsPct", state.diamondPurchases[0].tdsPct)}
         ${readout("TDS", money(totals.tds))}
+        ${dmdAdjustmentField("GST %", "gstPct", (purchaseView === "Diamond Purchase Return" ? state.diamondPurchaseReturns[0] : state.diamondPurchases[0]).gstPct ?? 3)}
         ${readout("Gst", money(totals.gst))}
         ${readout("Invoice Total", money(totals.invoiceTotal))}
-        ${readout("Cash Payment", money(totals.cashPayment))}
+        ${dmdAdjustmentField("Cash Payment", "cashPayment", totals.cashPayment)}
         ${readout("Balance", money(totals.balance))}
       </div>
     </div>
@@ -20342,12 +20347,13 @@ function diamondPurchaseReturnTotals(totals) {
       <div></div>
       <div class="adjustments total-block">
         ${readout("Bill Amount", money(totals.billAmount))}
-        ${readout("Addition", money(totals.addition))}
-        ${readout("Discount", money(totals.discount))}
+        ${dmdAdjustmentField("Addition", "addition", totals.addition)}
+        ${dmdAdjustmentField("Discount", "discount", totals.discount)}
         ${readout("Diamond Amount", money(totals.diamondAmount))}
+        ${dmdAdjustmentField("GST %", "gstPct", currentCustomerBill(document.querySelector(".diamond-purchase-shell"))?.gstPct ?? 3)}
         ${readout("Gst", money(totals.gst))}
         ${readout("Invoice Total", money(totals.invoiceTotal))}
-        ${readout("Cash Payment", money(totals.cashPayment))}
+        ${dmdAdjustmentField("Cash Payment", "cashPayment", totals.cashPayment)}
         ${readout("Balance", money(totals.balance))}
       </div>
     </div>
@@ -20361,10 +20367,10 @@ function dmdStonePurchaseTotals(totals) {
       <div></div>
       <div class="adjustments total-block">
         ${readout("Bill Amount", money(totals.billAmount))}
-        ${readout("Addition", money(totals.addition))}
-        ${readout("Discount", money(totals.discount))}
+        ${dmdAdjustmentField("Addition", "addition", totals.addition)}
+        ${dmdAdjustmentField("Discount", "discount", totals.discount)}
         ${readout("Invoice Total", money(totals.invoiceTotal))}
-        ${readout("Cash Payment", money(totals.cashPayment))}
+        ${dmdAdjustmentField("Cash Payment", "cashPayment", totals.cashPayment)}
         ${readout("Balance", money(totals.balance))}
       </div>
     </div>
@@ -20376,10 +20382,10 @@ function directPurchaseTotals(totals) {
     <div class="transaction-bottom-grid purchase-bottom direct-purchase-bottom">
       <div class="adjustments">
         ${readout("Bill Amount", money(totals.billAmount))}
-        ${readout("Addition", money(totals.addition))}
-        ${readout("Discount", money(totals.discount))}
+        ${billAdjustmentField("Addition", "addition", totals.addition, "record")}
+        ${billAdjustmentField("Discount", "discount", totals.discount, "record")}
         ${readout("GST / VAT", money(totals.gstVat))}
-        ${readout("Cess Amt", money(totals.cess))}
+        ${billAdjustmentField("Cess Amt", "cess", totals.cess, "record")}
       </div>
       <div class="purchase-payment-lines">
         <input value="0" />
@@ -20389,76 +20395,66 @@ function directPurchaseTotals(totals) {
       </div>
       <div class="adjustments total-block">
         ${readout("Invoice Total", money(totals.invoiceTotal))}
-        ${readout("Round off", money(totals.roundOff))}
+        ${billAdjustmentField("Round off", "roundOff", totals.roundOff, "record")}
         ${readout("Account Balance", money(totals.accountBalance))}
-        ${readout("Cash Payment", money(totals.payment))}
+        ${billAdjustmentField("Cash Payment", "cashPayment", totals.payment, "record")}
         ${readout("Account Balance", money(totals.accountBalance))}
       </div>
     </div>
   `;
 }
 
-function dmdReturnTotals(totals) {
+function dmdReturnTotals(totals, bill = state.dmdWholesales?.[0]) {
   return `
     <div class="transaction-bottom-grid dmd-bottom">
       <div></div>
       <div class="adjustments">
         ${readout("Sales Total", money(totals.salesTotal))}
-        ${readout("Certification", money(totals.certification))}
-        ${readout("HUID Charge", money(totals.huidCharge))}
+        ${billAdjustmentField("Certification", "certification", totals.certification)}
+        ${billAdjustmentField("HUID Charge", "huidCharge", totals.huidCharge)}
+        ${billAdjustmentField("GST %", "gstPct", bill?.gstPct ?? 3)}
         ${readout("GST Amount", money(totals.gstAmount))}
       </div>
       <div class="adjustments">
-        ${readout("Addition", money(totals.addition))}
-        ${readout("Discount", money(totals.discount))}
+        ${billAdjustmentField("Addition", "addition", totals.addition, "record")}
+        ${billAdjustmentField("Discount", "discount", totals.discount, "record")}
         ${readout("Sub Total", money(totals.subTotal))}
-        ${readout("TDS/TCS", money(totals.tdsTcs))}
+        ${billAdjustmentField("TDS/TCS", "tdsTcs", totals.tdsTcs, "record")}
       </div>
       <div class="adjustments total-block">
         ${readout("Bill Amount", money(totals.billAmount))}
-        ${readout("Cash", money(totals.cash))}
+        ${billAdjustmentField("Cash", "cash", totals.cash, "record")}
         ${readout("Balance", money(totals.balance))}
       </div>
     </div>
   `;
 }
 
-function dmdWholesaleTotals(totals) {
+function dmdWholesaleTotals(totals, bill = state.dmdReturns?.[0]) {
   return `
     <div class="transaction-bottom-grid dmd-bottom">
       <div></div>
       <div></div>
       <div class="adjustments total-block">
         ${readout("Bill Amount", money(totals.billAmount))}
-        ${readout("Addition", money(totals.addition))}
-        ${readout("Discount", money(totals.discount))}
+        ${billAdjustmentField("Addition", "addition", totals.addition, "record")}
+        ${billAdjustmentField("Discount", "discount", totals.discount, "record")}
         ${readout("Diamond Amount", money(totals.diamondAmount))}
+        ${billAdjustmentField("GST %", "gstPct", bill?.gstPct ?? 3)}
         ${readout("Gst", money(totals.gst))}
         ${readout("Invoice Total", money(totals.invoiceTotal))}
-        ${readout("Cash Payment", money(totals.cashPayment))}
+        ${billAdjustmentField("Cash Payment", "cashPayment", totals.cashPayment, "record")}
         ${readout("Balance", money(totals.balance))}
       </div>
     </div>
   `;
 }
 
-function returnTotals(returnTotal) {
-  return `
-    <div class="transaction-bottom-grid return-bottom">
-      <div class="adjustments">
-        ${readout("Return Total", money(returnTotal))}
-        ${readout("GST/VAT", money(0))}
-        ${readout("Addition", money(0))}
-        ${readout("Discount", money(0))}
-      </div>
-      <div></div>
-      <div class="adjustments total-block">
-        ${readout("Bill Amount", money(returnTotal))}
-        ${readout("Cash Paid", money(returnTotal))}
-        ${readout("Balance", money(0))}
-      </div>
-    </div>
-  `;
+function returnTotals(returnTotal, bill = state.bills[0]) {
+ const addition = Number(bill?.addition || 0), discount = Number(bill?.discount || 0);
+ const invoiceTotal = Math.max(0,returnTotal+addition-discount);
+ const payment = Number(bill?.cashPayment ?? invoiceTotal);
+ return '<div class="transaction-bottom-grid return-bottom"><div class="adjustments">' + readout('Return Total',money(returnTotal)) + billAdjustmentField('Addition','addition',addition,'return') + billAdjustmentField('Discount','discount',discount,'return') + '</div><div></div><div class="adjustments total-block">' + readout('Bill Amount',money(invoiceTotal)) + billAdjustmentField('Cash Paid','cashPayment',payment,'return') + readout('Balance',money(invoiceTotal-payment)) + '</div></div>';
 }
 
 function salesOrderTotals(order) {
@@ -20481,6 +20477,8 @@ function salesOrderTotals(order) {
         <label class="readout editable-readout"><span>Tax%</span><span class="field-pair"><input value="${numericValue(order.line?.taxPct || 0, 2)}" /><input value="${moneyValue(financials.taxTotal)}" readonly /></span></label>
       </div>
       <div class="adjustments total-block">
+        ${billAdjustmentField("Addition", "addition", order.totals?.addition || 0, "sales")}
+        ${billAdjustmentField("Discount", "discount", order.totals?.flatDiscount || order.discount || 0, "sales")}
         ${readout("Quotation Total", money(financials.invoiceTotal))}
         ${readout("Customer Deposit", money(advance))}
         ${readout("Stock Impact", "None")}
@@ -20496,10 +20494,10 @@ function purchaseTotals(totals, showTaxExtras) {
     <div class="transaction-bottom-grid purchase-bottom">
       <div class="adjustments">
         ${readout("Bill Amount", money(totals.billAmount))}
-        ${readout("Addition", money(totals.addition))}
-        ${readout("Discount", money(totals.discount))}
+        ${billAdjustmentField("Addition", "addition", totals.addition, "purchase")}
+        ${billAdjustmentField("Discount", "discount", totals.discount, "purchase")}
         ${readout("GST / VAT", money(totals.gstVat))}
-        ${showTaxExtras ? readout("Cess Amt", money(totals.cess)) + readout("TDS/TCS", money(totals.tdsTcs)) : ""}
+        ${showTaxExtras ? billAdjustmentField("Cess Amt", "cess", totals.cess, "purchase") + billAdjustmentField("TDS/TCS", "tdsTcs", totals.tdsTcs, "purchase") : ""}
       </div>
       <div class="purchase-payment-lines">
         <input />
@@ -20511,8 +20509,8 @@ function purchaseTotals(totals, showTaxExtras) {
       </div>
       <div class="adjustments total-block">
         ${readout("Invoice Total", money(totals.invoiceTotal))}
-        ${readout("Round off", money(totals.roundOff))}
-        ${readout(showTaxExtras ? "Payment" : "Cash Received", money(totals.payment))}
+        ${billAdjustmentField("Round off", "roundOff", totals.roundOff, "purchase")}
+        ${billAdjustmentField(showTaxExtras ? "Payment" : "Cash Received", "cashPayment", totals.payment, "purchase")}
         ${readout(showTaxExtras ? "Account Balance" : "Ledger Balance", money(totals.accountBalance))}
       </div>
     </div>
@@ -20524,8 +20522,8 @@ function purchaseReturnTotals(totals) {
     <div class="transaction-bottom-grid purchase-return-bottom">
       <div class="adjustments">
         ${readout("Bill Amount", money(totals.billAmount))}
-        ${readout("Addition", money(totals.addition))}
-        ${readout("Discount", money(totals.discount))}
+        ${billAdjustmentField("Addition", "addition", totals.addition, "purchase")}
+        ${billAdjustmentField("Discount", "discount", totals.discount, "purchase")}
         ${readout("GST / VAT", money(totals.gstVat))}
       </div>
       <div class="purchase-payment-lines">
@@ -20538,7 +20536,7 @@ function purchaseReturnTotals(totals) {
       <div class="adjustments total-block">
         ${readout("Invoice Total", money(totals.invoiceTotal))}
         ${readout("Account", money(totals.accountBalance))}
-        ${readout("Cash Received", money(totals.payment))}
+        ${billAdjustmentField("Cash Received", "cashPayment", totals.payment, "purchase")}
         ${readout("Ledger Balance", money(totals.accountBalance))}
       </div>
     </div>
@@ -20585,9 +20583,9 @@ function billingTotals(bill) {
         ${readout("Return Total", signedMoney(-adj.salesReturn))}
         ${readout("DMD Amt", money(totals.dmdAmount))}
         ${readout("KFC,GST Amo", money(totals.kfcGstAmount))}
-        ${readout("Addition", money(totals.addition))}
+        ${billAdjustmentField("Addition", "addition", totals.addition, "sales")}
         ${removableReadout("Flat Disc", money(totals.flatDiscount), "remove-discount", "flatDiscount")}
-        ${readout("Rate Difference", money(totals.rateDifference))}
+        ${billAdjustmentField("Rate Difference", "rateDifference", totals.rateDifference, "sales")}
         ${readout("Tax Total", money(financials.taxTotal))}
       </div>
       <div class="adjustments total-block">
@@ -20600,7 +20598,7 @@ function billingTotals(bill) {
         <label class="readout editable-readout"><span>Bank Transfer</span><input data-sales-payment-field="bank" type="number" min="0" step="0.01" value="${moneyValue(payment.bank)}" /></label>
         ${readout("Status", financials.paymentLabel)}
         ${readout("Ledger Balance", money(totals.ledgerBalance))}
-        ${readout("Round-off", money(totals.billAmountRoundOff))}
+        ${billAdjustmentField("Round-off", "roundOff", totals.billAmountRoundOff, "sales")}
         ${readout("Total Received", money(totals.cashReceived))}
         ${financials.refundAmount > 0 ? readout("Refund Amount", money(financials.refundAmount)) : ""}
         ${readout(financials.refundAmount > 0 ? "Change / Refund Due" : "Balance Due", money(totals.balance))}
@@ -21756,6 +21754,8 @@ function bindEvents() {
   setupBillCustomerLookup();
   setupSalesHeaderFields();
   setupDmdReturnScreens();
+  setupDmdPurchaseControls();
+  setupBillAdjustmentFields();
   setupOrderAdvanceScreens();
   setupSmithWorkScreens();
   setupOpeningStockScreen();
@@ -21923,6 +21923,7 @@ function saveBankTransactionAction(type) {
   bankTransactionDrafts[type] = draft;
   state.audit.unshift(audit(`Saved ${bankTransactionTitle(type)} ${draft.voucherNo || draft.refNo || ""}`.trim()));
   saveState();
+  bankTransactionDrafts[type] = defaultBankTransaction(type);
   render();
   toast(`${bankTransactionTitle(type)} saved.`);
 }
@@ -22074,6 +22075,7 @@ function savePdcAction(type) {
   pdcDrafts[type] = draft;
   state.audit.unshift(audit(`Saved ${pdcTitle(type)} ${draft.entryNo || draft.refNo || ""}`.trim()));
   saveState();
+  pdcDrafts[type] = defaultPdcRecord(type);
   render();
   toast(`${pdcTitle(type)} saved.`);
 }
@@ -22262,6 +22264,7 @@ function saveJournalVoucherAction() {
   journalVoucherDraft = draft;
   state.audit.unshift(audit(`Saved Journal Voucher ${voucherNo}`));
   saveState();
+  journalVoucherDraft = defaultJournalVoucher();
   render();
   toast("Journal voucher saved.");
 }
@@ -22409,6 +22412,7 @@ function saveCashVoucherAction(type) {
   });
   state.audit.unshift(audit(`Saved ${cashVoucherTitle(type)} ${draft.voucherNo || draft.refNo || ""}`.trim()));
   saveState();
+  cashVoucherDrafts[type] = defaultCashVoucher(type);
   render();
   toast(`${cashVoucherTitle(type)} saved.`);
 }
@@ -22546,6 +22550,7 @@ function saveDirectEntryAction() {
   directEntryDraft = draft;
   state.audit.unshift(audit(`Saved Direct Entry ${draft.entryNo}`));
   saveState();
+  directEntryDraft = defaultDirectEntry();
   render();
   toast("Direct Entry saved.");
 }
@@ -22671,6 +22676,7 @@ function saveExpenseEntryAction() {
   expenseEntryDraft = draft;
   state.audit.unshift(audit(`Saved Expense Entry ${draft.entryNo}`));
   saveState();
+  expenseEntryDraft = defaultExpenseEntry();
   render();
   toast("Expense Entry saved.");
 }
@@ -22750,6 +22756,7 @@ function saveBillwiseAction(type) {
   billwiseDrafts[type] = draft;
   state.audit.unshift(audit(`Saved ${billwiseTitle(type)} ${draft.entryNo || draft.refNo || ""}`.trim()));
   saveState();
+  billwiseDrafts[type] = defaultBillwiseTransaction(type);
   render();
   toast(`${billwiseTitle(type)} saved.`);
 }
@@ -23221,6 +23228,7 @@ function saveComplimentaryPurchase() {
   complimentaryPurchaseSelectedRow = 0;
   state.audit.unshift(audit(`Saved complimentary item purchase ${record.entryNo}`));
   saveState();
+  complimentaryPurchaseDraft = defaultComplimentaryPurchase();
   render();
   toast("Complimentary item purchase saved.");
 }
@@ -23242,6 +23250,7 @@ function saveComplimentaryIssue() {
   complimentaryIssueSelectedRow = 0;
   state.audit.unshift(audit(`Saved complimentary item issue ${record.entryNo}`));
   saveState();
+  complimentaryIssueDraft = defaultComplimentaryIssue();
   render();
   toast("Complimentary item issue saved.");
 }
@@ -23764,6 +23773,7 @@ function setupSalesHeaderFields() {
     } else {
       bill.paymentBreakup = { ...normalizePaymentBreakup(bill.paymentBreakup), [key]: value };
       bill.paid = 0;
+      bill.totals = { ...bill.totals, cashReceived: Object.values(bill.paymentBreakup).reduce((sum, amount) => sum + Number(amount || 0), 0) };
     }
     applyBillFinancials(bill);
     saveState();
@@ -23936,7 +23946,7 @@ function setupEntryGridCalculations() {
         return;
       }
       if (row.closest(".diamond-purchase-stone")) {
-        updateDmdStonePreview(row, readDmdStoneEntryLine(row));
+        updateDmdStonePreview(row, readDmdPurchaseStoneEntryLine(row));
         return;
       }
       if (row.closest(".diamond-purchase-return-ornament")) {
@@ -24134,6 +24144,9 @@ function loadSavedLineIntoEntry(row) {
   entryRow.dataset.editLineKind = row.dataset.editLineKind || "";
   entryRow.dataset.editLineSection = row.dataset.editLineSection || "";
   entryRow.dataset.editLineIndex = row.dataset.editLineIndex || "0";
+  entryRow.dataset.linkedItemId = line.itemId || "";
+  entryRow.dataset.linkedItemName = line.itemName || "";
+  entryRow.dataset.linkedBarcode = line.barcode || "";
   fillEntryRow(entryRow, line);
   const addButton = row.closest(".classic-entry-area")?.querySelector("[data-action='add-bill-item']");
   if (addButton) addButton.textContent = "Update Item";
@@ -24216,7 +24229,12 @@ function upsertEntryLine(row, collection, line) {
   const editingCollection = editableCollectionForEntryRow(row);
   const editingIndex = Number(row.dataset.editLineIndex);
   if (editingCollection && Number.isInteger(editingIndex) && editingIndex >= 0 && editingIndex < editingCollection.length) {
-    editingCollection.splice(editingIndex, 1, line);
+    const original = editingCollection[editingIndex];
+    line.id = original.id;
+    if (!line.barcode) line.barcode = original.barcode || "";
+    if (!line.itemId) line.itemId = original.itemId || "";
+    if (!line.itemName) line.itemName = original.itemName || "";
+    collection.splice(editingIndex, 1, line);
     return "updated";
   }
   collection.push(line);
@@ -24233,6 +24251,7 @@ function applyPendingDiamondHandoff() {
   pendingDiamondHandoff = null;
   const entryRow = document.querySelector(`.classic-entry-area.${targetKind} .classic-entry-grid tbody tr`);
   if (!entryRow) return;
+  entryRow.closest(".classic-billing-shell")?.querySelector("[data-dmd-tab=diamond]")?.click();
   entryRow.dataset.linkedItemId = sourceLine.itemId || sourceLine.itemCode || "";
   entryRow.dataset.linkedItemName = sourceLine.itemDescription || sourceLine.itemName || "";
   entryRow.dataset.linkedBarcode = sourceLine.barcode || "";
@@ -24764,7 +24783,7 @@ function readDmdStoneEntryLine(row) {
 
 function readDmdPurchaseStoneEntryLine(row) {
   const line = readDmdStoneEntryLine(row);
-  line.amount = Math.round(Number(line.caratCent || 0) * Number(line.purchaseRate || 0));
+  line.amount = Math.round(Number(line.caratCent || 0) * Number(line.purchaseRate || 0) * 100) / 100;
   return line;
 }
 
@@ -24786,7 +24805,7 @@ function readDmdStonePurchaseEntryLine(row) {
     purchaseRate: readNumber("purchaseRate"),
     sellingRate: readNumber("sellingRate")
   });
-  line.amount = Math.round(Number(line.caratCent || 0) * Number(line.purchaseRate || 0));
+  line.amount = Math.round(Number(line.caratCent || 0) * Number(line.purchaseRate || 0) * 100) / 100;
   return line;
 }
 
@@ -25327,6 +25346,7 @@ function saveSmithWork() {
   }));
   state.audit.unshift(audit(`Saved Smith work order ${smithWorkDraft.entryNo}`));
   saveState();
+  smithWorkDraft = defaultSmithWorkOrder();
   render();
   toast("Smith work order saved.");
 }
@@ -25354,6 +25374,7 @@ function saveCashWeightSmith() {
   }));
   state.audit.unshift(audit(`Saved cash for weight Smith ${cashWeightSmithDraft.entryNo}`));
   saveState();
+  cashWeightSmithDraft = defaultCashWeightSmith();
   render();
   toast("Cash for weight Smith saved.");
 }
@@ -25381,6 +25402,7 @@ function saveJewellerWork() {
   }));
   state.audit.unshift(audit(`Saved Jeweller work order ${jewellerWorkDraft.entryNo}`));
   saveState();
+  jewellerWorkDraft = defaultJewellerWorkOrder();
   render();
   toast("Jeweller work order saved.");
 }
@@ -25408,6 +25430,7 @@ function saveCashWeightJeweller() {
   }));
   state.audit.unshift(audit(`Saved cash for weight Jeweller ${cashWeightJewellerDraft.entryNo}`));
   saveState();
+  cashWeightJewellerDraft = defaultCashWeightJeweller();
   render();
   toast("Cash for weight Jeweller saved.");
 }
@@ -25421,6 +25444,7 @@ function saveStockAdjustment() {
   stockAdjustmentDraft.lines.forEach(applyStockAdjustmentLineToStock);
   state.audit.unshift(audit(`Saved stock adjustment ${stockAdjustmentDraft.entryNo}`));
   saveState();
+  stockAdjustmentDraft = defaultStockAdjustment();
   render();
   toast("Stock adjustment saved.");
 }
@@ -25434,6 +25458,7 @@ function saveOpeningStock() {
   applyOpeningStockToStock(openingStockDraft);
   state.audit.unshift(audit(`Saved opening stock for ${openingStockDraft.openingDate}`));
   saveState();
+  openingStockDraft = defaultOpeningStockEntry();
   render();
   toast("Opening stock saved.");
 }
@@ -25505,6 +25530,7 @@ function saveGoldDeposit(type = "Deposit") {
   if (isWithdrawal) goldWithdrawalDraft = draft;
   else goldDepositDraft = draft;
   saveState();
+  if (isWithdrawal) goldWithdrawalDraft = defaultGoldDeposit(type); else goldDepositDraft = defaultGoldDeposit(type);
   render();
   toast(`${isWithdrawal ? "Gold withdrawal" : "Gold deposit"} saved.`);
 }
@@ -25542,6 +25568,7 @@ function saveSample(type = "Issue") {
   if (isReturn) sampleReturnDraft = draft;
   else sampleIssueDraft = draft;
   saveState();
+  if (type === "Return") sampleReturnDraft = defaultSample(type); else sampleIssueDraft = defaultSample(type);
   render();
   toast(`Sample ${type.toLowerCase()} saved.`);
 }
@@ -25574,6 +25601,7 @@ function savePolishing() {
   }));
   state.audit.unshift(audit(`Saved polishing ${polishingDraft.entryNo}`));
   saveState();
+  polishingDraft = defaultPolishingEntry();
   render();
   toast("Polishing entry updated.");
 }
@@ -25709,6 +25737,7 @@ function saveServiceJob(type) {
   setServiceDraft(type, draft);
   state.audit.unshift(audit(`Saved ${type.toLowerCase()} service job ${draft.entryNo}`));
   saveState();
+  setServiceDraft(type, defaultServiceJob(type));
   render();
   toast(`${type === "Close" ? "Close service" : "New service"} saved.`);
 }
@@ -25737,6 +25766,7 @@ function saveRefineryIssue() {
   }));
   state.audit.unshift(audit(`Saved refinery issue ${refineryIssueDraft.entryNo}`));
   saveState();
+  refineryIssueDraft = defaultRefineryIssue();
   render();
   toast("Refinery issue saved.");
 }
@@ -25766,6 +25796,7 @@ function saveRefineryReturn() {
   }));
   state.audit.unshift(audit(`Saved refinery return ${refineryReturnDraft.entryNo}`));
   saveState();
+  refineryReturnDraft = defaultRefineryReturn();
   render();
   toast("Refinery return saved.");
 }
@@ -25795,6 +25826,7 @@ function saveRefineryFinalReturn() {
   }));
   state.audit.unshift(audit(`Saved refinery final return ${refineryFinalDraft.entryNo}`));
   saveState();
+  refineryFinalDraft = defaultRefineryFinalReturn();
   render();
   toast("Refinery final return saved.");
 }
@@ -25823,6 +25855,7 @@ function saveMeltingIssue() {
   }));
   state.audit.unshift(audit(`Saved melting issue ${meltingIssueDraft.entryNo}`));
   saveState();
+  meltingIssueDraft = defaultMeltingIssue();
   render();
   toast("Melting issue saved.");
 }
@@ -25852,6 +25885,7 @@ function saveMeltingReturn() {
   }));
   state.audit.unshift(audit(`Saved melting return ${meltingReturnDraft.entryNo}`));
   saveState();
+  meltingReturnDraft = defaultMeltingReturn();
   render();
   toast("Melting return saved.");
 }
@@ -26137,6 +26171,7 @@ function appendDiamondPurchaseOrnamentLine(row) {
   }
   state.diamondPurchases ||= [normalizeDiamondPurchaseBill()];
   const bill = normalizeDiamondPurchaseBill(state.diamondPurchases[0]);
+  line.barcode ||= "DMD-" + crypto.randomUUID().replaceAll("-", "").slice(0, 12).toUpperCase();
   upsertEntryLine(row, bill.ornamentLines, line);
   state.diamondPurchases[0] = bill;
   state.audit.unshift(audit(`Added ${line.itemName} to diamond purchase`));
@@ -26147,7 +26182,7 @@ function appendDiamondPurchaseOrnamentLine(row) {
 }
 
 function appendDiamondPurchaseStoneLine(row) {
-  const line = readDmdStoneEntryLine(row);
+  const line = readDmdPurchaseStoneEntryLine(row);
   if (!line.colorType && !line.shape && line.caratCent <= 0 && line.pcs <= 0) {
     toast("Enter diamond stone details before adding.");
     return;
@@ -26950,21 +26985,20 @@ function handleAction(action, source) {
   if (action.startsWith("open-transaction-") && !["open-transaction-gold-deposit", "open-transaction-gold-withdrawal", "open-transaction-complimentary-purchase", "open-transaction-complimentary-sales"].includes(action)) {
     toast("Transaction window ready. Detailed entry screen can be expanded from this action.");
   }
-  if (action === "save-current-bill") {
-    const bill = captureSalesHeaderFields();
-    if (bill) {
-      bill.saved = true;
-      bill.updatedAt = new Date().toISOString();
-    }
-    saveState();
-    toast("Bill saved. Click New to enter another bill, or use Previous and Next to browse saved bills.");
+  if (action === "save-dmd-stone-purchase" || (action === "save-current-bill" && active === "Purchase" && ["Diamond Purchase", "Diamond Purchase Return"].includes(purchaseView))) {
+    const bill = currentPurchaseRecord();
+    if (!bill) return;
+    document.querySelectorAll("[data-header-field]").forEach(field => bill[field.dataset.headerField] = field.value);
+    saveDmdPurchaseStock(bill, purchaseView === "Diamond Purchase Return");
+    bill.saved = true; bill.updatedAt = new Date().toISOString();
+    saveState(); resetSavedBillEntry(); saveState(); render(); toast("Purchase saved. New entry ready."); return;
   }
-  if (action === "save-dmd-return" || action === "save-dmd-wholesale") {
-    const bill = captureSalesHeaderFields();
-    if (bill) { bill.saved = true; bill.updatedAt = new Date().toISOString(); }
-    saveState();
-    toast("Bill saved. Click New for another bill or use Previous and Next.");
-    return;
+  if (["save-current-bill", "save-dmd-return", "save-dmd-wholesale"].includes(action)) {
+    const bill = active === "Purchase" ? currentPurchaseRecord() : captureSalesHeaderFields();
+    if (!bill) return;
+    document.querySelectorAll("[data-header-field]").forEach(field => bill[field.dataset.headerField] = field.value);
+    bill.saved = true; bill.updatedAt = new Date().toISOString();
+    saveState(); resetSavedBillEntry(); saveState(); render(); toast("Bill saved. New entry ready."); return;
   }
   if (action === "new-sales-bill") { newSalesRecord(); return; }
   if (action === "previous-bill") { navigateSalesRecord("previous"); return; }
@@ -27000,7 +27034,7 @@ function handleAction(action, source) {
     bill.paymentMode = clean; saveState(); render(); toast("Billing setting updated."); return;
   }
   if (action === "help") { window.alert("Sales billing: choose Staff and Agent, enter items, Save the bill, click New for another bill, and use Previous/Next to browse saved bills."); return; }
-  if (action === "edit-current-bill") {
+  if (action === "edit-current-bill" || action === "edit-dmd-stone-purchase") {
     openExistingRecordPicker();
     return;
   }
@@ -27570,8 +27604,8 @@ function saveOrderAdvance(type) {
   }
   state.audit.unshift(audit(`${isRefund ? "Saved advance refund" : "Saved additional advance"} for sales order ${order.entryNo}`));
   saveState();
-  if (isRefund) orderAdvanceRefundDraft = { ...defaultOrderAdvanceDraft("refund"), pickOrder: order.entryNo || order.refNo || "" };
-  else orderAdvanceDraft = { ...defaultOrderAdvanceDraft("advance"), pickOrder: order.entryNo || order.refNo || "" };
+  if (isRefund) orderAdvanceRefundDraft = defaultOrderAdvanceDraft("refund");
+  else orderAdvanceDraft = defaultOrderAdvanceDraft("advance");
   render();
   toast(isRefund ? "Order advance refund saved." : "Additional order advance saved.");
 }
@@ -29248,3 +29282,89 @@ function icon(name) {
 }
 
 render();
+
+function dmdAdjustmentField(label, key, value) {
+  return '<label class="readout editable-readout dmd-adjustment-readout"><span>' + label + '</span><input type="number" min="0" step="0.01" data-dmd-adjustment="' + key + '" value="' + Number(value || 0) + '" /></label>';
+}
+function setupDmdPurchaseControls() {
+  document.querySelectorAll('[data-dmd-adjustment]').forEach(input => input.addEventListener('change', () => {
+    const bill = currentCustomerBill(input.closest('.classic-billing-shell'));
+    bill[input.dataset.dmdAdjustment] = Math.max(0, parseEntryNumber(input.value)); saveState(); render();
+  }));
+  document.querySelectorAll('[data-dmd-tab]').forEach(button => button.addEventListener('click', () => {
+    dmdDetailsTab = button.dataset.dmdTab;
+    const shell = button.closest('.classic-billing-shell');
+    shell.querySelectorAll('[data-dmd-tab]').forEach(tab => tab.setAttribute('aria-selected', String(tab === button)));
+    shell.querySelectorAll('.classic-entry-area').forEach(area => area.hidden = area.dataset.entryKind.endsWith('stone') !== (button.dataset.dmdTab === 'diamond'));
+  }));
+  document.querySelectorAll('.diamond-purchase-shell').forEach(shell => shell.querySelector('[data-dmd-tab=' + dmdDetailsTab + ']')?.click());
+  document.querySelectorAll('[data-line-field=barcode], [data-line-field=itemCode]').forEach(input => input.addEventListener('change', () => {
+    if (active !== 'Sales') return;
+    const stock = (state.stock || []).find(item => item.purchaseSource && (item.barcode === input.value || item.huid === input.value));
+    if (stock) fillEntryRow(input.closest('tr'), { ...stock, itemName: stock.item, itemCode: stock.barcode, stoneCharge: stock.diamondAmount, dmdAmount: stock.diamondAmount });
+  }));
+}
+function saveDmdPurchaseStock(bill, isReturn = false) {
+  const ornaments = bill.ornamentLines || [];
+  const diamonds = bill.diamondLines || bill.lines || [];
+  const rows = ornaments.length ? [...ornaments, ...diamonds.filter(stone => !ornaments.some(line => (stone.barcode && stone.barcode === line.barcode) || (stone.itemId && stone.itemId === line.itemId)))] : diamonds;
+  rows.forEach(line => {
+    line.barcode ||= 'DMD-' + crypto.randomUUID().replaceAll('-', '').slice(0, 12).toUpperCase();
+    const isOrnament = ornaments.includes(line);
+    const linked = isOrnament ? diamonds.filter(stone => stone.barcode === line.barcode || (stone.itemId && stone.itemId === line.itemId)) : [line];
+    linked.forEach(stone => stone.barcode = line.barcode);
+    const sellingAmount = linked.reduce((sum, stone) => sum + Number(stone.caratCent || 0) * Number(stone.sellingRate || 0), 0);
+    const existing = (state.stock || []).find(item => item.barcode === line.barcode || item.huid === line.barcode);
+    if (isReturn) { if (existing) { existing.qty = 0; existing.closing = 0; existing.status = 'Returned'; } return; }
+    const item = normalizeStock({ ...line, id: existing?.id || crypto.randomUUID(), purchaseSource: bill.id, barcode: line.barcode, huid: line.barcode, item: line.itemName || line.colorType || 'Diamond', category: 'Diamond', purity: line.goldType || '', qty: line.nos || 1, gross: line.gross || 0, stone: line.stone || 0, net: line.netWeight || 0, closing: line.gross || 0, rate: isOrnament ? line.goldRate : 0, makingCharge: line.salesMc || 0, diamondAmount: sellingAmount, dmdAmount: sellingAmount, dmdWgt: linked.reduce((sum, stone) => sum + Number(stone.caratCent || 0), 0), sellingRate: linked[0]?.sellingRate || 0, diamondLines: linked.map(stone => ({ ...stone })), status: 'Available' });
+    state.stock ||= []; if (existing) Object.assign(existing, item); else state.stock.push(item);
+  });
+}
+
+function purchaseRecordDefinition() {
+ return {"Diamond Purchase":["diamondPurchases",normalizeDiamondPurchaseBill],"Diamond Purchase Return":["diamondPurchaseReturns",normalizeDiamondPurchaseReturnBill],"DMD Stone Purchase":["dmdStonePurchases",normalizeDmdStonePurchaseBill],"Direct Purchase":["directPurchases",normalizeDirectPurchaseBill],"Direct Purchase Return":["directPurchaseReturns",normalizeDirectPurchaseReturnBill]}[purchaseView];
+}
+function currentPurchaseRecord() { const definition = purchaseRecordDefinition(); return definition ? state[definition[0]]?.[0] : purchaseBill(); }
+function resetSavedBillEntry() {
+ pendingDiamondHandoff = null; dmdDetailsTab = 'gold';
+ const date = new Date().toLocaleDateString('en-GB');
+ if (active === 'Purchase') {
+   const definition = purchaseRecordDefinition();
+   if (definition) {
+     const [key,normalize] = definition; const records = state[key] ||= [];
+     const entryNo = String(Math.max(0,...records.map(record => Number(record.entryNo) || 0)) + 1);
+     records.unshift(normalize({entryNo,date}));
+   } else state.bills.unshift(normalizeBill({id:crypto.randomUUID(),entryNo:String(Date.now()).slice(-6),billNo:'',date,type:purchaseView === 'Purchase Return' ? 'Purchase Return' : 'Purchase',sections:{sales:[],exchange:[],return:[]}}));
+ } else {
+   const records = currentSalesRecordCollection();
+   const entryNo = String(Math.max(0,...records.map(record => Number(record.entryNo) || 0)) + 1);
+   const normalize = salesView === 'DMD Return/DMD OP' ? normalizeDmdReturnBill : salesView === 'DMD Sales WholeSales' ? normalizeDmdWholesaleBill : normalizeBill;
+   records.unshift(normalize({id:crypto.randomUUID(),entryNo,billNo:entryNo,date,type:salesView === 'Sales Order' ? 'Sales Order' : salesView === 'Sales Return' ? 'Return' : 'Sale',sections:{sales:[],exchange:[],return:[]}}));
+ }
+ const fresh = active === 'Purchase' ? currentPurchaseRecord() : currentSalesRecord();
+ if (fresh) { fresh.refNo = ''; if (fresh.sections) fresh.line = null; }
+}
+
+function billAdjustmentField(label, key, value, context = 'record') {
+ const signed = ['roundOff','rateDifference','tdsTcs'].includes(key);
+ return '<label class="readout editable-readout dmd-adjustment-readout"><span>'+label+'</span><input type="number" step="0.01" '+(signed?'':'min="0" ')+'data-bill-adjustment="'+key+'" data-adjustment-context="'+context+'" value="'+Number(value||0)+'" /></label>';
+}
+function setBillAdjustment(bill, key, value, context) {
+ const signed = ['roundOff','rateDifference','tdsTcs'].includes(key);
+ value = signed ? parseEntryNumber(value) : Math.max(0,parseEntryNumber(value));
+ if(context === 'sales') {
+   const totalKey = key === 'discount' ? 'flatDiscount' : key === 'roundOff' ? 'billAmountRoundOff' : key;
+   bill.totals = {...bill.totals,[totalKey]:value};
+   if(key === 'discount') bill.discount=value;
+   applyBillFinancials(bill);
+ } else { bill[key]=value; if(key==='cash') bill.cashPayment=value; }
+}
+function setupBillAdjustmentFields() {
+ document.querySelectorAll('[data-bill-adjustment]').forEach(input=>input.addEventListener('change',()=>{
+   const context=input.dataset.adjustmentContext;
+   const bill=context==='purchase' ? currentPurchaseRecord() : currentCustomerBill(input.closest('.classic-billing-shell'));
+   if(!bill) return;
+   setBillAdjustment(bill,input.dataset.billAdjustment,input.value,context);
+   saveState(); render();
+ }));
+}
