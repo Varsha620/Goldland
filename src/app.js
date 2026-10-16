@@ -14725,18 +14725,11 @@ function diamondPurchaseReportToolbar() {
 }
 
 function diamondPurchaseRegisterRow(bill) {
-  const ornamentLines = bill.ornamentLines || [];
-  const diamondLines = bill.diamondLines || [];
-  const ornamentTotal = ornamentLines.reduce((sum, line) => sum + Number(line.salesAmt || line.amount || 0), 0);
-  const embeddedDiamond = ornamentLines.reduce((sum, line) => sum + Number(line.diamondAmount || 0), 0);
-  const looseDiamond = diamondLines.reduce((sum, line) => sum + Number(line.amount || Number(line.caratCent || 0) * Number(line.purchaseRate || 0)), 0);
-  const diamondAmount = embeddedDiamond + looseDiamond;
-  const billAmount = Math.max(0, ornamentTotal - embeddedDiamond);
-  const addition = Number(bill.addition || 0), discount = Number(bill.discount || 0);
-  const taxable = Math.max(0, billAmount + diamondAmount + addition - discount);
-  const tax = taxable * (Number(bill.gstPct || 0) / 100);
-  const invoiceTotal = taxable + tax;
-  const cashPaid = Number(bill.cashPayment || 0);
+  const totals = diamondPurchaseFinancials(bill);
+  const billAmount = totals.ornamentAmount, diamondAmount = totals.diamondAmount;
+  const addition = totals.addition, discount = totals.discount;
+  const tax = totals.gst + totals.tcs - totals.tds;
+  const invoiceTotal = totals.invoiceTotal, cashPaid = Number(bill.cashPayment || 0);
   return {
     bill, entryNo: bill.entryNo || bill.id, referenceNo: bill.refNo || "", entryDate: displaySalesDate(bill.date), purchaseMode: bill.paymentMode || "Credit",
     invoiceNo: bill.invoiceNo || "", invoiceDate: displaySalesDate(bill.invoiceDate || bill.date), partyName: bill.supplierSmith || bill.partyName || "",
@@ -20111,7 +20104,7 @@ function dmdReturnOpRow(line, index) {
 }
 
 function diamondPurchaseOrnamentRow(line, index) {
-  return [deleteLineButton("diamondPurchaseOrnament", line.id, "diamond-purchase"), index + 1, line.itemId || "-", line.itemName || "-", line.itemDescription || "-", line.barcode || "-", line.nos, grams(line.gross), grams(line.stone), grams(line.netWeight), money(line.stonePrice), numericValue(line.va, 2), line.goldType, line.salesType, money(line.goldRate), money(line.total), grams(line.dmdWgt), money(line.stnSPrice), money(line.purMc), money(line.salesMc), money(line.salesAmt)];
+  return [deleteLineButton("diamondPurchaseOrnament", line.id, "diamond-purchase"), index + 1, line.itemId || "-", line.itemName || "-", line.itemDescription || "-", line.barcode || "-", line.nos, grams(line.gross), grams(line.stone), grams(line.netWeight), money(line.stonePrice), numericValue(line.va, 2), line.goldType, line.salesType, money(line.goldRate), money(diamondPurchaseItemTotal(line, state.diamondPurchases?.[0])), grams(line.dmdWgt), money(line.stnSPrice), money(line.purMc), money(line.salesMc), money(diamondPurchaseItemSaleAmount(line, state.diamondPurchases?.[0]))];
 }
 
 function diamondPurchaseReturnOrnamentRow(line, index) {
@@ -20257,16 +20250,22 @@ function dmdWholesaleFinancials(bill) {
 }
 
 function diamondPurchaseFinancials(bill) {
-  const ornamentAmount = (bill.ornamentLines || []).reduce((sum, line) => sum + Number(line.goldAmount || 0) + Number(line.vaAmount || 0) + Number(line.stoneAmount || 0) + Number(line.purchaseMaking || 0), 0);
-  const diamondAmount = (bill.diamondLines || []).reduce((sum, line) => sum + normalizeDmdPurchaseStoneLine(line).amount, 0);
-  const billAmount = ornamentAmount + diamondAmount;
-  const taxable = Math.max(0, billAmount + Number(bill.addition || 0) - Number(bill.discount || 0));
-  const tcs = taxable * (Number(bill.tcsPct || 0) / 100);
-  const tds = taxable * (Number(bill.tdsPct || 0) / 100);
-  const gst = taxable * (Number(bill.gstPct || 0) / 100);
-  const invoiceTotal = taxable + tcs + gst - tds;
-  const balance = invoiceTotal - Number(bill.cashPayment || 0);
-  return { billAmount, addition: bill.addition, discount: bill.discount, diamondAmount, tcs, tds, gst, invoiceTotal, cashPayment: bill.cashPayment, balance };
+  const round = value => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+  const ornamentAmount = round((bill.ornamentLines || []).reduce((sum,line) => sum + diamondPurchaseGoldAmount(line),0));
+  const diamondAmount = round((bill.diamondLines || []).reduce((sum,line) => sum + normalizeDmdPurchaseStoneLine(line).amount,0));
+  const billAmount = round(ornamentAmount + diamondAmount);
+  const addition = round(bill.addition || 0), discount = round(bill.discount || 0);
+  const taxable = round(Math.max(0,billAmount+addition-discount));
+  const gst = round(taxable * Number(bill.gstPct || 0) / 100);
+  const tcs = round(taxable * Number(bill.tcsPct || 0) / 100);
+  const tds = round(taxable * Number(bill.tdsPct || 0) / 100);
+  const invoiceTotal = round(taxable+gst+tcs-tds);
+  const cashPayment = round(bill.cashPayment || 0), balance = round(invoiceTotal-cashPayment);
+  return {ornamentAmount,billAmount,addition,discount,diamondAmount,taxable,gst,tcs,tds,invoiceTotal,cashPayment,balance};
+}
+function diamondPurchaseGoldAmount(line) {
+  const calculated = line.goldAmount === undefined ? normalizeDmdWholesaleLine(line) : line;
+  return Number(calculated.goldAmount || 0)+Number(calculated.vaAmount || 0)+Number(calculated.stoneAmount || 0)+Number(calculated.purchaseMaking || 0);
 }
 
 function diamondPurchaseReturnFinancials(bill) {
@@ -20322,10 +20321,11 @@ function diamondPurchaseTotals(totals) {
       <div></div>
       <div></div>
       <div class="adjustments total-block">
-        ${readout("Bill Amount", money(totals.billAmount))}
+        ${readout("Gold Amount", money(totals.ornamentAmount))}
+        ${readout("Diamond Amount", money(totals.diamondAmount))}
+        ${readout("Items Total (Gold + Diamond)", money(totals.billAmount))}
         ${dmdAdjustmentField("Addition", "addition", totals.addition)}
         ${dmdAdjustmentField("Discount", "discount", totals.discount)}
-        ${readout("Diamond Amount", money(totals.diamondAmount))}
         ${dmdAdjustmentField("TCS %", "tcsPct", state.diamondPurchases[0].tcsPct)}
         ${readout("TCS", money(totals.tcs))}
         ${dmdAdjustmentField("TDS %", "tdsPct", state.diamondPurchases[0].tdsPct)}
@@ -23943,10 +23943,12 @@ function setupEntryGridCalculations() {
       }
       if (row.closest(".diamond-purchase-ornament")) {
         updateDmdWholesalePreview(row, readDmdWholesaleEntryLine(row));
+        updateDiamondPurchaseInvoicePreview();
         return;
       }
       if (row.closest(".diamond-purchase-stone")) {
         updateDmdStonePreview(row, readDmdPurchaseStoneEntryLine(row));
+        updateDiamondPurchaseInvoicePreview();
         return;
       }
       if (row.closest(".diamond-purchase-return-ornament")) {
@@ -24499,8 +24501,8 @@ function readDmdWholesaleEntryLine(row) {
 
 function updateDmdWholesalePreview(row, line) {
   updateLineOutputs(row, {
-    total: money(line.total),
-    salesAmt: money(line.salesAmt)
+    total: money(row.closest(".diamond-purchase-ornament") ? diamondPurchaseItemTotal({...line, barcode: row.dataset.linkedBarcode || line.barcode || ""}, state.diamondPurchases?.[0]) : line.total),
+    salesAmt: money(row.closest(".diamond-purchase-ornament") ? diamondPurchaseItemSaleAmount({...line,barcode:row.dataset.linkedBarcode || line.barcode || ""},state.diamondPurchases?.[0]) : line.salesAmt)
   });
 }
 
@@ -26989,6 +26991,11 @@ function handleAction(action, source) {
     const bill = currentPurchaseRecord();
     if (!bill) return;
     document.querySelectorAll("[data-header-field]").forEach(field => bill[field.dataset.headerField] = field.value);
+    if (purchaseView === "Diamond Purchase") {
+      const pending = diamondPurchasePendingEntries();
+      const updated = diamondPurchaseWithPending(bill, pending);
+      bill.ornamentLines = updated.ornamentLines; bill.diamondLines = updated.diamondLines;
+    }
     saveDmdPurchaseStock(bill, purchaseView === "Diamond Purchase Return");
     bill.saved = true; bill.updatedAt = new Date().toISOString();
     saveState(); resetSavedBillEntry(); saveState(); render(); toast("Purchase saved. New entry ready."); return;
@@ -29367,4 +29374,56 @@ function setupBillAdjustmentFields() {
    setBillAdjustment(bill,input.dataset.billAdjustment,input.value,context);
    saveState(); render();
  }));
+}
+
+function diamondPurchaseItemTotal(line, bill) {
+ const linked = diamondPurchaseLinkedStones(line, bill);
+ const diamondAmount = linked.reduce((sum,stone)=>sum+normalizeDmdPurchaseStoneLine(stone).amount,0);
+ return Math.round((diamondPurchaseGoldAmount(line)+diamondAmount+Number.EPSILON)*100)/100;
+}
+
+function diamondPurchasePendingEntries() {
+ const gold = document.querySelector('.diamond-purchase-ornament .classic-entry-grid tbody tr');
+ const diamond = document.querySelector('.diamond-purchase-stone .classic-entry-grid tbody tr');
+ const entries = [];
+ if (gold) {
+  const line = readDmdWholesaleEntryLine(gold);
+  if (line.gross > 0 || line.purMc > 0 || line.itemId || line.itemDescription) entries.push({key:'ornamentLines',index:gold.dataset.editLineIndex,line});
+ }
+ if (diamond) {
+  const line = readDmdPurchaseStoneEntryLine(diamond);
+  if (line.caratCent > 0 || line.purchaseRate > 0 || line.pcs > 0) entries.push({key:'diamondLines',index:diamond.dataset.editLineIndex,line});
+ }
+ return entries;
+}
+function diamondPurchaseWithPending(bill, entries) {
+ const preview = {...bill,ornamentLines:[...(bill.ornamentLines||[])],diamondLines:[...(bill.diamondLines||[])]};
+ for (const entry of entries) {
+  const collection = preview[entry.key], index = Number(entry.index);
+  if (entry.index !== undefined && Number.isInteger(index) && index >= 0 && index < collection.length) {
+   collection[index] = {...collection[index],...entry.line,id:collection[index].id,barcode:collection[index].barcode,itemId:collection[index].itemId,itemName:collection[index].itemName};
+  } else collection.push(entry.line);
+ }
+ return preview;
+}
+function updateDiamondPurchaseInvoicePreview() {
+ if (active !== 'Purchase' || purchaseView !== 'Diamond Purchase') return;
+ const bill = state.diamondPurchases?.[0]; if (!bill) return;
+ const totals = diamondPurchaseFinancials(diamondPurchaseWithPending(bill,diamondPurchasePendingEntries()));
+ const values = {'Gold Amount':totals.ornamentAmount,'Diamond Amount':totals.diamondAmount,'Items Total (Gold + Diamond)':totals.billAmount,'TCS':totals.tcs,'TDS':totals.tds,'Gst':totals.gst,'Invoice Total':totals.invoiceTotal,'Balance':totals.balance};
+ document.querySelectorAll('.diamond-purchase-bottom .readout').forEach(readout=>{
+  const label = readout.querySelector('span')?.textContent, target = readout.querySelector('strong');
+  if (target && Object.hasOwn(values,label)) target.textContent = money(values[label]);
+ });
+}
+
+function diamondPurchaseLinkedStones(line,bill) {
+ // Item codes can repeat across ornaments; only the item's barcode identifies its stones.
+ return (bill?.diamondLines||[]).filter(stone=>Boolean(line.barcode && stone.barcode && line.barcode===stone.barcode));
+}
+function diamondPurchaseItemSaleAmount(line,bill) {
+ const calculated = line.goldAmount === undefined ? normalizeDmdWholesaleLine(line) : line;
+ const gold = Number(calculated.goldAmount||0)+Number(calculated.vaAmount||0)+Number(calculated.stoneAmount||0)+Number(calculated.salesMaking||0);
+ const diamonds = diamondPurchaseLinkedStones(line,bill).reduce((sum,stone)=>sum+Number(stone.caratCent||0)*Number(stone.sellingRate||0),0);
+ return Math.round((gold+diamonds+Number.EPSILON)*100)/100;
 }
