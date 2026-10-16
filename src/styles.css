@@ -9683,3 +9683,5 @@ body:has(.staff-test-banner) .shell { padding-top: 34px; }
 .modal-backdrop :not([type="radio"]):not([type="checkbox"]) {
   border-radius: 0 !important;
 }
+
+.diamond-purchase-bottom .readout { grid-template-columns: minmax(185px, 1fr) minmax(112px, 150px); }

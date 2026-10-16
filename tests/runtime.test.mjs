@@ -1904,3 +1904,52 @@ assert.equal(editableAdjustmentChecks.normalizedDmd.certification,10);
 assert.equal(editableAdjustmentChecks.normalizedDmd.gstPct,0);
 assert(editableAdjustmentChecks.returned.includes('1,075'));
 assert(editableAdjustmentChecks.returned.includes('data-bill-adjustment="discount"'));
+
+const purchaseInvoiceReconciliation = vm.runInContext(`(() => {
+ const bill=normalizeDiamondPurchaseBill({ornamentLines:[{gross:2,stone:0,goldRate:1000,va:0,purMc:10,salesMc:999,dmdWgt:10,stnSPrice:999}],diamondLines:[{caratCent:10,purchaseRate:50,sellingRate:999,amount:99999}],addition:100,discount:20,gstPct:3,tcsPct:1,tdsPct:0.5,cashPayment:100});
+ return {screen:diamondPurchaseFinancials(bill),report:diamondPurchaseRegisterRow(bill),zero:diamondPurchaseFinancials({...bill,gstPct:0,tcsPct:0,tdsPct:0})};
+})()`,context);
+assert.equal(purchaseInvoiceReconciliation.screen.ornamentAmount,2020);
+assert.equal(purchaseInvoiceReconciliation.screen.diamondAmount,500);
+assert.equal(purchaseInvoiceReconciliation.screen.invoiceTotal,2691);
+assert.equal(purchaseInvoiceReconciliation.screen.balance,2591);
+assert.equal(purchaseInvoiceReconciliation.report.invoiceTotal,purchaseInvoiceReconciliation.screen.invoiceTotal);
+assert.equal(purchaseInvoiceReconciliation.report.billBalance,purchaseInvoiceReconciliation.screen.balance);
+assert.equal(purchaseInvoiceReconciliation.zero.invoiceTotal,2600);
+
+const linkedDiamondItemTotals = vm.runInContext(`(() => {
+ const first={itemId:'RING',barcode:'RING-1',goldAmount:1000,purchaseMaking:50};
+ const second={itemId:'RING',barcode:'RING-2',goldAmount:2000,purchaseMaking:75};
+ const bill={ornamentLines:[first,second],diamondLines:[{itemId:'RING',barcode:'RING-1',caratCent:10,purchaseRate:50,sellingRate:999},{itemId:'RING',barcode:'RING-2',caratCent:20,purchaseRate:60,sellingRate:999}],gstPct:0};
+ return {first:diamondPurchaseItemTotal(first,bill),second:diamondPurchaseItemTotal(second,bill),invoice:diamondPurchaseFinancials(bill).invoiceTotal};
+})()`,context);
+assert.equal(linkedDiamondItemTotals.first,1550);
+assert.equal(linkedDiamondItemTotals.second,3275);
+assert.equal(linkedDiamondItemTotals.invoice,linkedDiamondItemTotals.first+linkedDiamondItemTotals.second,'Linked diamond purchase amounts must be counted once in both item and invoice totals');
+
+const pendingDiamondInvoice=vm.runInContext(`(() => {
+ const bill={ornamentLines:[{id:'gold',barcode:'TAG-1',goldAmount:1000}],diamondLines:[],gstPct:3};
+ const added=diamondPurchaseWithPending(bill,[{key:'diamondLines',line:{id:'stone',barcode:'TAG-1',caratCent:10,purchaseRate:50,sellingRate:999}}]);
+ const edited=diamondPurchaseWithPending(added,[{key:'diamondLines',index:'0',line:{caratCent:20,purchaseRate:50,sellingRate:999}}]);
+ return {before:diamondPurchaseFinancials(bill),added:diamondPurchaseFinancials(added),edited:diamondPurchaseFinancials(edited),count:edited.diamondLines.length,originalCount:bill.diamondLines.length,barcode:edited.diamondLines[0].barcode};
+})()`,context);
+assert.equal(pendingDiamondInvoice.before.invoiceTotal,1030);
+assert.equal(pendingDiamondInvoice.added.invoiceTotal,1545,'Current diamond entry must contribute to invoice preview');
+assert.equal(pendingDiamondInvoice.edited.invoiceTotal,2060,'Editing a diamond must replace its prior contribution');
+assert.equal(pendingDiamondInvoice.count,1);
+assert.equal(pendingDiamondInvoice.originalCount,0,'Preview must not mutate saved data');
+assert.equal(pendingDiamondInvoice.barcode,'TAG-1');
+
+const noDiamondDetails=vm.runInContext(`(() => {
+ const line=normalizeDmdWholesaleLine({itemId:'R',barcode:'NEW-R',gross:1,stone:0.5,stonePrice:122,va:3,goldRate:9280,dmdWgt:5,stnSPrice:500,purMc:1000,salesMc:1200});
+ const empty={ornamentLines:[line],diamondLines:[],gstPct:0};
+ const unrelated={...empty,diamondLines:[{itemId:'R',caratCent:12,purchaseRate:140,sellingRate:500}]};
+ const linked={...empty,diamondLines:[{itemId:'R',barcode:'NEW-R',caratCent:12,purchaseRate:140,sellingRate:500}]};
+ return {gold:diamondPurchaseItemTotal(line,empty),sale:diamondPurchaseItemSaleAmount(line,empty),unrelated:diamondPurchaseItemTotal(line,unrelated),linked:diamondPurchaseItemTotal(line,linked),linkedSale:diamondPurchaseItemSaleAmount(line,linked),invoice:diamondPurchaseFinancials(empty).invoiceTotal};
+})()`,context);
+assert.equal(noDiamondDetails.gold,5340.2);
+assert.equal(noDiamondDetails.sale,5440.2,'Gold-tab diamond selling fields must not imply entered diamond details');
+assert.equal(noDiamondDetails.unrelated,5340.2,'Repeated item code must not attach unrelated diamond details');
+assert.equal(noDiamondDetails.linked,7020.2);
+assert.equal(noDiamondDetails.linkedSale,11440.2);
+assert.equal(noDiamondDetails.invoice,5340.2);
