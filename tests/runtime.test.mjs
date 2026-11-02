@@ -1865,11 +1865,11 @@ for(const entry of resetAfterSaveChecks) {
  assert(entry.savedParty.startsWith('Saved'),entry.view+' must preserve saved party');
 }
 const stockSaveReset = vm.runInContext(`(() => {
- stockAdjustmentDraft=defaultStockAdjustment();stockAdjustmentDraft.reason='First saved entry';
+ stockAdjustmentDraft=defaultStockAdjustment();stockAdjustmentDraft.reason='First saved entry';stockAdjustmentDraft.lines=[{itemName:'RESET AUDIT 1',nosAdd:1,grossAdd:1}];
  const originalId=stockAdjustmentDraft.id;saveStockAdjustment();
  const saved=state.stockAdjustments.find(record=>record.id===originalId);
  const nextId=stockAdjustmentDraft.id;
- stockAdjustmentDraft.reason='Second saved entry';saveStockAdjustment();
+ stockAdjustmentDraft.reason='Second saved entry';stockAdjustmentDraft.lines=[{itemName:'RESET AUDIT 2',nosAdd:1,grossAdd:1}];saveStockAdjustment();
  return {originalId,nextId,currentId:stockAdjustmentDraft.id,firstReason:saved.reason,nextSaved:state.stockAdjustments.some(record=>record.id===nextId),lineCount:stockAdjustmentDraft.lines.length};
 })()`,context);
 assert.notEqual(stockSaveReset.originalId,stockSaveReset.nextId);
@@ -1953,3 +1953,476 @@ assert.equal(noDiamondDetails.unrelated,5340.2,'Repeated item code must not atta
 assert.equal(noDiamondDetails.linked,7020.2);
 assert.equal(noDiamondDetails.linkedSale,11440.2);
 assert.equal(noDiamondDetails.invoice,5340.2);
+const barcodeEntryRegression = vm.runInContext(`(() => {
+ const saved={entries:state.barcodeEntries,stock:state.stock,audit:state.audit};
+ try {
+ state.barcodeEntries=[]; state.stock=[]; state.audit=[];barcodeEntryDraft=newBarcodeEntry();
+ const master=state.itemMasters[0];
+ const make=(code='')=>({itemId:master.itemId,itemName:master.itemName,qty:1,gross:12.5,stone:0.5,mcGram:20,barcode:code});
+ barcodeEntryLine=make();barcodeEntryAddLine();const first=barcodeEntryDraft.lines[0];
+ if(first.net!==12)throw Error('Net weight calculation failed');
+ barcodeEntryLine=make(first.barcode);let duplicate=false;try{barcodeEntryAddLine();}catch{duplicate=true;}
+ if(!duplicate)throw Error('Duplicate accepted');
+ barcodeEntryLine=make();barcodeEntryAddLine();
+ if(barcodeEntryDraft.lines[1].barcode===first.barcode)throw Error('Generated duplicate tag');
+ barcodeEntrySave();if(state.stock.length!==2)throw Error('Stock tags not created');
+ const record=state.barcodeEntries[0];
+ if(barcodeMovementData(first.barcode).length!==1)throw Error('Receipt counted twice');
+ if(!barcodeCurrentInventory().some(r=>r.barcode===first.barcode))throw Error('Tag missing from inventory');
+ if(loadState().barcodeEntries[0].lines.length!==2)throw Error('Persistence failed');
+ barcodeEntryDraft=structuredClone(record);barcodeEntryLine={};barcodeEntrySave();
+ if(state.stock.length!==2||state.barcodeEntries.length!==1)throw Error('Edit duplicated receipt or stock');
+ barcodeEntryDraft=newBarcodeEntry();barcodeEntryLine={...make(),stone:15};
+ let invalid=false;try{barcodeEntryAddLine();}catch{invalid=true;}if(!invalid)throw Error('Stone above gross accepted');
+ barcodeEntryLine={...make(),qty:0};invalid=false;try{barcodeEntryAddLine();}catch{invalid=true;}
+ if(!invalid)throw Error('Zero quantity accepted');
+ barcodeEntryDraft=newBarcodeEntry();barcodeEntryLine={};const screen=barcodeEntryScreen();
+ if(!screen.includes('data-be-command="barcodes"')||!screen.includes('BIS UID'))throw Error('Reference screen controls missing');
+ return true;
+ } finally {state.barcodeEntries=saved.entries;state.stock=saved.stock;state.audit=saved.audit;barcodeEntryDraft=null;barcodeEntryLine={};barcodeEntryEditIndex=-1;saveState();}
+})()`,context);
+assert(barcodeEntryRegression,'Barcode entry regression failed');
+console.log('Barcode entry lifecycle tests passed.');
+const barcodePrintingRegression=vm.runInContext(`(() => {
+ const previous={entries:state.barcodeEntries,stock:state.stock,audit:state.audit};
+ try {
+ state.barcodeEntries=[];state.stock=[];state.audit=[];
+ const master=state.itemMasters[0];
+ barcodeEntryDraft=newBarcodeEntry();barcodeEntryDraft.entryNo='252';barcodeEntryDraft.date='2026-10-22';
+ barcodeEntryLine={itemId:master.itemId,itemName:master.itemName,barcode:'TEST-N001014',qty:1,gross:27.6,stone:11.52,stoneCharge:3456,va:10};barcodeEntryAddLine();
+ barcodeEntryLine={itemId:master.itemId,itemName:master.itemName,barcode:'TEST-AG000892',qty:2,gross:16.15,stone:0,va:9};barcodeEntryAddLine();
+ const totals=barcodeEntryTotals(barcodeEntryDraft);
+ if(totals.net!==32.23||totals.gross!==43.75)throw Error('Reference weights calculated incorrectly');
+ barcodeEntrySave();
+ if(state.stock[1].qty!==2||state.stock[1].nos!==2)throw Error('Pair quantity not saved to stock');
+ barcodeEditQuery='252';barcodeEditSelected=0;
+ if(barcodeEditRecords().length!==1||!barcodeEditDialog().includes('Entry Date'))throw Error('Edit register missing');
+ barcodeEditQuery='999';if(barcodeEditRecords().length)throw Error('Entry search not applied');
+ barcodeEditQuery='252';barcodeEditOpen(0);
+ if(!barcodeEntryScreen().includes('Update'))throw Error('Saved record must show Update');
+ barcodePrintingOpen();barcodePrintState.type='All';
+ const dialog=barcodePrintingDialog();
+ for(const field of ['Gold Type','DmdWeight','Pricewithtax','M_VaPerc','M_Price','ClrStnRate'])if(!dialog.includes(field))throw Error('Print column missing: '+field);
+ if(barcodePrintingLabels().length!==0)throw Error('Unselected labels included');
+ barcodePrintState.selected=[0,1];
+ if(barcodePrintingLabels().length!==3)throw Error('Sticker Qty zero must follow piece count');
+ barcodePrintState.stickerQty=2;if(barcodePrintingLabels().length!==4)throw Error('Sticker copy override ignored');
+ barcodePrintState.pauseAfter=3;barcodePrintState.preview=true;
+ if((barcodePrintPreview().match(/<article/g)||[]).length!==3)throw Error('Print batch boundary incorrect');
+ barcodePrintState.batch=1;if((barcodePrintPreview().match(/<article/g)||[]).length!==1)throw Error('Last batch incorrect');
+ if(!barcodeTagSvg('N001014').includes('<rect'))throw Error('Barcode bars missing');
+ let invalid=false;try{barcodeTagSvg('bad<script>');}catch{invalid=true;}if(!invalid)throw Error('Invalid symbol accepted');
+ barcodePrintState.selected=[];barcodePrintAction('preview');if(!barcodePrintState.message.includes('Select at least'))throw Error('Empty selection not rejected');
+ return true;
+ }finally{state.barcodeEntries=previous.entries;state.stock=previous.stock;state.audit=previous.audit;barcodeEntryDraft=null;barcodeEntryLine={};barcodeEntryPicker=false;barcodePrintState=null;saveState();}
+})()`,context);
+assert(barcodePrintingRegression);console.log('Barcode edit, pairs, selection and printing tests passed.');
+const barcodeScreenCoverage=vm.runInContext(`(() => {
+ const before=state.itemTransfers;
+ try {
+ barcodeEntryDraft=newBarcodeEntry();barcodeEntryLine={};
+ const screen=barcodeEntryScreen();
+ for(const field of ['entryNo','refNo','refChecked','date','time','reversePrice','popupModel','autoUpdate','transferNo','transferRef','transferItemId','transferWeight','remarks'])if(!screen.includes('data-be-header="'+field+'"'))throw Error('Missing screenshot header field: '+field);
+ for(const field of ['itemId','itemName','description','barcode','bisUid','itemType','qty','gross','wastage','stone','net','stoneMode','stoneCharge','va','mcGram','mc','other','price','smith','pmcGram'])if(!screen.includes('data-be-line="'+field+'"'))throw Error('Missing screenshot entry field: '+field);
+ const expected=['ID','Item Name','Description','Barcode','Nos','Select','Item Type','Gross Weight','Stone Weight','Net Weight','StnChrMode','Stn Charge','VA %','MC','Price','Gold Type','MCperGrm','BisUid','Smith','DmdWeight','Pcs','salerate','DmdSaleamt','otherStone','Pricewithtax','M_VaPerc','M_Price','ClrStn','ClrStnRate'];
+ if(JSON.stringify(barcodePrintColumns.map(c=>c[1]))!==JSON.stringify(expected))throw Error('Printing screenshot columns differ');
+ state.itemTransfers=[{entryNo:'T123',refNo:'P456',lines:[{itemId:'R',mode:'IN',gross:3},{itemId:'R',mode:'OUT',gross:3}]}];
+ barcodeEntryDraft.transferNo='T123';barcodeEntryRefreshTransfer();
+ if(barcodeEntryDraft.transferWeight!=='3.000'||barcodeEntryDraft.transferItemId!=='R'||barcodeEntryDraft.transferRef!=='P456')throw Error('Transfer summary incorrect');
+ barcodeEntryDraft.transferNo='';barcodeEntryRefreshTransfer();if(barcodeEntryDraft.transferRef)throw Error('Cleared transfer kept stale details');
+ return true;
+ }finally{state.itemTransfers=before;barcodeEntryDraft=null;barcodeEntryLine={};}
+})()`,context);
+assert(barcodeScreenCoverage);console.log('Barcode screenshot field coverage and transfer tests passed.');
+const barcodeMenuRegression=vm.runInContext(`(() => {
+ const old={entries:state.barcodeEntries,stock:state.stock,audit:state.audit,overrides:state.barcodeOverrides,print:window.print,insert:document.body.insertAdjacentHTML};
+ try{
+ state.barcodeEntries=[{id:'MENU-ENTRY',entryNo:'321',date:'2026-10-25',lines:[{itemId:'R',itemName:'TEST RING',barcode:'MENU-R123',qty:2,gross:5,stone:1,net:4,va:12,mcGram:10,mc:40,pmcGram:3,pmc:12}]}];state.stock=[];state.audit=[];state.barcodeOverrides={};
+ const before=JSON.stringify(barcodeEntryDraft);selectedBarcodeListItem='R';barcodeListCategory='';barcodeListViewAll=false;barcodeListFilter.value='MENU-R123';
+ const rows=barcodeListRows();if(rows.length!==1||rows[0].pmcPerGrm!==3||rows[0].purchaseMC!==12)throw Error('List lookup or purchase-charge mapping failed');
+ const list=barcodeListScreen();for(const label of ['View All Barcode','Refresh Data','DmdPuRate','dmdsellrate1','ClrStnRate'])if(!list.includes(label))throw Error('List screenshot field missing: '+label);
+ barcodeMultipleRows=[];barcodeMultipleScan='MENU-R123';barcodeMultipleQty=3;barcodeMultipleAdd();
+ if(barcodeMultipleRows[0].printCopies!==3)throw Error('Queue did not use requested print quantity');
+ barcodeMultipleScan='MENU-R123';barcodeMultipleQty=2;barcodeMultipleAdd();if(barcodeMultipleRows[0].printCopies!==5)throw Error('Repeated scan did not accumulate copies');
+ let printCount=0,markup='';window.print=()=>printCount++;document.body.insertAdjacentHTML=(position,html)=>markup=html;
+ barcodeMultiplePrint();if(printCount!==1||(markup.match(/<article/g)||[]).length!==5)throw Error('Barcode Print must start printing directly with requested copies');
+ barcodeItemEditScan='MENU-R123';barcodeItemEditShow();barcodeItemEditDraft.gross=6;barcodeItemEditUpdate();
+ if(state.barcodeEntries[0].lines[0].net!==5||barcodeListRows()[0].net!==5)throw Error('Barcode edit did not persist to entry/list');
+ if(!barcodeStandaloneEditScreen().includes('data-bi-action="update"'))throw Error('Barcode menu edit screen missing Update');
+ if(JSON.stringify(barcodeEntryDraft)!==before)throw Error('Menu screens changed the Barcode Entry draft');
+ barcodeMultipleScan='DOES-NOT-EXIST';let failed=false;try{barcodeMultipleAdd();}catch{failed=true;}if(!failed)throw Error('Unknown barcode accepted');
+ return true;
+ }finally{state.barcodeEntries=old.entries;state.stock=old.stock;state.audit=old.audit;state.barcodeOverrides=old.overrides;window.print=old.print;document.body.insertAdjacentHTML=old.insert;barcodeMultipleRows=[];barcodeMultipleScan='';barcodeItemEditDraft=null;barcodeItemEditSource=null;barcodeItemEditScan='';barcodeListFilter.value='';saveState();}
+})()`,context);
+assert(barcodeMenuRegression);console.log('Barcode menu list, direct printing, edit persistence and entry isolation tests passed.');
+const barcodeReportsRegression=vm.runInContext(`(() => {
+ const names=['stock','itemMasters','barcodeEntries','openingStockEntries','itemTransfers','bills','barcodeOverrides'];const old=Object.fromEntries(names.map(k=>[k,state[k]]));const dates={from:salesReportOptions.from,to:salesReportOptions.to};
+ try{
+ state.itemMasters=[{itemId:'R',itemName:'RING'}];state.stock=[{itemId:'R',item:'RING',qty:10,net:50,date:'2026-10-26'}];state.openingStockEntries=[];state.itemTransfers=[];state.bills=[];state.barcodeOverrides={};
+ state.barcodeEntries=[{id:'BR-1',entryNo:'1',refNo:'P1',date:'2026-10-26',lines:[{itemId:'R',itemName:'RING',barcode:'BR-TAG',qty:8,gross:42,stone:2,net:40,stoneCharge:100,va:9}]},{id:'BR-OLD',entryNo:'2',date:'2026-09-01',lines:[{itemId:'R',itemName:'RING',barcode:'BR-OLD',qty:2,gross:10,stone:0,net:10}]}];
+ salesReportOptions.from='2026-10-26';salesReportOptions.to='2026-10-26';
+ const detail=barcodeReportConfig('Barcode Entry');if(detail.rows.length!==1||detail.rows[0].net!==40||detail.rows[0].nos!==8)throw Error('Entry report weight/quantity or date filtering incorrect');
+ const expected=['Entry No','RefNo','Date','Item ID','Item Name','Barcode','Description','Type','Nos','Gross','Stone','NetWeight','Stn Mode','Stn Charge','Va%'];if(JSON.stringify(detail.columns.map(c=>c.label))!==JSON.stringify(expected))throw Error('Entry report columns differ from screenshot');
+ let row=barcodeReportConfig('BarCode Reco').rows[0];if(row.nos!==10||row.net!==50||row.barcodeNos!==8||row.barcodeNet!==40||row.balanceNos!==2||row.balanceNet!==10)throw Error('Period reconciliation calculations incorrect');
+ row=barcodeReportConfig('BarCode Reco- Full').rows[0];if(row.barcodeNos!==10||row.barcodeNet!==50||row.balanceNet!==0)throw Error('Full reconciliation excluded older transactions');
+ state.stock[0].qty=1;state.stock[0].net=3;row=barcodeReportConfig('BarCode Reco').rows[0];if(row.balanceNos!==-7||row.balanceNet!==-37)throw Error('Negative discrepancies must not be clamped');
+ state.bills=[{id:'SALE',type:'Sales',entryNo:'S1',date:'2026-10-26',sections:{sales:[{itemId:'R',itemName:'RING',barcode:'BR-TAG',qty:2,gross:10,stone:0,net:10}]}}];
+ row=barcodeReportConfig('BarCode Reco').rows[0];if(row.barcodeNos!==6||row.barcodeNet!==30)throw Error('Outgoing barcode quantities/weight not subtracted');
+ state.stock=[{itemId:'R',item:'RING',barcode:'BR-TAG',qty:8,gross:42,stone:2,net:40,date:'2026-10-26'}];state.bills=[];
+ row=barcodeReportConfig('BarCode Reco').rows[0];if(row.barcodeNos!==8||row.barcodeNet!==40)throw Error('Receipt and corresponding stock tag counted twice');
+ barcodeReportView='BarCode Reco';barcodeReportUi.shown=true;const config=barcodeReportVisible();if(config.totals.balanceNos!==0||config.totals.balanceNet!==0)throw Error('Reconciliation totals incorrect');
+ if(classicReportColumnConfig('barcodeReport:BarCode Reco').columns.length!==8)throw Error('Shared filter configuration missing');
+ state.barcodeEntries=[];state.stock=[{itemId:'R',item:'RING',huid:'MASTER-HUID',qty:10,net:50,date:'2026-10-26'}];const untagged=barcodeReportConfig('BarCode Reco').rows[0];if(untagged.barcodeNos!==0||untagged.barcodeNet!==0||untagged.balanceNet!==50)throw Error('Aggregate HUID incorrectly treated as assigned barcode stock');
+ const screen=barcodeReportsScreen();for(const tool of ['SHOW','PRINT','DIRECT PRINT','EXCEL','SAVE AS','DATE','FIRST','PREV','NEXT','LAST','VIEW/HIDE','ZOOM IN','DEFAULT','ZOOM OUT','CLOSE'])if(!screen.includes('data-br-action="'+tool+'"'))throw Error('Missing toolbar operation '+tool);
+ return true;
+ }finally{for(const [k,v] of Object.entries(old))state[k]=v;salesReportOptions.from=dates.from;salesReportOptions.to=dates.to;barcodeReportView='Barcode Entry';}
+})()`,context);
+assert(barcodeReportsRegression);console.log('Barcode report calculations, date ranges, negatives, stock deduplication and toolbar tests passed.');
+
+const barcodeReportShowGate=vm.runInContext(`(() => {
+ const old=state.barcodeEntries;
+ try{
+ state.barcodeEntries=[{id:'SHOW-GATE',entryNo:'1',date:salesReportOptions.from,lines:[{itemId:'R',itemName:'RING',barcode:'HIDDEN-TAG',qty:1,gross:5,stone:1,net:4}]}];
+ for(const view of barcodeReportViews){barcodeReportView=view;barcodeReportUi.shown=false;const hidden=barcodeReportVisible();if(hidden.rows.length||hidden.totals!==null)throw Error('Data visible before Show: '+view);if(barcodeReportsScreen().includes('<td>HIDDEN-TAG</td>'))throw Error('Hidden report row rendered');barcodeReportUi.shown=true;if(!barcodeReportVisible().rows.length)throw Error('Show did not reveal rows: '+view);}
+ barcodeReportUi.shown=true;selectReport('Barcode Entry');if(barcodeReportUi.shown)throw Error('Reopening report must require Show');return true;
+ }finally{state.barcodeEntries=old;barcodeReportView='Barcode Entry';barcodeReportUi.shown=false;}
+})()`,context);
+assert(barcodeReportShowGate);console.log('Barcode reports require Show before displaying data.');
+const stockWorkflowRegression=vm.runInContext(`(() => {
+ const old={stock:state.stock,entries:state.barcodeEntries,bills:state.bills,audit:state.audit};
+ try {
+ state.stock=[];state.barcodeEntries=[];state.bills=[];state.audit=[];
+ const master=state.itemMasters.find(m=>m.itemId==='R')||state.itemMasters[0];
+ barcodeEntryDraft=newBarcodeEntry();barcodeEntryLine={itemId:master.itemId,itemName:master.itemName,barcode:'FLOW-RECEIPT',qty:1,gross:5,stone:.5,stoneCharge:100,va:9,mcGram:20};barcodeEntryAddLine();barcodeEntrySave();
+ const received=findStockByBarcode('flow-receipt');if(received.qty!==1||received.net!==4.5)throw Error('Barcode entry did not add physical stock');
+ const autofill=saleDetailsFromStock(received);for(const [key,value] of Object.entries({barcode:'FLOW-RECEIPT',itemName:master.itemName,qty:1,gross:5,stone:.5,stoneCharge:100,va:9,mcPerGm:20}))if(autofill[key]!==value)throw Error('Autofill mismatch '+key);
+ const sale={id:'FLOW-SALE',date:'2026-10-27',sections:{sales:[{...autofill}],exchange:[],return:[]}};
+ postBillStock(sale,{view:'Sales Invoice'});if(findStockByBarcode('FLOW-RECEIPT').qty!==0||findStockByBarcode('FLOW-RECEIPT').net!==0)throw Error('Sale did not deduct barcode stock');
+ postBillStock(sale,{view:'Sales Invoice'});if(findStockByBarcode('FLOW-RECEIPT').qty!==0||findStockByBarcode('FLOW-RECEIPT').deduction!==4.5)throw Error('Repeat-save double deducted stock');
+ const snapshot=JSON.stringify(state.stock);let blocked=false;try{postBillStock({...sale,id:'FLOW-OVERSELL',stockPosting:null},{view:'Sales Invoice'});}catch{blocked=true;}if(!blocked||snapshot!==JSON.stringify(state.stock))throw Error('Oversell must be rejected atomically');
+ const purchase={id:'FLOW-PURCHASE',date:'2026-10-27',sections:{exchange:[{itemId:master.itemId,itemName:master.itemName,qty:2,gross:12,stone:2,va:12,stoneCharge:30}],sales:[],return:[]}};
+ postBillStock(purchase,{purchase:true,view:'Purchase Invoice'});const code=purchase.sections.exchange[0].barcode;if(!code)throw Error('Purchase did not get a saleable barcode');
+ let stock=findStockByBarcode(code);if(stock.qty!==2||stock.gross!==12||stock.stone!==2||stock.net!==10)throw Error('Purchase stock weights incorrect');
+ postBillStock(purchase,{purchase:true,view:'Purchase Invoice'});if(findStockByBarcode(code).qty!==2)throw Error('Repeat purchase-save duplicated stock');
+ const purchaseSale={id:'FLOW-PUR-SALE',sections:{sales:[saleDetailsFromStock(findStockByBarcode(code))]}};
+ postBillStock(purchaseSale,{view:'Sales Invoice'});stock=findStockByBarcode(code);if(stock.qty!==0||stock.gross!==0||stock.stone!==0||stock.net!==0)throw Error('Purchased-item sale did not clear stock');
+ const returnBill={id:'FLOW-RETURN',sections:{return:[{...purchaseSale.sections.sales[0]}]}};postBillStock(returnBill,{view:'Sales Return'});if(findStockByBarcode(code).qty!==2||findStockByBarcode(code).net!==10)throw Error('Sales return did not restore stock');
+ const order={id:'FLOW-ORDER',sections:{sales:[{...autofill}]}};const beforeOrder=JSON.stringify(state.stock);postBillStock(order,{view:'Sales Order'});if(beforeOrder!==JSON.stringify(state.stock))throw Error('Quotation affected stock');
+ state.bills=[sale,purchase,purchaseSale];saveState();const restored=loadState();if(!restored.bills[0].stockPosting?.entries.length)throw Error('Stock posting metadata did not survive reload');
+ return true;
+ } finally {state.stock=old.stock;state.barcodeEntries=old.entries;state.bills=old.bills;state.audit=old.audit;barcodeEntryDraft=null;barcodeEntryLine={};saveState();}
+})()`,context);
+assert(stockWorkflowRegression);console.log('Barcode receipt -> sale and purchase -> sale stock flows, autofill, repeat-save, oversell and return tests passed.');
+const stockPostingReversalRegression=vm.runInContext(`(() => {
+ const old=state.stock;
+ try{
+ state.stock=[];const purchase={id:'REV-P',sections:{exchange:[{itemName:'RING',itemId:'R',qty:1,gross:6,stone:1}]}};postBillStock(purchase,{purchase:true,view:'Purchase Invoice'});const code=purchase.sections.exchange[0].barcode;
+ const stock=findStockByBarcode(code);stock.taxPct=0;if(saleDetailsFromStock(stock).taxPct!==3)throw Error('Purchase tax leaked into sales');
+ const sale={id:'REV-S',sections:{sales:[saleDetailsFromStock(stock)]}};postBillStock(sale,{view:'Sales Invoice'});
+ const before=JSON.stringify(state.stock);let blocked=false;try{reverseBillStock(purchase);}catch{blocked=true;}if(!blocked||before!==JSON.stringify(state.stock))throw Error('Deleting consumed receipt must be blocked atomically');
+ reverseBillStock(sale);if(findStockByBarcode(code).qty!==1||findStockByBarcode(code).net!==5)throw Error('Deleting a sale did not restore stock');
+ reverseBillStock(purchase);if(findStockByBarcode(code).qty!==0||findStockByBarcode(code).net!==0)throw Error('Deleting receipt did not reverse its stock');
+ return true;
+ }finally{state.stock=old;}
+})()`,context);
+assert(stockPostingReversalRegression);console.log('Sales tax isolation and safe bill-deletion stock reversals passed.');
+const pendingStockEntryRegression=vm.runInContext(`(() => {
+ const old={query:document.querySelectorAll,bills:state.bills,stock:state.stock,active,salesView,billingView};
+ try{
+ active='Sales';salesView='Sales Invoice';billingView='Sales';
+ const bill=normalizeBill({id:'PENDING-S',type:'Sale',sections:{sales:[],exchange:[],return:[]}});state.bills=[bill];
+ state.stock=[{id:'PENDING-STOCK',barcode:'PENDING-TAG',item:'RING',itemId:'R',bisUid:'BIS-TEST-1',model:'TEST-MODEL',qty:1,gross:2,stone:.2,net:1.8,closing:1.8}];
+ const values={barcode:'PENDING-TAG',itemName:'RING',qty:'1',gross:'2',stone:'.2',rate:'9075',taxPct:'3'};
+ const row={dataset:{},closest:()=>null,querySelector:selector=>{const key=selector.match(/data-line-field="([^\"]+)"/);return key?{value:values[key[1]]||''}:null;}};
+ document.querySelectorAll=selector=>selector==='.classic-entry-grid tbody tr'?[row]:[];
+ const candidate=structuredClone(bill);capturePendingStockEntry(candidate);
+ if(candidate.sections.sales.length!==1||bill.sections.sales.length!==0)throw Error('Pending row capture must use a private candidate');
+ if(candidate.sections.sales[0].huid!=='BIS-TEST-1'||candidate.sections.sales[0].model!=='TEST-MODEL'||candidate.sections.sales[0].itemId!=='R')throw Error('Stock metadata missing from saved sales row');
+ postBillStock(candidate,{view:'Sales Invoice'});if(findStockByBarcode('PENDING-TAG').qty!==0)throw Error('Save without Add failed to post pending row');
+ return true;
+ }finally{document.querySelectorAll=old.query;state.bills=old.bills;state.stock=old.stock;active=old.active;salesView=old.salesView;billingView=old.billingView;}
+})()`,context);
+assert(pendingStockEntryRegression);console.log('Saving a filled sales row without a separate Add click posts stock correctly.');
+// Independent integer arithmetic oracle: weights in milligrams, prices in paise,
+// percentages in basis points. No production calculation helper is used here.
+const paiseRound=(n,d)=>(n+d/2n)/d;
+let dmdAuditSeed=176153;
+const auditRandom=max=>{dmdAuditSeed=(Math.imul(dmdAuditSeed,1664525)+1013904223)>>>0;return dmdAuditSeed%max;};
+for(let sample=0;sample<500;sample++){
+  const gross=1000+auditRandom(200000),stone=auditRandom(gross),rate=auditRandom(2000000),va=auditRandom(2501),mc=auditRandom(100000),stoneRate=auditRandom(100000);
+  const weight=1+auditRandom(100000),diamondRate=auditRandom(100000),addition=auditRandom(10000),discount=auditRandom(1000),cash=auditRandom(200000),nos=1+auditRandom(5),byNos=sample%3===0;
+  const net=BigInt(gross-stone),basis=byNos?BigInt(nos)*1000n:net;
+  const goldPaise=paiseRound(basis*BigInt(rate)*(10000n+BigInt(va))+BigInt(stone)*BigInt(stoneRate)*10000n+net*BigInt(mc)*10000n,10000000n);
+  const diamondPaise=paiseRound(BigInt(weight)*BigInt(diamondRate),1000n);
+  const subtotal=goldPaise+diamondPaise+BigInt(addition-discount),taxable=subtotal<0n?0n:subtotal;
+  const gst=paiseRound(taxable*300n,10000n),tcs=paiseRound(taxable*100n,10000n),tds=paiseRound(taxable*50n,10000n),invoice=taxable+gst+tcs-tds;
+  const bill={ornamentLines:[{gross:gross/1000,stone:stone/1000,goldRate:rate/100,va:va/100,purMc:mc/100,stonePrice:stoneRate/100,nos,salesType:byNos?'Nos':'Weight',goldAmount:9999999,salesMc:999999,dmdWgt:9999,stnSPrice:99999}],diamondLines:[{caratCent:weight/1000,purchaseRate:diamondRate/100,sellingRate:999999}],addition:addition/100,discount:discount/100,cashPayment:cash/100,gstPct:3,tcsPct:1,tdsPct:.5};
+  context.dmdAuditInput=bill;
+  const actual=vm.runInContext('diamondPurchaseFinancials(dmdAuditInput)',context);
+  for(const [key,expected] of Object.entries({ornamentAmount:goldPaise,diamondAmount:diamondPaise,taxable,gst,tcs,tds,invoiceTotal:invoice,balance:invoice-BigInt(cash)}))assert.equal(actual[key],Number(expected)/100,`DMD oracle sample ${sample}: ${key}`);
+}
+assert.equal(vm.runInContext('normalizeDmdPurchaseStoneLine({caratCent:1.005,purchaseRate:1}).amount',context),1.01,'Half paise rounds up');
+assert.equal(vm.runInContext('normalizeDmdWholesaleLine({gross:1,goldRate:0}).goldRate',context),0,'Explicit zero rate must stay zero');
+const dmdStockAudit=vm.runInContext(`(()=>{
+ const old=state.stock;
+ try{
+ state.stock=[];
+ const bill=normalizeDiamondPurchaseBill({id:'DMD-AUDIT',ornamentLines:[{barcode:'DMD-A',itemId:'R',gross:3,stone:1,goldRate:100},{barcode:'DMD-B',itemId:'R',gross:4,stone:1,goldRate:100}],diamondLines:[{barcode:'DMD-A',itemId:'R',caratCent:10,purchaseRate:2,sellingRate:3},{barcode:'DMD-B',itemId:'R',caratCent:20,purchaseRate:2,sellingRate:5}],gstPct:3});
+ saveDmdPurchaseStock(bill);
+ if(state.stock.length!==2||state.stock[0].diamondAmount!==30||state.stock[1].diamondAmount!==100)throw Error('Same item IDs cross-linked diamonds');
+ if(state.stock[0].opening!==0||state.stock[0].addition!==2||state.stock[0].net!==2||state.stock[0].closing!==2)throw Error('Receipt closing must use net gold weight');
+ const initial=JSON.stringify(state.stock);saveDmdPurchaseStock(bill);if(initial!==JSON.stringify(state.stock))throw Error('Repeat save changed stock');
+ const restored=normalizeDiamondPurchaseBill({...bill,saved:true});if(!restored.saved||!restored.dmdStockPosting)throw Error('Reload lost saved/posting metadata');
+ const sold=state.stock[0];sold.qty=0;sold.net=0;sold.gross=0;sold.stone=0;sold.closing=0;sold.status='Sold Out';
+ const afterSale=JSON.stringify(state.stock);saveDmdPurchaseStock(restored);if(afterSale!==JSON.stringify(state.stock))throw Error('Resave replenished sold stock');
+ restored.ornamentLines[0].gross=5;let blocked=false;try{saveDmdPurchaseStock(restored);}catch{blocked=true;}if(!blocked||afterSale!==JSON.stringify(state.stock))throw Error('Consumed receipt edit was not blocked atomically');
+ const invalid=[{}, {ornamentLines:[{gross:1,stone:2}]},{ornamentLines:[{gross:-1}]},{ornamentLines:[{gross:1,nos:0}]},{diamondLines:[{caratCent:-1,purchaseRate:10}]},{diamondLines:[{caratCent:1,purchaseRate:-1}]},{diamondLines:[{caratCent:1,pcs:.5}]},{diamondLines:[{caratCent:1,purchaseRate:1}],discount:2},{diamondLines:[{caratCent:1}],gstPct:101},{diamondLines:[{caratCent:1}],cashPayment:Infinity}];
+ for(const draft of invalid){let rejected=false;try{saveDmdPurchaseStock(draft);}catch{rejected=true;}if(!rejected||JSON.stringify(state.stock)!==afterSale)throw Error('Invalid receipt accepted or partly posted');}
+ const duplicate={id:'OTHER',ornamentLines:[{barcode:'DMD-A',gross:1,stone:0,goldRate:1}]};let duplicateBlocked=false;try{saveDmdPurchaseStock(duplicate);}catch{duplicateBlocked=true;}if(!duplicateBlocked||JSON.stringify(state.stock)!==afterSale)throw Error('Duplicate stock barcode accepted');
+ return true;
+ }finally{state.stock=old;}
+})()`,context);
+assert(dmdStockAudit);
+console.log('DMD purchase audit: 500 independent integer-oracle cases, rounding, tax bases, linkage, validation, persistence and sold-stock safeguards passed.');
+const dmdExtendedAudit=vm.runInContext(`(()=>{
+ const old={stock:state.stock,query:document.querySelector};
+ try{
+ state.stock=[];
+ const receipt=normalizeDiamondPurchaseBill({id:'DMD-EDIT',ornamentLines:[{barcode:'DMD-EDIT-A',gross:3,stone:.5,goldRate:100}],diamondLines:[{barcode:'DMD-EDIT-A',caratCent:.1,ct:'Ct',purchaseRate:20000,sellingRate:30000},{barcode:'DMD-EDIT-A',caratCent:10,ct:'Cnt',purchaseRate:200,sellingRate:300}],gstPct:0});
+ saveDmdPurchaseStock(receipt);const id=state.stock[0].id;
+ if(state.stock[0].diamondWtCent!==20||state.stock[0].diamondAmount!==6000)throw Error('Mixed Ct/Cnt quantities or selling amounts incorrect');
+ if(diamondPurchaseFinancials(receipt).diamondAmount!==4000)throw Error('Purchase rates must apply per selected unit');
+ receipt.ornamentLines[0].gross=4;saveDmdPurchaseStock(receipt);
+ if(state.stock.length!==1||state.stock[0].id!==id||state.stock[0].net!==3.5)throw Error('Unconsumed receipt update duplicated stock or lost identity');
+ receipt.diamondLines=[];saveDmdPurchaseStock(receipt);if(state.stock[0].diamondAmount!==0)throw Error('Removed diamond retained selling value');
+ const values={itemName:'Loose audit',nos:'2',caratCent:'12.5',ct:'Cnt',pcs:'4',purchaseRate:'80.25',sellingRate:'120'};
+ const row={dataset:{},querySelector:selector=>{const key=selector.match(/data-line-field="([^\"]+)"/);return key?{value:values[key[1]]||''}:null;}};
+ document.querySelector=()=>row;
+ const loose={id:'LOOSE-AUDIT',lines:[],addition:10,discount:5,cashPayment:100};
+ const pending=dmdStonePurchaseWithPending(loose);
+ if(loose.lines.length!==0||pending.lines.length!==1)throw Error('Loose pending capture mutated draft');
+ const totals=dmdStonePurchaseFinancials(pending);if(totals.invoiceTotal!==1008.13||totals.balance!==908.13)throw Error('Loose invoice totals incorrect');
+ saveDmdPurchaseStock(pending);if(!state.stock.some(item=>item.purchaseSource==='LOOSE-AUDIT'&&item.qty===2&&item.diamondAmount===1500))throw Error('Loose pending row not posted');
+ const overpayment=diamondPurchaseFinancials({diamondLines:[{caratCent:1,purchaseRate:100}],gstPct:0,cashPayment:150});if(overpayment.balance!==-50)throw Error('Credit balance lost');
+ const many=diamondPurchaseFinancials({diamondLines:Array.from({length:1000},()=>({caratCent:1.005,purchaseRate:1})),gstPct:0});if(many.invoiceTotal!==1010)throw Error('Many-line paise accumulation failed');
+ return true;
+ }finally{state.stock=old.stock;document.querySelector=old.query;}
+})()`,context);
+assert(dmdExtendedAudit);
+console.log('DMD loose-stone pending save, Ct/Cnt conversion, unconsumed edits, removal, overpayment and 1,000-line accumulation passed.');
+const dmdActualSaleFlow=vm.runInContext(`(()=>{
+ const old=state.stock;
+ try{
+ state.stock=[];
+ const purchase=normalizeDiamondPurchaseBill({id:'DMD-SALE-FLOW',ornamentLines:[{barcode:'DMD-FLOW-TAG',itemId:'R',itemName:'Diamond Ring',gross:5,stone:1,goldRate:1000}],diamondLines:[{barcode:'DMD-FLOW-TAG',caratCent:10,purchaseRate:50,sellingRate:100}]});
+ saveDmdPurchaseStock(purchase);
+ const received=findStockByBarcode('DMD-FLOW-TAG');if(received.qty!==1||received.net!==4||received.addition!==4)throw Error('DMD receipt balance incorrect');
+ const details=saleDetailsFromStock(received);if(details.itemName!=='Diamond Ring'||details.dmdAmount!==1000||details.gross!==5||details.stone!==1)throw Error('DMD sales autofill lost purchased details');
+ const sale={id:'DMD-ACTUAL-SALE',sections:{sales:[details]}};postBillStock(sale,{view:'Sales Invoice'});
+ const sold=findStockByBarcode('DMD-FLOW-TAG');if(sold.qty!==0||sold.net!==0||sold.deduction!==4)throw Error('DMD sale stock deduction incorrect');
+ const snapshot=JSON.stringify(state.stock);saveDmdPurchaseStock(purchase);if(snapshot!==JSON.stringify(state.stock))throw Error('DMD receipt resave restored sold stock');
+ return true;
+ }finally{state.stock=old;}
+})()`,context);
+assert(dmdActualSaleFlow);console.log('DMD purchase -> barcode autofill -> actual sales posting -> stock deduction -> safe receipt resave passed.');
+const dmdDeletionAudit=vm.runInContext(`(()=>{
+ const old=state.stock;
+ try{
+ state.stock=[];const bill=normalizeDiamondPurchaseBill({id:'DMD-DELETE',diamondLines:[{caratCent:1,purchaseRate:100,sellingRate:200}]});saveDmdPurchaseStock(bill);
+ const stock=state.stock[0];stock.qty=0;let blocked=false;try{reverseBillStock(bill);}catch{blocked=true;}if(!blocked||state.stock.length!==1)throw Error('Consumed DMD deletion not blocked');
+ stock.qty=1;reverseBillStock(bill);if(state.stock.length||bill.dmdStockPosting)throw Error('DMD deletion left orphan stock');return true;
+ }finally{state.stock=old;}
+})()`,context);assert(dmdDeletionAudit);console.log('DMD receipt deletion reverses unconsumed stock and rejects consumed stock.');
+const operationalAudit=vm.runInContext(`(()=>{
+ const original=state;
+ const check=(value,message)=>{if(!value)throw Error(message);};
+ const rejects=(fn,message)=>{const before=JSON.stringify(state);let error;try{fn();}catch(e){error=e;}check(error,message+' was accepted');check(JSON.stringify(state)===before,message+' mutated state on failure');};
+ const reset=()=>{state={...structuredClone(original),stock:[],operationalPostings:{},workLogs:[],audit:[],smithWorkOrders:[],jewellerWorkOrders:[],cashWeightSmiths:[],cashWeightJewellers:[],sampleIssues:[],sampleReturns:[],polishingEntries:[],refineryIssues:[],refineryReturns:[],refineryFinalReturns:[],meltingIssues:[],meltingReturns:[],serviceJobs:[],serviceClosures:[],stockAdjustments:[],openingStockEntries:[],goldDeposits:[],goldWithdrawals:[],itemTransfers:[],barcodeEntries:[],bills:[],complimentaryPurchases:[],complimentaryIssues:[],utilities:{dayLock:{locked:false}}};};
+ const stock=(code='AUDIT-TAG',qty=2,gross=10,stone=2)=>{const row={id:'stock-'+code,barcode:code,itemId:'R',item:'RING',qty,gross,stone,net:gross-stone,opening:gross-stone,addition:0,deduction:0,closing:gross-stone,status:'Available'};state.stock.push(row);return row;};
+ const line=(qty=1,gross=5,stone=1)=>({barcode:'AUDIT-TAG',itemId:'R',itemName:'RING',qty,gross,stone,rate:100,hmc:10,taxPct:3});
+ const receipt=(id,lines,extra={})=>({id,entryNo:id,date:'02/11/2026',jewellerName:'Audit Jeweller',jewellerCode:'AJ',partyName:'Audit Party',smithName:'Audit Smith',lines,...extra});
+ try{
+ reset();stock();
+ const issue=commitOperationalRecord('sampleIssue',receipt('SI-1',[line()]));check(state.stock[0].qty===1&&state.stock[0].net===4,'Sample issue must deduct exactly');
+ const once=JSON.stringify(state.stock);commitOperationalRecord('sampleIssue',issue);check(JSON.stringify(state.stock)===once&&state.workLogs.length===1,'Sample repeat save must not duplicate stock or work log');
+ rejects(()=>commitOperationalRecord('sampleIssue',receipt('SI-OVER',[line(2,10,2)])),'Sample over-issue');
+ rejects(()=>commitOperationalRecord('sampleReturn',receipt('SR-WRONG',[line()],{jewellerName:'Wrong',jewellerCode:'WRONG'})),'Wrong-party sample return');
+ rejects(()=>commitOperationalRecord('sampleReturn',receipt('SR-DOUBLE',[line(),line()])),'Combined sample over-return');
+ const returned=commitOperationalRecord('sampleReturn',receipt('SR-1',[line()]));check(state.stock[0].qty===2&&state.stock[0].net===8,'Sample return must restore stock');
+ rejects(()=>removeOperationalRecord('sampleIssue',issue),'Delete issue with return');
+ removeOperationalRecord('sampleReturn',returned);check(state.stock[0].qty===1,'Deleting sample return must restore issued state');removeOperationalRecord('sampleIssue',issue);check(state.stock[0].qty===2&&state.stock[0].deduction===0,'Deleting issue must reverse it');
+ // Exact barcode matching even when product names repeat.
+ stock('SECOND',1,3,0);const exact=commitOperationalRecord('smith',receipt('SM-1',[{...line(1,3,0),barcode:'SECOND',mode:'OUT',mcGram:5}],{postOnlyMc:true}));check(state.stock.find(s=>s.barcode==='SECOND').qty===0&&state.stock.find(s=>s.barcode==='AUDIT-TAG').qty===2,'Smith used wrong same-name stock');
+ rejects(()=>commitOperationalRecord('smith',receipt('SM-AMB',[{itemName:'RING',qty:1,gross:1,stone:0,mode:'OUT'}])),'Ambiguous stock issue');
+ const smIn=commitOperationalRecord('smith',receipt('SM-IN',[{itemName:'NEW CHAIN',qty:1,gross:3.2,stone:.2,mode:'IN',rate:100,mcGram:10}]));check(smIn.lines[0].barcode&&findStockByBarcode(smIn.lines[0].barcode).net===3,'Smith receipt creates saleable stock');
+ const smRows=state.stock.length;commitOperationalRecord('smith',smIn);check(state.stock.length===smRows,'Smith repeated receipt duplicated stock');
+ const jw=commitOperationalRecord('jeweller',receipt('JW-1',[{...line(),mode:'OUT',vaPercent:5,mcGram:10,rate:100}]));check(state.stock.find(s=>s.barcode==='AUDIT-TAG').qty===1,'Jeweller OUT not posted');
+ const jwi=commitOperationalRecord('jeweller',receipt('JW-2',[{...line(),mode:'IN',vaPercent:5,mcGram:10,rate:100}]));check(state.stock.find(s=>s.barcode==='AUDIT-TAG').qty===2,'Jeweller IN not posted');
+ check(barcodeEntryGuard({id:'unrelated',lines:[{barcode:'AUDIT-TAG'}]}),'Barcode editing must guard workflow movements');
+ // Polishing: issue, return, duplicate return and no physical receipt from stone valuation.
+ reset();stock('AUDIT-TAG',1,5,1);
+ const polish=commitOperationalRecord('polishing',receipt('PL-1',[line()],{movement:'Issue'}));check(state.stock[0].qty===0,'Polishing issue did not remove availability');
+ const pr=commitOperationalRecord('polishing',receipt('PL-2',[line()],{movement:'Return'}));check(state.stock[0].qty===1,'Polishing return did not restore availability');
+ rejects(()=>commitOperationalRecord('polishing',receipt('PL-3',[line()],{movement:'Return'})),'Polishing over-return');
+ // Adjustments and opening stock: clean balance equation, atomic failures, no repeat posting.
+ reset();stock();
+ const adjust=commitOperationalRecord('adjustment',receipt('SA-1',[{barcode:'AUDIT-TAG',itemName:'RING',nosAdd:1,grossAdd:2,stoneAdd:.5,nosLess:0,grossLess:0,stoneLess:0}]));
+ check(state.stock[0].qty===3&&state.stock[0].net===9.5&&state.stock[0].addition===1.5,'Stock adjustment net movement incorrect');
+ const adjusted=JSON.stringify(state.stock);commitOperationalRecord('adjustment',adjust);check(JSON.stringify(state.stock)===adjusted,'Adjustment reposted');
+ rejects(()=>commitOperationalRecord('adjustment',receipt('SA-NEG',[{barcode:'AUDIT-TAG',itemName:'RING',nosLess:4,grossLess:20}])),'Negative adjustment');
+ removeOperationalRecord('adjustment',adjust);check(state.stock[0].net===8&&state.stock[0].qty===2,'Adjustment reversal incorrect');
+ const op=commitOperationalRecord('opening',{id:'OP-1',openingDate:'2026-04-01',lines:[{description:'Gold Ornaments',weight:12,stone:2,rate:100,percent:75}]});
+ const open=state.stock.find(s=>s.item==='Gold Ornaments');check(open.net===10&&open.closing===10&&open.opening===10&&open.openingAmount===1000,'Opening stock net/amount incorrect');
+ commitOperationalRecord('opening',op);check(state.stock.filter(s=>s.item==='Gold Ornaments').length===1,'Opening repeated save duplicated row');
+ rejects(()=>commitOperationalRecord('sampleIssue',receipt('BAD-EMPTY',[])),'Empty work order');
+ rejects(()=>commitOperationalRecord('smith',receipt('BAD-NEG',[{...line(),gross:-1,mode:'IN'}])),'Negative gross');
+ rejects(()=>commitOperationalRecord('smith',receipt('BAD-NAN',[{...line(),gross:NaN,mode:'IN'}])),'Nonfinite gross');
+ // Party gold deposits cannot withdraw another party's or shop-owned gold.
+ reset();stock();
+ const dep=commitOperationalRecord('deposit',receipt('GD-1',[{itemId:'OG',itemName:'OLD GOLD',gross:10,stone:1,touch:90,rate:100}],{partyName:'Depositor A'}));
+ check(state.stock[0].net===8&&state.stock.length===2,'Deposit altered shop tag');
+ const depStock=state.stock.find(s=>s.barcode.startsWith('DEPOSIT-'));check(depStock.gross===10&&depStock.net===9,'Deposit physical net incorrect');
+ rejects(()=>commitOperationalRecord('withdrawal',receipt('GW-WRONG',[{itemId:'OG',itemName:'OLD GOLD',gross:1,stone:0}],{partyName:'Depositor B'})),'Another-party gold withdrawal');
+ const wd=commitOperationalRecord('withdrawal',receipt('GW-1',[{itemId:'OG',itemName:'OLD GOLD',gross:5,stone:.5,touch:90,rate:100}],{partyName:'Depositor A'}));
+ check(state.stock.find(s=>s.id===depStock.id).net===4.5,'Gold withdrawal net incorrect');
+ rejects(()=>commitOperationalRecord('withdrawal',receipt('GW-OVER',[{itemId:'OG',itemName:'OLD GOLD',gross:6,stone:0}],{partyName:'Depositor A'})),'Gold over-withdrawal');
+ // Refinery stages: issue -> test return (not shop receipt) -> final output, loss conservation.
+ reset();stock('AUDIT-TAG',1,10,0);
+ const ri=commitOperationalRecord('refineryIssue',receipt('RI-1',[{...line(1,10,0),rate:100}],{refinerName:'Audit Refiner'}));check(state.stock[0].net===0,'Refinery issue not deducted');
+ const rr=commitOperationalRecord('refineryReturn',{id:'RR-1',entryNo:'RR-1',date:'02/11/2026',pendingIssueId:ri.id,lines:[{itemName:'RING',issuedWeight:10,receivedWeight:9.5,meltingLoss:.5,bottleStockWeight:0,reissueWeight:0,testWeight:.1}]});check(state.stock.every(s=>s.net===0),'Test return must not duplicate final stock');
+ rejects(()=>commitOperationalRecord('refineryReturn',{...rr,id:'RR-2',entryNo:'RR-2'}),'Second test return');
+ const rf=commitOperationalRecord('refineryFinal',{id:'RF-1',entryNo:'RF-1',date:'02/11/2026',pendingIssueId:ri.id,refinerCharge:10,addition:2,discount:1,cashPaid:100,lines:[{itemName:'RING',receivedWeight:9.5,acidingLoss:.1,testWeight:9.4,touch:99.5,bottleStockWeight:0,rate:100}]});
+ check(state.stock.find(s=>s.item==='Refined Gold').net===9.4,'Final refined output missing');
+ check(refineryFinalFinancials(rf).balance===851,'Refinery final cash balance incorrect');
+ rejects(()=>removeOperationalRecord('refineryIssue',ri),'Refinery issue deletion with dependent returns');
+ rejects(()=>commitOperationalRecord('refineryFinal',{...rf,id:'RF-2',entryNo:'RF-2',lines:[{...rf.lines[0],testWeight:10.1}]}),'Overweight refined output');
+ removeOperationalRecord('refineryFinal',rf);removeOperationalRecord('refineryReturn',rr);removeOperationalRecord('refineryIssue',ri);check(state.stock[0].net===10,'Refinery reverse chain did not restore source');
+ // Melting has one final return; no double-counting of test/bottle quantities.
+ reset();stock('AUDIT-TAG',1,10,0);
+ const mi=commitOperationalRecord('meltingIssue',receipt('MI-1',[line(1,10,0)],{refinerName:'Audit Refiner'}));
+ const mr=commitOperationalRecord('meltingReturn',{id:'MR-1',entryNo:'MR-1',date:'02/11/2026',pendingIssueId:mi.id,lines:[{itemName:'RING',issuedWeight:10,receivedWeight:9.5,meltingLoss:.4,bottleStockWeight:.1,testWeight:.1,rate:100,touch:99}]});check(state.stock.find(s=>s.item==='Refined Gold').net===9.5,'Melting receipt weight incorrect');
+ rejects(()=>commitOperationalRecord('meltingReturn',{...mr,id:'MR-OVER',entryNo:'MR-OVER'}),'Duplicate melting return');
+ // Service jobs are customer goods, never saleable shop stock; advance is counted once.
+ reset();stock();const shopBefore=JSON.stringify(state.stock);
+ const job=commitOperationalRecord('serviceNew',receipt('JOB-1',[{itemName:'Customer Ring',nos:1,gross:5,stone:1}],{partyName:'Repair Customer',approxAmount:1000,advance:200}));
+ const closure=commitOperationalRecord('serviceClose',{id:'CLOSE-1',entryNo:'CLOSE-1',date:'02/11/2026',sourceJobId:job.id,partyName:job.partyName,lines:structuredClone(job.lines),approxAmount:1100,advance:200,cashPayment:900});
+ check(serviceFinancials(closure).balance===0&&JSON.stringify(state.stock)===shopBefore,'Service payment or customer-owned stock isolation incorrect');
+ rejects(()=>commitOperationalRecord('serviceClose',{...closure,id:'CLOSE-2',entryNo:'CLOSE-2'}),'Duplicate service closure');
+ rejects(()=>removeOperationalRecord('serviceNew',job),'Delete closed source job');removeOperationalRecord('serviceClose',closure);check(state.serviceJobs[0].jobStatus!=='Closed','Removing closure must reopen job');
+ // Transfers change location, never company quantity/weight; sales restricted until return.
+ reset();stock('AUDIT-TAG',1,5,1);
+ const tr=commitOperationalRecord('transfer',receipt('TR-1',[{...line(),mode:'OUT'}],{stockLocation:'Counter B',salesman:'Audit Staff'}));check(state.stock[0].stockLocation==='Counter B'&&state.stock[0].net===4,'Location transfer changed company stock');
+ rejects(()=>postBillStock({id:'WRONG-LOCATION',sections:{sales:[saleDetailsFromStock(state.stock[0])]}},{view:'Sales Invoice'}),'Sale from another location');
+ check(!barcodeCurrentInventory('Shop').some(s=>s.barcode==='AUDIT-TAG')&&barcodeCurrentInventory('Counter B').some(s=>s.barcode==='AUDIT-TAG'),'Barcode location inventory disagrees with stock');
+ const back=commitOperationalRecord('transfer',receipt('TR-2',[{...line(),mode:'IN'}],{stockLocation:'Counter B',salesman:'Audit Staff'}));check(state.stock[0].stockLocation==='Main Stock','Transfer return failed');
+ const sale={id:'TRANSFER-SALE',sections:{sales:[saleDetailsFromStock(state.stock[0])]}};postBillStock(sale,{view:'Sales Invoice'});check(state.stock[0].qty===0,'Sale after transfer return failed');
+ rejects(()=>removeOperationalRecord('transfer',back),'Delete transfer consumed by sale');
+ // Complimentary purchase/free items -> issue -> edit/delete safeguards.
+ reset();
+ const cp=commitComplimentaryRecord('purchase',{id:'CP-A',entryNo:'CP-A',date:'02/11/2026',partyName:'Gift supplier',lines:[{itemName:'AUDIT GIFT',quantity:10,foc:2,price:12.5,unit:'Nos'}]});check(complimentaryPurchaseFinancials(cp).invoiceTotal===100,'FOC purchase charge incorrect');
+ commitComplimentaryRecord('purchase',cp);check(state.complimentaryStock.find(s=>s.itemName==='AUDIT GIFT').balance===10,'Complimentary purchase duplicated');
+ const ci=commitComplimentaryRecord('issue',{id:'CI-A',entryNo:'CI-A',date:'02/11/2026',lines:[{itemName:'AUDIT GIFT',quantity:4,unit:'Nos'}]});check(state.complimentaryStock.find(s=>s.itemName==='AUDIT GIFT').balance===6,'Complimentary stock issue incorrect');
+ rejects(()=>commitComplimentaryRecord('purchase',cp,{remove:true}),'Delete consumed complimentary purchase');
+ rejects(()=>commitComplimentaryRecord('issue',{...ci,id:'CI-OVER',entryNo:'CI-OVER',lines:[{itemName:'AUDIT GIFT',quantity:7,unit:'Nos'}]}),'Complimentary over-issue');
+ rejects(()=>commitComplimentaryRecord('purchase',{...cp,id:'CP-BAD',entryNo:'CP-BAD',lines:[{itemName:'BAD',quantity:2,foc:3,price:1}]}),'FOC exceeds quantity');
+ commitComplimentaryRecord('issue',ci,{remove:true});commitComplimentaryRecord('purchase',cp,{remove:true});check(!state.complimentaryStock.some(s=>s.itemName==='AUDIT GIFT'),'Complimentary reversals left stock');
+ // Persist/reload the posting journal and source links.
+ reset();stock();const persisted=commitOperationalRecord('sampleIssue',receipt('PERSIST',[line()]));saveState();state=loadState();check(state.operationalPostings['sampleIssue:'+persisted.id]&&state.workLogs.some(log=>log.sourceId===persisted.id),'Operational journal/source links lost on reload');commitOperationalRecord('sampleIssue',state.sampleIssues[0]);check(state.stock[0].qty===1,'Reload/re-save duplicated issue');
+ return true;
+ }finally{state=original;saveState();}
+})()`,context);
+assert(operationalAudit);console.log('Work Orders / Stock operational lifecycle audit passed: Smith, Jeweller, Sample, Polishing, Refinery, Melting, Service, Opening, Adjustment, Deposit, Transfer and Complimentary.');
+const operationalMoneyAudit=vm.runInContext(`(()=>{
+ const original=state;try{
+ state={...state,smithWorkOrders:[],jewellerWorkOrders:[],cashWeightSmiths:[],cashWeightJewellers:[],parties:[]};
+ const check=(actual,expected,label)=>{if(actual!==expected)throw Error(label+': '+actual+' != '+expected);};
+ const round=(n,d)=>(n+d/2n)/d;let seedValue=24681357;
+ const random=max=>{seedValue=(Math.imul(seedValue,1664525)+1013904223)>>>0;return seedValue%max;};
+ for(let sample=0;sample<300;sample++){
+   const gross=1000+random(30000),stone=random(gross),net=BigInt(gross-stone),rate=BigInt(random(200000)),mcRate=BigInt(random(20000)),stoneCharge=BigInt(random(10000)),hmc=BigInt(random(5000)),addition=BigInt(random(10000)),discount=BigInt(random(1000)),va=BigInt(random(1001));
+   const mc=round(net*mcRate,1000n),jwMc=round(net*mcRate*10000n+net*rate*va,10000000n),gold=net*rate;
+   const smLine=round(gold+(mc+stoneCharge+hmc)*1000n,1000n),jwLine=round(gold+(jwMc+stoneCharge+hmc)*1000n,1000n),fees=mc+stoneCharge+hmc;
+   const onlyMc=sample%2===0,taxable=sample%3!==0,base=(onlyMc?fees:smLine)+addition-discount,gst=taxable?round(base*3n,100n):0n;
+   const line={gross:gross/1000,stone:stone/1000,rate:Number(rate)/100,mcGram:Number(mcRate)/100,stoneCharge:Number(stoneCharge)/100,hmc:Number(hmc)/100,vaPercent:Number(va)/100,mode:'IN',qty:1};
+   const smith=smithWorkFinancials({lines:[line],postOnlyMc:onlyMc,taxable,gstPct:3,addition:Number(addition)/100,discount:Number(discount)/100,cashPayment:10});
+   check(smith.netTotal,Number(base+gst)/100,'Smith invoice sample '+sample);check(smith.balance,Number(base+gst-1000n)/100,'Smith balance sample '+sample);
+   const jwBase=jwLine+addition-discount,jwTax=round(jwBase*3n,100n),jeweller=jewellerWorkFinancials({lines:[line],gstPct:3,addition:Number(addition)/100,discount:Number(discount)/100,cashPayment:10});
+   check(jeweller.netTotal,Number(jwBase+jwTax)/100,'Jeweller invoice sample '+sample);
+   const sampleBase=round(gold+hmc*1000n,1000n),sampleTax=round(sampleBase*3n,100n),sampleLine=normalizeSampleLine({...line,taxPct:3,net:999,total:99999,taxAmount:99999});
+   check(sampleLine.net,(gross-stone)/1000,'Sample stale net');check(sampleLine.total,Number(sampleBase+sampleTax)/100,'Sample tax sample '+sample);
+   const polish=normalizePolishingStoneLine({caratCent:1.005,sellingRate:1,amount:999});check(polish.amount,1.01,'Polishing stale/half-paise amount');
+ }
+ const cash=normalizeCashWeightSmithLine({amount:1000,rate:250,touch:75,convert:100});check(cash.weight,4,'Cash weight');check(cash.netWeight,3,'Cash pure conversion');
+ const zeroTouch=normalizeCashWeightSmithLine({amount:1000,rate:250,touch:0,convert:100});check(zeroTouch.netWeight,0,'Explicit zero touch');
+ const weighted=normalizeRefineryFinalReturn({expectedTouch:95,lines:[{receivedWeight:1,testWeight:1,touch:50,rate:0},{receivedWeight:9,testWeight:9,touch:100,rate:0}]});check(weighted.diffTouch,0,'Weighted refinery touch difference');
+ const over=serviceFinancials({approxAmount:100,advance:120});check(over.balance,-20,'Service customer credit');
+ return true;
+ }finally{state=original;}
+})()`,context);assert(operationalMoneyAudit);console.log('300 independent Work Orders money-oracle cases passed, including Smith/Jeweller GST, sample tax, polishing paise, cash conversion and weighted touch.');
+const operationalEdgeAudit=vm.runInContext(`(()=>{
+ const saved={state,stockAdjustmentDraft,polishingDraft,active,workOrderView,stockView,barcodeEntryDraft,barcodeEntryLine};
+ const ensure=(ok,message)=>{if(!ok)throw Error(message);};
+ const rejected=fn=>{const before=JSON.stringify(state);let error=false;try{fn();}catch{error=true;}ensure(error&&JSON.stringify(state)===before,'Edge case must reject atomically');};
+ try{
+ state={...structuredClone(state),stock:[],operationalPostings:{},workLogs:[],audit:[],goldDeposits:[],goldWithdrawals:[],sampleIssues:[],sampleReturns:[],polishingEntries:[],smithWorkOrders:[],cashWeightSmiths:[],jewellerWorkOrders:[],cashWeightJewellers:[],stockAdjustments:[],utilities:{dayLock:{locked:false}},barcodeEntries:[],bills:[]};
+ const gd=commitOperationalRecord('deposit',{id:'AMOUNT-GD',entryNo:'AMOUNT-GD',date:'02/11/2026',partyName:'Amount Party',byAmount:true,lines:[{itemId:'OG',itemName:'OLD GOLD',amount:900,rate:100,touch:90,gross:0,stone:0}]});
+ ensure(gd.lines[0].partyWeight===9&&gd.lines[0].gross===10&&state.stock[0].net===10,'Amount-only gold deposit conversion failed');
+ const withdrawn=commitOperationalRecord('withdrawal',{id:'AMOUNT-GW',entryNo:'AMOUNT-GW',date:'02/11/2026',partyName:'Amount Party',byAmount:true,lines:[{itemId:'OG',itemName:'OLD GOLD',amount:450,rate:100,touch:90,gross:0,stone:0}]});
+ ensure(state.stock[0].net===5,'Amount-only withdrawal failed');
+ const historical={id:'LEGACY-SA',entryNo:'SA00010',date:'02/11/2026',lines:[{itemName:'OLD',grossAdd:1}]};state.stockAdjustments=[historical];
+ rejected(()=>commitOperationalRecord('adjustment',historical));rejected(()=>removeOperationalRecord('adjustment',historical));
+ const config=operationalConfig('adjustment'),fresh=freshOperationalRecord(config);ensure(fresh.entryNo==='SA00011','Fresh reference reused an existing entry number');
+ // Each barcode grid row must be recalculated and revalidated on Save, not only Add.
+ barcodeEntryDraft=newBarcodeEntry();barcodeEntryLine={itemId:'R',itemName:'RING',barcode:'GRID-AUDIT',qty:1,gross:5,stone:1};barcodeEntryAddLine();barcodeEntryDraft.lines[0].gross=6;barcodeEntryDraft.lines[0].net=999;barcodeEntrySave();ensure(findStockByBarcode('GRID-AUDIT').net===5,'Barcode grid retained stale net');
+ barcodeEntryDraft=structuredClone(state.barcodeEntries[0]);barcodeEntryDraft.lines[0].stone=7;rejected(()=>barcodeEntrySave());
+ // Movement history, current inventory and receipt guards all include Work Orders.
+ const original=state.stock.find(s=>s.barcode==='GRID-AUDIT'),sample=commitOperationalRecord('sampleIssue',{id:'EDGE-SI',entryNo:'EDGE-SI',date:'02/11/2026',jewellerName:'Check Jeweller',lines:[{barcode:'GRID-AUDIT',itemName:'RING',qty:1,gross:6,stone:1}]});
+ ensure(!barcodeCurrentInventory().some(row=>row.barcode==='GRID-AUDIT'),'Issued tag remained in barcode inventory');
+ const history=barcodeMovementData('GRID-AUDIT');ensure(history.some(row=>row.sourceId===sample.id&&row.direction==='OUT'),'Work movement missing from barcode trail');
+ ensure(barcodeEntryGuard({id:state.barcodeEntries[0].id,lines:[{barcode:'GRID-AUDIT'}]}),'Consumed barcode receipt was not protected');
+ const returnDetails=operationalBarcodeDetails('sampleReturn',{jewellerName:'Check Jeweller'},state.stock.find(s=>s.id===original.id));ensure(returnDetails.qty===1&&returnDetails.gross===6&&returnDetails.net===5,'Return autofill lost outstanding weights');
+ // Day Lock applies to the document date even when direct handlers are used.
+ state.utilities.dayLock={locked:true,from:'01/11/2026',to:'03/11/2026'};
+ rejected(()=>commitOperationalRecord('sampleIssue',{id:'LOCKED',entryNo:'LOCKED',date:'02/11/2026',jewellerName:'Check Jeweller',lines:[{barcode:'GRID-AUDIT',qty:1,gross:1,stone:0}]}));rejected(()=>removeOperationalRecord('sampleIssue',sample));
+ return true;
+ }finally{state=saved.state;stockAdjustmentDraft=saved.stockAdjustmentDraft;polishingDraft=saved.polishingDraft;active=saved.active;workOrderView=saved.workOrderView;stockView=saved.stockView;barcodeEntryDraft=saved.barcodeEntryDraft;barcodeEntryLine=saved.barcodeEntryLine;saveState();}
+})()`,context);assert(operationalEdgeAudit);console.log('Operational edge checks passed: amount-only deposits, entry numbering, historical safeguards, barcode grid validation, movement trace, return autofill and date locks.');
+const operationalSourceAudit=vm.runInContext(`(()=>{
+ const saved={state,serviceCloseDraft,refineryReturnDraft};
+ try{
+ state={...structuredClone(state),stock:[],operationalPostings:{},workLogs:[],audit:[],serviceJobs:[],serviceClosures:[],refineryIssues:[],refineryReturns:[],utilities:{dayLock:{locked:false}}};
+ const source=commitOperationalRecord('serviceNew',{id:'SOURCE-JOB',entryNo:'JB00020',date:'02/11/2026',partyName:'Source Customer',approxAmount:1000,advance:200,place:'Correct place',lines:[{itemName:'Customer Ring',nos:1,gross:2,stone:.2}]});
+ const legacy={id:'OTHER-CLOSE',entryNo:'JBC00010',date:'01/01/2026',partyName:'Different customer',remarks:'Do not copy',cashPayment:999,lines:[{itemName:'Other',nos:1,gross:1,stone:0}]};state.serviceClosures=[legacy];serviceCloseDraft=normalizeServiceJob(legacy,'Close');
+ if(!loadServiceJobForClose(source.id))throw Error('Job selection did not load');
+ if(serviceCloseDraft.id===legacy.id||serviceCloseDraft.entryNo!=='JBC00011'||serviceCloseDraft.remarks||serviceCloseDraft.cashPayment||serviceCloseDraft.place!=='Correct place'||serviceCloseDraft.advance!==200)throw Error('Changing source reused a different closure or leaked its fields');
+ const record=commitOperationalRecord('serviceClose',{...serviceCloseDraft,cashPayment:800});
+ if(state.serviceClosures.length!==2||!state.serviceClosures.some(close=>close.id===legacy.id)||serviceFinancials(record).balance!==0)throw Error('New source closure overwrote old history');
+ const before=JSON.stringify(state);let blocked=false;try{commitOperationalRecord('serviceClose',{...record,date:'01/11/2026'});}catch{blocked=true;}if(!blocked||JSON.stringify(state)!==before)throw Error('Closing before source date was accepted');
+ // Changing a refinery source similarly starts a fresh return document.
+ state.refineryIssues=[normalizeRefineryIssue({id:'NEW-ISSUE',entryNo:'NR00020',date:'02/11/2026',refinerName:'Refiner',lines:[{itemName:'Gold',gross:5,stone:0}]})];
+ const oldReturn=normalizeRefineryReturn({id:'OLD-RETURN',entryNo:'RR00009',pendingIssueId:'OTHER-ISSUE',lines:[]});state.refineryReturns=[oldReturn];refineryReturnDraft=oldReturn;
+ updateRefineryReturnDraftField('pendingIssueId','NEW-ISSUE');
+ if(refineryReturnDraft.id===oldReturn.id||refineryReturnDraft.entryNo!=='RR00010'||refineryReturnDraft.lines[0].issuedWeight!==5)throw Error('Refinery source switch reused a saved return');
+ return true;
+ }finally{state=saved.state;serviceCloseDraft=saved.serviceCloseDraft;refineryReturnDraft=saved.refineryReturnDraft;}
+})()`,context);assert(operationalSourceAudit);console.log('Service/refinery source switching preserves historical documents, clears unrelated values and validates closing dates.');
+const operationalBalanceSafety=vm.runInContext(`(()=>{
+ const original=state;
+ try{
+ state={...structuredClone(state),stock:[{id:'STONE-FIX',item:'Ring',barcode:'STONE-FIX',qty:1,gross:5,stone:1,net:4,closing:4,opening:4,addition:0,deduction:0,status:'Available'}],stockAdjustments:[],openingStockEntries:[],operationalPostings:{},audit:[],workLogs:[],utilities:{dayLock:{locked:false}}};
+ const adjustment=commitOperationalRecord('adjustment',{id:'STONE-ADJUST',entryNo:'STONE-ADJUST',date:'02/11/2026',lines:[{itemName:'Ring',barcode:'STONE-FIX',stoneAdd:.5}]});
+ if(state.stock[0].net!==3.5||state.stock[0].addition!==0||state.stock[0].deduction!==.5||state.stock[0].opening+state.stock[0].addition-state.stock[0].deduction!==state.stock[0].closing)throw Error('Stone-only adjustment created negative addition or unbalanced stock');
+ state.stock[0].item='Gold Ornaments';const before=JSON.stringify(state);let blocked=false;try{commitOperationalRecord('opening',{id:'BAD-OPEN-2',openingDate:'2026-04-02',lines:[{description:'Gold Ornaments',weight:100,stone:0}]});}catch{blocked=true;}if(!blocked||JSON.stringify(state)!==before)throw Error('Opening over existing movements was not safely rejected');
+ return true;
+ }finally{state=original;}
+})()`,context);assert(operationalBalanceSafety);console.log('Stone-only corrections preserve Opening + Additions - Deductions = Closing; opening stock cannot overwrite posted balances.');
+const barcodeEditBalanceAudit=vm.runInContext(`(()=>{
+ const saved={state,barcodeEntryDraft,barcodeEntryLine,barcodeItemEditDraft,barcodeItemEditSource,barcodeItemEditScan};
+ try{
+ state={...structuredClone(state),stock:[],barcodeEntries:[],bills:[],operationalPostings:{},audit:[]};
+ barcodeEntryDraft=newBarcodeEntry();barcodeEntryLine={itemId:'R',itemName:'RING',barcode:'EDIT-BALANCE',qty:1,gross:5,stone:1,mcGram:10,pmcGram:5};barcodeEntryAddLine();barcodeEntrySave();
+ barcodeItemEditScan='EDIT-BALANCE';barcodeItemEditShow();barcodeItemEditDraft.gross=6;barcodeItemEditUpdate();
+ const row=findStockByBarcode('EDIT-BALANCE');if(row.net!==5||row.addition!==5||row.opening!==0||row.deduction!==0||row.mc!==50||row.pmc!==25||row.opening+row.addition-row.deduction!==row.closing)throw Error('Barcode edit retained stale making charges or broke the stock equation');
+ return true;
+ }finally{state=saved.state;barcodeEntryDraft=saved.barcodeEntryDraft;barcodeEntryLine=saved.barcodeEntryLine;barcodeItemEditDraft=saved.barcodeItemEditDraft;barcodeItemEditSource=saved.barcodeItemEditSource;barcodeItemEditScan=saved.barcodeItemEditScan;saveState();}
+})()`,context);assert(barcodeEditBalanceAudit);console.log('Barcode weight edits recalculate per-gram making charges and preserve stock balance.');

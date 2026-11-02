@@ -1648,6 +1648,7 @@ function normalizeBillLine(line, fallbackAmount = 0, bill = {}, sectionKey = "sa
     huid: line.huid || "",
     itemDescription: line.itemDescription || line.description || "",
     itemCode: line.itemCode || line.itemId || line.barcode || "",
+    itemId: line.itemId || "",
     length: line.length || "",
     breadth: line.breadth || "",
     model: line.model || "",
@@ -1783,6 +1784,7 @@ function normalizeDmdWholesaleBill(bill = {}) {
 
 function normalizeDiamondPurchaseBill(bill = {}) {
   return {
+    ...bill,
     id: bill.id || crypto.randomUUID(),
     entryNo: bill.entryNo || "3",
     refNo: bill.refNo || "",
@@ -1834,6 +1836,7 @@ function normalizeDiamondPurchaseReturnBill(bill = {}) {
 
 function normalizeDmdStonePurchaseBill(bill = {}) {
   return {
+    ...bill,
     id: bill.id || crypto.randomUUID(),
     entryNo: bill.entryNo || "",
     refNo: bill.refNo || "",
@@ -1930,13 +1933,13 @@ function normalizeDiamondPurchaseReturnLine(line = {}) {
     itemId: line.itemId || line.item || "",
     itemName: line.itemName || line.item || "",
     barcode: line.barcode || "",
-    nos: Number(line.nos || line.qty || 1),
+    nos: Number(line.nos ?? line.qty ?? 1),
     gross: Number(line.gross || 0),
     stone: Number(line.stone || 0),
     type: line.type || "",
     stonePrice: Number(line.stonePrice || 0),
     goldType: line.goldType || "22K",
-    goldRate: Number(line.goldRate || activeGoldRate()),
+    goldRate: Number(line.goldRate ?? activeGoldRate()),
     dmdWgt: Number(line.dmdWgt || line.diamondWeight || 0),
     purMc: Number(line.purMc || line.purchaseMc || 0),
     salesType: line.salesType || "Weight"
@@ -1961,14 +1964,14 @@ function normalizeDmdWholesaleLine(line = {}, options = {}) {
     itemName: line.itemName || "",
     itemDescription: line.itemDescription || line.description || "",
     barcode: line.barcode || "",
-    nos: Number(line.nos || line.qty || 1),
+    nos: Number(line.nos ?? line.qty ?? 1),
     gross: Number(line.gross || 0),
     stone: Number(line.stone || 0),
     stonePrice: Number(line.stonePrice || 0),
     va: Number(line.va || 0),
     goldType: line.goldType || "22K",
     salesType: line.salesType || "Weight",
-    goldRate: Number(line.goldRate || activeGoldRate()),
+    goldRate: Number(line.goldRate ?? activeGoldRate()),
     dmdWgt: Number(line.dmdWgt || 0),
     stnSPrice: Number(line.stnSPrice || 0),
     purMc: Number(line.purMc || 0),
@@ -2013,7 +2016,7 @@ function normalizeDmdStoneLine(line = {}) {
     itemId: line.itemId || line.idCode || "",
     itemName: line.itemName || line.item || line.name || "",
     barcode: line.barcode || "",
-    nos: Number(line.nos || line.qty || 1),
+    nos: Number(line.nos ?? line.qty ?? 1),
     colorType: line.colorType || "",
     colorScale: line.colorScale || "",
     shape: line.shape || "",
@@ -2031,7 +2034,7 @@ function normalizeDmdStoneLine(line = {}) {
 
 function normalizeDmdPurchaseStoneLine(line = {}) {
   const normalized = normalizeDmdStoneLine(line);
-  const amount = Math.round(normalized.caratCent * normalized.purchaseRate * 100) / 100;
+  const amount = dmdMoneyTerms([[normalized.caratCent,normalized.purchaseRate]]);
   return { ...normalized, amount };
 }
 
@@ -2200,6 +2203,7 @@ function normalizeStaff(item) {
 
 function normalizeWorkLog(item) {
   return {
+    ...item,
     refNo: item.refNo || `WL-${Date.now()}`,
     date: item.date || new Date().toLocaleDateString("en-GB"),
     workflow: item.workflow || "Stock",
@@ -2240,11 +2244,11 @@ function normalizeSmithWorkLine(item = {}) {
   const mudLess = Number(item.mudLess || 0);
   const smWeight = Number(item.smWeight ?? Math.max(0, gross - stone - mudLess));
   const mcGram = Number(item.mcGram || 0);
-  const mc = Number(item.mc ?? smWeight * mcGram);
+  const mc = dmdMoneyTerms([[smWeight,mcGram]]);
   const hmc = Number(item.hmc || 0);
   const stoneCharge = Number(item.stoneCharge || item.stnCharge || 0);
-  const rate = Number(item.rate || activeGoldRate() || 0);
-  const total = Number(item.total ?? (smWeight * rate) + stoneCharge + mc + hmc);
+  const rate = Number(item.rate ?? activeGoldRate() ?? 0);
+  const total = dmdMoneyTerms([[smWeight,rate],[stoneCharge],[mc],[hmc]]);
   return {
     id: item.id || crypto.randomUUID(),
     barcode: item.barcode || "",
@@ -2295,6 +2299,7 @@ function defaultSmithWorkOrder() {
 
 function normalizeSmithWorkOrder(item = {}) {
   return {
+    ...item,
     id: item.id || crypto.randomUUID(),
     entryNo: item.entryNo || "NR00006",
     refNo: item.refNo || "",
@@ -2331,11 +2336,11 @@ function defaultCashWeightSmithLine() {
 
 function normalizeCashWeightSmithLine(item = {}) {
   const amount = Number(item.amount || 0);
-  const rate = Number(item.rate || activeGoldRate() || 0);
-  const weight = Number(item.weight || (rate ? amount / rate : 0));
-  const touch = Number(item.touch || 99.5);
-  const convert = Number(item.convert || 100);
-  const netWeight = Number(item.netWeight ?? (convert ? weight * touch / convert : weight));
+  const rate = Number(item.rate ?? activeGoldRate() ?? 0);
+  const weight = Number(item.weight ?? (rate ? amount / rate : 0));
+  const touch = Number(item.touch ?? 99.5);
+  const convert = Number(item.convert ?? 100);
+  const netWeight = workflowRound(convert ? weight * touch / convert : 0);
   return {
     id: item.id || crypto.randomUUID(),
     amount,
@@ -2370,6 +2375,7 @@ function defaultCashWeightSmith() {
 
 function normalizeCashWeightSmith(item = {}) {
   return {
+    ...item,
     id: item.id || crypto.randomUUID(),
     entryNo: item.entryNo || "CF00001",
     refNo: item.refNo || "",
@@ -2415,12 +2421,12 @@ function normalizeJewellerWorkLine(item = {}) {
   const jwWeight = Number(item.jwWeight ?? Math.max(0, gross - stone - mudLess));
   const mcGram = Number(item.mcGram || 0);
   const vaPercent = Number(item.vaPercent || item.va || 0);
-  const rate = Number(item.rate || activeGoldRate() || 0);
+  const rate = Number(item.rate ?? activeGoldRate() ?? 0);
   const stoneCharge = Number(item.stoneCharge || item.stnCharge || 0);
-  const mc = Number(item.mc ?? item.mcAmt ?? (jwWeight * mcGram) + ((jwWeight * vaPercent / 100) * rate));
+  const mc = dmdMoneyTerms([[jwWeight,mcGram],[jwWeight,vaPercent,.01,rate]]);
   const hmc = Number(item.hmc || 0);
   const pureWeight = Number(item.pureWeight ?? (jwWeight * Number(item.touch || 0) / 100));
-  const total = Number(item.total ?? (jwWeight * rate) + stoneCharge + mc + hmc);
+  const total = dmdMoneyTerms([[jwWeight,rate],[stoneCharge],[mc],[hmc]]);
   return {
     id: item.id || crypto.randomUUID(),
     barcode: item.barcode || "",
@@ -2482,6 +2488,7 @@ function defaultJewellerWorkOrder() {
 
 function normalizeJewellerWorkOrder(item = {}) {
   return {
+    ...item,
     id: item.id || crypto.randomUUID(),
     entryNo: item.entryNo || "AR00001",
     refNo: item.refNo || "",
@@ -2605,6 +2612,7 @@ function normalizeOpeningStockEntry(record = {}) {
   const openingDate = record.openingDate || financialYearOpeningDate();
   const existing = new Map((record.lines || []).map((line) => [line.description, line]));
   return {
+    ...record,
     id: record.id || crypto.randomUUID(),
     openingDate,
     financialYear: record.financialYear || financialYear(openingDate),
@@ -2649,7 +2657,8 @@ function defaultStockAdjustmentLine() {
 }
 
 function normalizeStockAdjustmentLine(line = {}) {
-  const stockItem = (state?.stock || seed.stock || []).find((item) => item.item === line.itemName || item.huid === line.barcode);
+  const rows=state?.stock||seed.stock||[];
+  const stockItem = line.barcode ? rows.find(item=>workflowKey(item.barcode||item.huid)===workflowKey(line.barcode)||workflowKey(item.huid)===workflowKey(line.barcode)) : rows.find(item=>workflowKey(item.item)===workflowKey(line.itemName));
   const nos = Number(line.nos || line.qty || 0);
   const gross = Number(line.gross || 0);
   const stone = Number(line.stone || 0);
@@ -2703,6 +2712,7 @@ function defaultStockAdjustment() {
 
 function normalizeStockAdjustment(record = {}) {
   return {
+    ...record,
     id: record.id || crypto.randomUUID(),
     entryNo: record.entryNo || "SA00001",
     refNo: record.refNo || "",
@@ -2729,8 +2739,8 @@ function normalizeGoldDepositLine(line = {}) {
   const net = Math.max(0, Number(line.net ?? gross - stone - mudless));
   const touch = Number(line.touch || 0);
   const partyWeight = Number(line.partyWeight ?? line.prtyWgt ?? (touch ? net * touch / 100 : net));
-  const rate = Number(line.rate || activeGoldRate());
-  const amount = Number(line.amount ?? partyWeight * rate);
+  const rate = Number(line.rate ?? activeGoldRate());
+  const amount = line.amount === undefined ? dmdMoneyTerms([[partyWeight,rate]]) : dmdMoneySum([line.amount]);
   return {
     id: line.id || crypto.randomUUID(),
     itemId: line.itemId || line.idCode || "OG",
@@ -2762,9 +2772,10 @@ function defaultGoldDeposit(type = "Deposit") {
 
 function normalizeGoldDeposit(record = {}, fallbackType = "Deposit") {
   const type = record.type || fallbackType;
-  const lines = (record.lines || []).map(normalizeGoldDepositLine);
+  const lines = (record.lines || []).map(line=>normalizeGoldDepositLine(record.byAmount?goldDepositAmountWeights(line):line));
   const totals = goldDepositFinancials({ ...record, lines });
   return {
+    ...record,
     id: record.id || crypto.randomUUID(),
     type,
     entryNo: record.entryNo || (type === "Withdrawal" ? "GW00001" : "GD00001"),
@@ -2788,7 +2799,7 @@ function goldDepositFinancials(record = {}) {
   const lines = (record.lines || []).filter((line) => line.active !== false);
   return {
     totalWeight: sumField(lines, "partyWeight"),
-    totalAmount: sumField(lines, "amount"),
+    totalAmount: dmdMoneySum(lines.map(line=>line.amount||0)),
     gross: sumField(lines, "gross"),
     stone: sumField(lines, "stone"),
     net: sumField(lines, "net")
@@ -2810,13 +2821,13 @@ function normalizeSampleLine(line = {}) {
   const qty = Number(line.qty ?? line.nos ?? 1);
   const gross = Number(line.gross ?? line.grossWeight ?? 0);
   const stone = Number(line.stone ?? line.stoneWeight ?? 0);
-  const net = Math.max(0, Number(line.net ?? line.netWeight ?? gross - stone));
+  const net = Math.max(0, workflowRound(gross - stone));
   const rate = Number(line.rate ?? activeGoldRate() ?? 0);
   const hmc = Number(line.hmc ?? 0);
   const taxPct = Number(line.taxPct ?? line.taxPercent ?? 0);
-  const base = Number(line.base ?? (net * rate) + hmc);
-  const taxAmount = Number(line.taxAmount ?? (base * taxPct) / 100);
-  const total = Number(line.total ?? base + taxAmount);
+  const base = dmdMoneyTerms([[net,rate],[hmc]]);
+  const taxAmount = dmdMoneyTerms([[base,taxPct,.01]]);
+  const total = dmdMoneySum([base,taxAmount]);
   return {
     id: line.id || crypto.randomUUID(),
     itemId: line.itemId || line.idCode || "",
@@ -2862,6 +2873,7 @@ function normalizeSample(record = {}, fallbackType = "Issue") {
   const lines = (record.lines || []).map(normalizeSampleLine);
   const totals = sampleFinancials({ lines });
   return {
+    ...record,
     id: record.id || crypto.randomUUID(),
     type,
     entryNo: record.entryNo || (type === "Return" ? "SR00001" : "SI00001"),
@@ -2888,8 +2900,8 @@ function sampleFinancials(record = {}) {
     gross: sumField(lines, "gross"),
     stone: sumField(lines, "stone"),
     net: sumField(lines, "net"),
-    taxAmount: sumField(lines, "taxAmount"),
-    totalAmount: sumField(lines, "total")
+    taxAmount: dmdMoneySum(lines.map(line=>line.taxAmount||0)),
+    totalAmount: dmdMoneySum(lines.map(line=>line.total||0))
   };
 }
 
@@ -2900,7 +2912,8 @@ function normalizeItemTransferLine(line = {}) {
 
 function normalizeItemTransfer(record = {}) {
   const salesman = record.salesman || record.staffName || "";
-  return { id: record.id || crypto.randomUUID(), entryNo: String(record.entryNo || "1"), date: record.date || new Date().toLocaleDateString("en-GB"), refNo: record.refNo || record.remark || "", remark: record.remark || record.refNo || "", salesman, smCode: record.smCode || record.salesmanCode || staffCodeForName(salesman) || "", time: record.time || nowTime(), stockLocation: record.stockLocation || "Main Stock", lines: (record.lines || []).map(normalizeItemTransferLine) };
+  return {
+    ...record, id: record.id || crypto.randomUUID(), entryNo: String(record.entryNo || "1"), date: record.date || new Date().toLocaleDateString("en-GB"), refNo: record.refNo || record.remark || "", remark: record.remark || record.refNo || "", salesman, smCode: record.smCode || record.salesmanCode || staffCodeForName(salesman) || "", time: record.time || nowTime(), stockLocation: record.stockLocation || "Main Stock", lines: (record.lines || []).map(normalizeItemTransferLine) };
 }
 
 function itemTransferTotals(record = {}) {
@@ -2920,7 +2933,7 @@ function normalizePolishingLine(line = {}) {
   const qty = Number(line.qty ?? line.nos ?? 1);
   const gross = Number(line.gross ?? line.grossWeight ?? 0);
   const stone = Number(line.stone ?? line.stoneWeight ?? 0);
-  const net = Math.max(0, Number(line.net ?? line.netWeight ?? gross - stone));
+  const net = Math.max(0, workflowRound(gross - stone));
   return {
     id: line.id || crypto.randomUUID(),
     itemId: line.itemId || line.idCode || line.itemCode || "",
@@ -2964,7 +2977,7 @@ function normalizePolishingStoneLine(line = {}) {
     pcs,
     purchaseRate,
     sellingRate,
-    amount: Number(line.amount ?? computedAmount),
+    amount: dmdMoneyTerms([[(caratCent > 0 ? caratCent : pcs),sellingRate]]),
     active: line.active !== false
   };
 }
@@ -2990,6 +3003,7 @@ function normalizePolishingEntry(record = {}) {
   const stones = (record.stones || record.stoneLines || []).map(normalizePolishingStoneLine);
   const totals = polishingFinancials({ lines, stones });
   return {
+    ...record,
     id: record.id || crypto.randomUUID(),
     entryNo: record.entryNo || "PL00001",
     refNo: record.refNo || "",
@@ -3018,8 +3032,8 @@ function polishingFinancials(record = {}) {
     gross: sumField(lines, "gross"),
     stone: sumField(lines, "stone"),
     net: sumField(lines, "net"),
-    stoneAmount: sumField(stones, "amount"),
-    totalAmount: sumField(stones, "amount")
+    stoneAmount: dmdMoneySum(stones.map(line=>line.amount||0)),
+    totalAmount: dmdMoneySum(stones.map(line=>line.amount||0))
   };
 }
 
@@ -3035,7 +3049,7 @@ function normalizeServiceLine(line = {}) {
   const nos = Number(line.nos ?? line.qty ?? 0);
   const gross = Number(line.gross ?? line.grossWeight ?? 0);
   const stone = Number(line.stone ?? line.stoneWeight ?? 0);
-  const net = Math.max(0, Number(line.net ?? line.netWeight ?? gross - stone));
+  const net = Math.max(0, workflowRound(gross - stone));
   return {
     id: line.id || crypto.randomUUID(),
     itemName: line.itemName || "",
@@ -3079,6 +3093,7 @@ function normalizeServiceJob(record = {}, fallbackType = "New") {
   const lines = (record.lines || []).map(normalizeServiceLine);
   const totals = serviceFinancials({ ...record, lines });
   return {
+    ...record,
     id: record.id || crypto.randomUUID(),
     type,
     entryNo: record.entryNo || (type === "Close" ? "JBC00001" : "JB00001"),
@@ -3104,7 +3119,7 @@ function normalizeServiceJob(record = {}, fallbackType = "New") {
 function serviceFinancials(record = {}) {
   const lines = (record.lines || []).map(normalizeServiceLine).filter((line) => line.active !== false);
   const approxAmount = Number(record.approxAmount || 0);
-  const advance = Number(record.advance || 0);
+  const advance = Number(record.advance || 0),cashPayment=Number(record.cashPayment||0);
   return {
     nos: sumField(lines, "nos"),
     gross: sumField(lines, "gross"),
@@ -3112,7 +3127,8 @@ function serviceFinancials(record = {}) {
     net: sumField(lines, "net"),
     approxAmount,
     advance,
-    balance: Math.max(0, approxAmount - advance)
+    cashPayment,
+    balance: dmdMoneySum([approxAmount,-advance,-cashPayment])
   };
 }
 
@@ -3137,11 +3153,12 @@ function normalizeRefineryIssueLine(line = {}) {
   const qty = Number(line.qty || line.nos || 0);
   const gross = Number(line.gross || 0);
   const stone = Number(line.stone || 0);
-  const net = Math.max(0, Number(line.net ?? gross - stone));
-  const rate = Number(line.rate || activeGoldRate() || 0);
-  const amount = Number(line.amount ?? net * rate);
+  const net = Math.max(0, workflowRound(gross - stone));
+  const rate = Number(line.rate ?? activeGoldRate() ?? 0);
+  const amount = dmdMoneyTerms([[net,rate]]);
   return {
     id: line.id || crypto.randomUUID(),
+    barcode: line.barcode || "",
     itemId: line.itemId || line.idCode || "",
     itemName: line.itemName || "",
     qty,
@@ -3172,6 +3189,7 @@ function defaultRefineryIssue() {
 
 function normalizeRefineryIssue(record = {}) {
   return {
+    ...record,
     id: record.id || crypto.randomUUID(),
     entryNo: record.entryNo || "NR00001",
     refNo: record.refNo || "",
@@ -3193,7 +3211,7 @@ function refineryIssueFinancials(record = {}) {
     gross: sumField(lines, "gross"),
     stone: sumField(lines, "stone"),
     issueWeight: sumField(lines, "net"),
-    issueAmount: sumField(lines, "amount")
+    issueAmount: dmdMoneySum(lines.map(line=>line.amount||0))
   };
 }
 
@@ -3266,8 +3284,9 @@ function defaultRefineryReturn() {
 
 function normalizeRefineryReturn(record = {}) {
   const issue = selectedRefineryIssue(record.pendingIssueId);
-  const sourceLines = record.lines?.length ? record.lines : issue?.lines?.map(defaultRefineryReturnLine) || [];
+  const sourceLines = Array.isArray(record.lines) ? record.lines : issue?.lines?.map(defaultRefineryReturnLine) || [];
   return {
+    ...record,
     id: record.id || crypto.randomUUID(),
     entryNo: record.entryNo || "RR00001",
     refNo: record.refNo || "",
@@ -3310,8 +3329,8 @@ function normalizeRefineryFinalLine(line = {}) {
   const testWeight = Math.max(0, Number(line.testWeight ?? receivedWeight - acidingLoss));
   const touch = Number(line.touch || 0);
   const bottleStockWeight = Number(line.bottleStockWeight || 0);
-  const rate = Number(line.rate || activeGoldRate() || 0);
-  const amount = Number(line.amount ?? testWeight * rate);
+  const rate = Number(line.rate ?? activeGoldRate() ?? 0);
+  const amount = dmdMoneyTerms([[testWeight,rate]]);
   return {
     id: line.id || crypto.randomUUID(),
     itemName: line.itemName || "",
@@ -3350,11 +3369,13 @@ function defaultRefineryFinalReturn() {
 function normalizeRefineryFinalReturn(record = {}) {
   const returnRecord = (state?.refineryReturns || []).find((item) => item.pendingIssueId === record.pendingIssueId);
   const issue = selectedRefineryIssue(record.pendingIssueId);
-  const sourceLines = record.lines?.length ? record.lines : returnRecord?.lines?.map(defaultRefineryFinalLine) || issue?.lines?.map(defaultRefineryFinalLine) || [];
+  const sourceLines = Array.isArray(record.lines) ? record.lines : returnRecord?.lines?.map(defaultRefineryFinalLine) || issue?.lines?.map(defaultRefineryFinalLine) || [];
   const expectedTouch = Number(record.expectedTouch ?? issue?.expectedTouch ?? 0);
   const lines = sourceLines.map(normalizeRefineryFinalLine);
-  const avgTouch = lines.length ? sumField(lines, "touch") / lines.length : 0;
+  const touchWeight = sumField(lines,"testWeight");
+  const avgTouch = touchWeight ? lines.reduce((sum,line)=>sum+line.testWeight*line.touch,0)/touchWeight : 0;
   return {
+    ...record,
     id: record.id || crypto.randomUUID(),
     entryNo: record.entryNo || "FR00001",
     refNo: record.refNo || "",
@@ -3362,7 +3383,7 @@ function normalizeRefineryFinalReturn(record = {}) {
     time: record.time || nowTime(),
     pendingIssueId: record.pendingIssueId || issue?.id || "",
     expectedTouch,
-    diffTouch: Number(record.diffTouch ?? expectedTouch - avgTouch),
+    diffTouch: workflowRound(expectedTouch - avgTouch),
     preparedBy: record.preparedBy || state?.staffs?.[0]?.name || seed.staffs[0]?.name || "",
     remark: record.remark || "",
     refinerCharge: Number(record.refinerCharge || 0),
@@ -3375,8 +3396,8 @@ function normalizeRefineryFinalReturn(record = {}) {
 
 function refineryFinalFinancials(record = {}) {
   const lines = (record.lines || []).map(normalizeRefineryFinalLine);
-  const refinedAmount = sumField(lines, "amount");
-  const total = refinedAmount + Number(record.refinerCharge || 0) + Number(record.addition || 0) - Number(record.discount || 0);
+  const refinedAmount = dmdMoneySum(lines.map(line=>line.amount||0));
+  const total = dmdMoneySum([refinedAmount,record.refinerCharge||0,record.addition||0,-Number(record.discount||0)]);
   const cashPaid = Number(record.cashPaid || 0);
   return {
     receivedWeight: sumField(lines, "receivedWeight"),
@@ -3386,7 +3407,7 @@ function refineryFinalFinancials(record = {}) {
     refinedAmount,
     total,
     cashPaid,
-    balance: total - cashPaid
+    balance: dmdMoneySum([total,-cashPaid])
   };
 }
 
@@ -3403,11 +3424,12 @@ function normalizeMeltingIssueLine(line = {}) {
   const qty = Number(line.qty || line.nos || 0);
   const gross = Number(line.gross || 0);
   const stone = Number(line.stone || line.stoneWeight || 0);
-  const net = Math.max(0, Number(line.net ?? gross - stone));
-  const rate = Number(line.rate || activeGoldRate() || 0);
-  const amount = Number(line.amount ?? net * rate);
+  const net = Math.max(0, workflowRound(gross - stone));
+  const rate = Number(line.rate ?? activeGoldRate() ?? 0);
+  const amount = dmdMoneyTerms([[net,rate]]);
   return {
     id: line.id || crypto.randomUUID(),
+    barcode: line.barcode || "",
     itemId: line.itemId || "",
     itemName: line.itemName || "",
     qty,
@@ -3435,6 +3457,7 @@ function defaultMeltingIssue() {
 
 function normalizeMeltingIssue(record = {}) {
   return {
+    ...record,
     id: record.id || crypto.randomUUID(),
     entryNo: record.entryNo || "MI00001",
     refNo: record.refNo || "",
@@ -3454,7 +3477,7 @@ function meltingIssueFinancials(record = {}) {
     gross: sumField(lines, "gross"),
     stone: sumField(lines, "stone"),
     issueWeight: sumField(lines, "net"),
-    issueAmount: sumField(lines, "amount")
+    issueAmount: dmdMoneySum(lines.map(line=>line.amount||0))
   };
 }
 
@@ -3488,9 +3511,9 @@ function normalizeMeltingReturnLine(line = {}) {
   const testWeight = Number(line.testWeight || 0);
   const receivedWeight = Math.max(0, Number(line.receivedWeight ?? issuedWeight - meltingLoss));
   const touch = Number(line.touch || 0);
-  const rate = Number(line.rate || activeGoldRate() || 0);
+  const rate = Number(line.rate ?? activeGoldRate() ?? 0);
   const bottleStockWeight = Number(line.bottleStockWeight || 0);
-  const amount = Number(line.amount ?? receivedWeight * rate);
+  const amount = dmdMoneyTerms([[receivedWeight,rate]]);
   return {
     id: line.id || crypto.randomUUID(),
     itemName: line.itemName || "",
@@ -3526,8 +3549,9 @@ function defaultMeltingReturn() {
 
 function normalizeMeltingReturn(record = {}) {
   const issue = selectedMeltingIssue(record.pendingIssueId);
-  const sourceLines = record.lines?.length ? record.lines : issue?.lines?.map(defaultMeltingReturnLine) || [];
+  const sourceLines = Array.isArray(record.lines) ? record.lines : issue?.lines?.map(defaultMeltingReturnLine) || [];
   return {
+    ...record,
     id: record.id || crypto.randomUUID(),
     entryNo: record.entryNo || "MR00001",
     refNo: record.refNo || "",
@@ -3546,8 +3570,8 @@ function normalizeMeltingReturn(record = {}) {
 
 function meltingReturnFinancials(record = {}) {
   const lines = (record.lines || []).map(normalizeMeltingReturnLine);
-  const amount = sumField(lines, "amount");
-  const total = amount + Number(record.refinerCharge || 0) + Number(record.addition || 0) - Number(record.discount || 0);
+  const amount = dmdMoneySum(lines.map(line=>line.amount||0));
+  const total = dmdMoneySum([amount,record.refinerCharge||0,record.addition||0,-Number(record.discount||0)]);
   const cashPaid = Number(record.cashPaid || 0);
   return {
     issuedWeight: sumField(lines, "issuedWeight"),
@@ -3558,7 +3582,7 @@ function meltingReturnFinancials(record = {}) {
     amount,
     total,
     cashPaid,
-    balance: total - cashPaid
+    balance: dmdMoneySum([total,-cashPaid])
   };
 }
 
@@ -3643,7 +3667,7 @@ function normalizeComplimentaryPurchaseLine(line = {}) {
     unit: line.unit || catalogItem?.unit || "Nos",
     foc,
     price,
-    total: chargeableQty * price
+    total: dmdMoneyTerms([[chargeableQty,price]])
   };
 }
 
@@ -3690,14 +3714,14 @@ function defaultComplimentaryPurchase() {
 
 function complimentaryPurchaseFinancials(record = {}) {
   const lines = (record.lines || []).map(normalizeComplimentaryPurchaseLine);
-  const billAmount = sumField(lines, "total");
+  const billAmount = dmdMoneySum(lines.map(line=>line.total||0));
   const addition = Number(record.addition || 0);
   const discount = Number(record.discount || 0);
   return {
     billAmount,
     addition,
     discount,
-    invoiceTotal: billAmount + addition - discount
+    invoiceTotal: dmdMoneySum([billAmount,addition,-discount])
   };
 }
 
@@ -4421,11 +4445,17 @@ function barcodeMovementData(barcode = "") {
     rows.push({ ...identity, entryNo: record.entryNo || record.billNo || record.refNo || "0", date: record.date || record.entryDate || "", transactionType, direction, location: location || identity.location || "Shop", sourceId: record.id || "", sortDate: toDateInputValue(record.date || record.entryDate || "") });
   };
   (state.openingStockEntries || []).forEach((record) => (record.lines || []).forEach((line) => add(record, line, "Barcode Entry", "IN", record.location || "Shop")));
+  (state.barcodeEntries || []).forEach(record => record.lines.forEach(line => add(record, line, "Barcode Entry", "IN", "Shop")));
   (state.itemTransfers || []).forEach((record) => (record.lines || []).forEach((line) => add(record, line, `Item Transfer ${line.mode || ""}`.trim(), line.mode === "OUT" ? "OUT" : "IN", record.stockLocation || "Shop")));
   (state.bills || []).forEach((record) => {
+    if(record.saved===false)return;
     const type = String(record.type || ""), isReturn = /return/i.test(type), isPurchase = /purchase/i.test(type), direction = isPurchase ? (isReturn ? "OUT" : "IN") : (isReturn ? "IN" : "OUT"), transactionType = `${type || (isPurchase ? "Purchase" : "Sales")}${record.customer || record.partyName ? ` \\ ${record.customer || record.partyName}` : ""}`;
     Object.values(record.sections || {}).flat().forEach((line) => add(record, line, transactionType, direction, record.location || "Shop"));
   });
+  for(const posting of Object.values(state.operationalPostings||{})){
+    const config=operationalConfig(posting.kind),record=(state[config.collection]||[]).find(record=>record.id===posting.sourceId);if(!record)continue;
+    for(const move of posting.moves||[]){const item=(state.stock||[]).find(item=>item.id===move.stockId);const before=posting.entries.find(entry=>entry.stockId===move.stockId)?.before;const barcode=item?.barcode||before?.barcode;if(barcode)add(record,{barcode,itemName:item?.item||before?.item,qty:move.qty,gross:move.gross,stone:move.stone,net:move.net},config.workflow+' '+posting.kind,move.sign<0?'OUT':'IN',item?.stockLocation||'Shop');}
+  }
   (state.stock || []).forEach((line) => { const identity = barcodeLineIdentity(line); if (!identity.barcode || rows.some((row) => row.barcode === identity.barcode) || (target && identity.barcode !== target)) return; add({ entryNo: "0", date: line.date || line.transDate || "" }, line, "Barcode Entry", "IN", line.location || "Shop"); });
   rows.sort((left, right) => left.sortDate.localeCompare(right.sortDate) || String(left.entryNo).localeCompare(String(right.entryNo)));
   return rows;
@@ -4440,6 +4470,7 @@ function barcodeCurrentInventory(location = "") {
     current.itemName ||= row.itemName; current.gross = row.gross || current.gross; current.stone = row.stone || current.stone; current.net = row.net || current.net; current.location = row.location || current.location;
     balances.set(row.barcode, current);
   });
+  for(const item of state.stock||[]){const code=workflowKey(item.barcode);if(!code)continue;const actualLocation=item.stockLocation||item.location||'Shop',sameLocation=!location||location===actualLocation||['Shop','Main Stock'].includes(location)&&['Shop','Main Stock'].includes(actualLocation);if(!sameLocation){balances.delete(code);continue;}const qty=Number(item.qty??item.nos??0);if(qty<=0){balances.delete(code);continue;}balances.set(code,{barcode:code,itemName:item.item||item.itemName,nos:qty,gross:Number(item.gross||0),stone:Number(item.stone||0),net:Number(item.net??item.closing??0),location:actualLocation,status:item.status||'Available'});}
   return [...balances.values()].filter((row) => row.nos > 0).sort((a, b) => a.barcode.localeCompare(b.barcode));
 }
 
@@ -4494,7 +4525,7 @@ function handleBarcodeVerificationCommand(command) {
 function dashboard() {
   const t = totals();
   const lowStock = state.stock.filter((item) => item.status !== "Ready").length;
-  const pendingWork = state.workLogs.filter((log) => log.status !== "Closed" && log.status !== "Received").length;
+  const pendingWork = operationalPendingCount();
   const receivable = state.bills.reduce((sum, bill) => sum + Number(bill.balance || 0), 0);
   const activeStaff = state.staffs.filter((staff) => staff.status === "Active").length;
   const topStaff = state.staffs.slice().sort((a, b) => b.sales - a.sales)[0];
@@ -4742,6 +4773,7 @@ function newSalesRecord() {
   else if (salesView === "DMD Return/DMD OP") state.dmdReturns.unshift(normalizeDmdReturnBill({ entryNo: String((state.dmdReturns?.length || 0) + 1), date: today, preparedBy: staff }));
   else if (salesView === "DMD Sales WholeSales") state.dmdWholesales.unshift(normalizeDmdWholesaleBill({ entryNo: String((state.dmdWholesales?.length || 0) + 1), date: today, preparedBy: staff }));
   else state.bills.unshift(normalizeBill({ id: crypto.randomUUID(), entryNo: String(Date.now()).slice(-6), billNo: "", date: today, type: salesView === "Sales Return" ? "Return" : "Sale", staffName: staff, sections: { sales: [], exchange: [], return: [] } }));
+  const fresh=currentSalesRecord();if(fresh)fresh.saved=false;
   render();
   toast("New sales bill ready for entry.");
 }
@@ -5642,7 +5674,7 @@ function transactionGroup(group) {
 }
 
 function stock() {
-  const activeScreen = stockView === "Stock Adjustments"
+  const activeScreen = stockView === "Barcode Entry" ? barcodeEntryScreen() : stockView === "Stock Adjustments"
     ? stockAdjustmentScreen()
     : stockView === "Item Transfer"
       ? itemTransferScreen()
@@ -5662,7 +5694,10 @@ function stock() {
 }
 
 function barcodeModule() {
+  if (barcodeView === "Barcode Entry") return barcodeEntryScreen();
   if (barcodeView === "Barcode List") return barcodeListScreen();
+  if (barcodeView === "Barcode Printing") return barcodeMultiplePrintScreen();
+  if (barcodeView === "Barcode Edit") return barcodeStandaloneEditScreen();
   const rows = barcodeCurrentInventory();
   const descriptions = {
     "Barcode Entry": "Create barcode records for newly received or manually entered stock items.",
@@ -5687,97 +5722,22 @@ function barcodeModule() {
 }
 
 function barcodeListScreen() {
-  if (false && !selectedBarcodeListItem) {
-    return `${moduleSwitcher("Barcode", BARCODE_ITEMS, barcodeView, "data-barcode-section")}
-      <section class="panel">
-        <div class="panel-head"><div><h2>Barcode List</h2><p>Double-click an item to display all barcode details.</p></div></div>
-        ${tableWithRowAttrs(
-          ["Item Name", "ID", "Category", "Type", "Nos", "Net Weight"],
-          ITEM_WISE_CLOSING_STOCK.map((item) => ({
-            attrs: `data-barcode-list-item="${escapeHtml(item.itemId)}" title="Double-click to open barcode details"`,
-            cells: [escapeHtml(item.name), escapeHtml(item.itemId), escapeHtml(item.itemType), item.itemType === "Gold" ? "22ct" : escapeHtml(item.itemType), item.nos, grams(item.netWeight)]
-          }))
-        )}
-      </section>`;
-  }
-
-  const item = ITEM_WISE_CLOSING_STOCK.find((row) => row.itemId === selectedBarcodeListItem);
-  let itemRows = selectedBarcodeListItem ? BARCODE_WISE_CLOSING_STOCK.filter((row) => row.iid === selectedBarcodeListItem || row.name === item?.name) : [];
-  if (selectedBarcodeListItem && !itemRows.length && item) {
-    const count = Math.min(14, Math.max(1, Math.abs(Number(item.nos || 1))));
-    const averageNet = Math.abs(Number(item.netWeight || 0)) / count;
-    itemRows = Array.from({ length: count }, (_, index) => ({
-      iid: item.itemId, name: item.name, itemCategory: item.itemType, type: item.itemType === "Gold" ? "22ct" : item.itemType,
-      barcode: `${item.itemId}${String(index + 1).padStart(6, "0")}`, description: "", nos: index % 3,
-      gross: averageNet, stone: 0, net: averageNet, stnChr: 0, vaPerc: index % 3 === 1 ? 12 : 9,
-      mcPerGrm: 0, mc: 0, otherCharge: 0, totalMC: 0, smithName: "", pmc: 0
-    }));
-  }
-  const filterValue = String(barcodeListFilter.value || "").trim().toLowerCase();
-  const detailRows = !filterValue ? itemRows : itemRows.filter((row) => barcodeListFilter.type === "Barcode"
-    ? String(row.barcode || "").toLowerCase().includes(filterValue)
-    : `${row.iid || ""} ${row.name || ""}`.toLowerCase().includes(filterValue));
-  const columns = ["X", "P", "EntryNo", "ID", "Name", "Barcode", "Bis_Uid", "Description", "Nos", "GrossWeight", "StoneWeight", "NetWeight", "StnCharge", "VA_Perc", "MCperGrm", "MC", "OtherCharge", "TotalMC", "Smith", "PMCperGrm", "PurchaseMC", "Dmdcarat", "DmdPcs", "DmdSRate", "DmdPuRate", "DmdSRate1", "dmdsellrate1", "DmdSaleamt", "ClrStn", "ClrStnRate"];
-  const rows = detailRows.map((row, index) => [
-    "✖", "□", row.entryNo || 0, row.iid, escapeHtml(row.name), escapeHtml(row.barcode), escapeHtml(row.bisUid || ""), escapeHtml(row.description || ""), row.nos,
-    grams(row.gross), grams(row.stone), grams(row.net), moneyValue(row.stnChr || 0), numericValue(row.vaPerc || 0, 2), numericValue(row.mcPerGrm || 0, 3), moneyValue(row.mc || 0), moneyValue(row.otherCharge || 0), moneyValue(row.totalMC || row.mc || 0), escapeHtml(row.smithName || ""), numericValue(row.pmc || 0, 3), moneyValue(row.purchaseMC || 0), numericValue(row.dmdCarat || 0, 3), row.dmdPcs || 0, moneyValue(row.dmdSRate || 0), moneyValue(row.dmdPuRate || 0), moneyValue(row.dmdSRate1 || 0), moneyValue(row.dmdSellRate1 || 0), moneyValue(row.dmdSaleAmt || 0), numericValue(row.clrStn || 0, 3), moneyValue(row.clrStnRate || 0)
-  ]);
-  const itemGrid = tableWithRowAttrs(["Item_Name", "ID", "Category", "Type"], ITEM_WISE_CLOSING_STOCK.map((row) => ({
-    attrs: `class="${row.itemId === selectedBarcodeListItem ? "selected" : ""}" data-barcode-list-item="${escapeHtml(row.itemId)}" title="Double-click to show barcodes"`,
-    cells: [escapeHtml(row.name), escapeHtml(row.itemId), escapeHtml(row.itemType), row.itemType === "Gold" ? "22ct" : escapeHtml(row.itemType)]
-  })));
-  return `${moduleSwitcher("Barcode", BARCODE_ITEMS, barcodeView, "data-barcode-section")}
-    <section class="classic-barcode-window" aria-label="Barcode List">
-      <header class="classic-window-title">Barcode List</header>
-      <div class="classic-barcode-top">
-        <div class="classic-barcode-items">${itemGrid}<small>Double-click an item to display its barcode rows.</small></div>
-        <div class="classic-barcode-filters">
-          <label><span>Item Type</span><select data-barcode-filter-type><option ${barcodeListFilter.type === "Code" ? "selected" : ""}>Code</option><option ${barcodeListFilter.type === "Barcode" ? "selected" : ""}>Barcode</option></select></label>
-          <label><span>${barcodeListFilter.type === "Barcode" ? "Barcode" : "Item Code"}</span><input class="lookup" data-barcode-filter-value value="${escapeHtml(barcodeListFilter.value)}" /></label>
-          <label><span>Item Name</span><input readonly value="${escapeHtml(item?.name || "")}" /></label>
-          <label class="net-weight"><span>Net Weight</span><input readonly value="${item ? grams(item.netWeight) : ""}" /></label>
-          <div class="classic-barcode-buttons"><button data-action="barcode-list-show">Show</button><button data-action="print-page">Print</button></div>
-        </div>
-      </div>
-      <div class="classic-barcode-options"><label><input type="checkbox" /> View All Barcode</label><label><input type="checkbox" /> Refresh Data</label></div>
-      <div class="classic-barcode-grid">${selectedBarcodeListItem ? (rows.length ? table(columns, rows) : `<div class="empty-master">No barcode records match this filter.</div>`) : `<div class="classic-barcode-empty">Double-click an item above to show its barcode list.</div>`}</div>
-    </section>`;
-  return `${moduleSwitcher("Barcode", BARCODE_ITEMS, barcodeView, "data-barcode-section")}
-    <section class="panel barcode-list-detail">
-      <div class="panel-head"><div><button class="secondary" data-action="barcode-list-back">← Items</button><h2>Barcode List — ${escapeHtml(item?.name || selectedBarcodeListItem)}</h2></div><div class="panel-actions"><button class="secondary" data-action="barcode-list-show">Show</button><button class="primary" data-action="print-page">Print</button></div></div>
-      <div class="form-grid compact-form"><label><span>Item Type</span><select data-barcode-filter-type><option ${barcodeListFilter.type === "Code" ? "selected" : ""}>Code</option><option ${barcodeListFilter.type === "Barcode" ? "selected" : ""}>Barcode</option></select></label><label><span>${barcodeListFilter.type === "Barcode" ? "Barcode" : "Item Code"}</span><input data-barcode-filter-value value="${escapeHtml(barcodeListFilter.value)}" placeholder="${barcodeListFilter.type === "Barcode" ? "Enter barcode" : "Enter item code or name"}" /></label><label><span>Item Name</span><input readonly value="${escapeHtml(item?.name || "")}" /></label><label><span>Net Weight</span><input readonly value="${grams(item?.netWeight || 0)}" /></label></div>
-      <div class="panel-actions"><label><input type="checkbox" /> View All Barcode</label><label><input type="checkbox" /> Refresh Data</label></div>
-      ${rows.length ? table(columns, rows) : `<div class="empty-master">No barcode records found for this item.</div>`}
-    </section>`;
+ const items=barcodeListItems();
+ selectedBarcodeListItem ||= items[0]?.itemId||'';
+ const item=items.find(row=>row.itemId===selectedBarcodeListItem),rows=barcodeListRows();
+ const net=rows.reduce((sum,row)=>sum+Number(row.net||0),0);
+ const selected=barcodeListSelected;
+ return `${moduleSwitcher('Barcode',BARCODE_ITEMS,barcodeView,'data-barcode-section')}<section class="be-window bl-window" aria-label="Barcode List"><header class="bl-title">Barcode List</header>${barcodePrintState?barcodePrintingDialog():''}<div class="bl-top"><div class="bl-item-grid"><table><thead><tr>${['Item_Name','ID','Category','Type'].map(label=>`<th>${label}</th>`).join('')}</tr></thead><tbody>${items.map(row=>`<tr tabindex="0" data-bl-item="${escapeHtml(row.itemId)}" class="${row.itemId===selectedBarcodeListItem?'selected':''}" aria-selected="${row.itemId===selectedBarcodeListItem}"><td>${escapeHtml(row.name)}</td><td>${escapeHtml(row.itemId)}</td><td>${escapeHtml(row.category)}</td><td>${escapeHtml(row.type)}</td></tr>`).join('')}</tbody></table></div><div class="bl-net"><label class="be-field"><span>Net Weight</span><output>${net.toFixed(3)}</output></label></div><div class="bl-filters"><label><span>Item Type</span><select data-bl-filter="category"><option value="">All types</option>${[...new Set(items.map(row=>row.category))].filter(Boolean).map(category=>`<option ${barcodeListCategory===category?'selected':''}>${escapeHtml(category)}</option>`).join('')}</select></label><label><span>Item Code</span><input data-bl-filter="query" value="${escapeHtml(barcodeListFilter.value)}" placeholder="Item code or barcode" /></label><label><span>Item Name</span><input readonly value="${escapeHtml(barcodeListViewAll?'All items':item?.name||'')}" /></label><div><button data-bl-action="show">Show</button><button data-bl-action="print">Print</button></div></div></div><div class="bl-options"><label class="be-check"><input type="checkbox" data-bl-all ${barcodeListViewAll?'checked':''}>View All Barcode</label><label class="be-check"><input type="checkbox" data-bl-refresh ${barcodeListRefresh?'checked':''}>Refresh Data</label><span>${rows.length} records · ${selected.length} selected</span></div><div class="bl-grid" tabindex="0" role="region" aria-label="Barcode list details"><table><colgroup>${barcodeListColumns.map(([key])=>`<col style="width:${key==='remove'||key==='pick'?32:key==='name'?140:key==='description'?130:105}px">`).join('')}</colgroup><thead><tr>${barcodeListColumns.map(([,label])=>`<th>${label}</th>`).join('')}</tr></thead><tbody>${rows.map(row=>`<tr>${barcodeListColumns.map(([key])=>`<td>${key==='remove'?`<button data-bl-remove="${escapeHtml(row.barcode)}" aria-label="Remove ${escapeHtml(row.barcode)}" ${row.sourceEntryId?'':'disabled title="Reference record: edit its source entry"'}>×</button>`:key==='pick'?`<input type="checkbox" aria-label="Select ${escapeHtml(row.barcode)}" data-bl-pick="${escapeHtml(row.barcode)}" ${selected.includes(row.barcode)?'checked':''}>`:barcodeListCell(row,key)}</td>`).join('')}</tr>`).join('')||'<tr><td colspan="30">No barcode records match the selected filters.</td></tr>'}</tbody></table></div></section>`;
 }
 
 function stockRegisterScreen() {
-  return `
-    <section class="panel">
-      <div class="panel-head">
-        <h2>Manual Stock Register</h2>
-        <div class="panel-actions">
-          <button class="secondary" data-action="open-opening-stock">Opening Stock</button>
-          <button class="secondary" data-action="open-stock">Add New Item</button>
-        </div>
-      </div>
-      ${table(["Item Name", "Purity", "HUID/BIS", "Qty", "Opening", "Addition", "Deduction", "Closing", "Gross", "Status"], state.stock.map((s) => [s.item, s.purity, s.huid, s.qty, grams(s.opening), grams(s.addition), grams(s.deduction), grams(s.closing), grams(s.gross), s.status]))}
-    </section>
-    <section class="grid workflow-grid">
-      ${workflow("Smith", "Issue, receive, ledger and reconciliation", "open-work-smith")}
-      ${workflow("Jeweller", "Transfer, detailed ledger and stock balance", "open-work-jeweller")}
-      ${workflow("Refiner", "Melting issue, return and wastage tracking", "open-work-refiner")}
-      ${workflow("Polishing", "Issue, receive and polishing balance", "open-work-polishing")}
-      ${workflow("Sample", "Sample issue and sample return", "open-work-sample")}
-      ${workflow("Service / Job", "New service, close service and payment", "open-service-new")}
-      ${workflow("Transfers", "Smith, jeweller and item transfer", "open-work-transfer")}
-      ${workflow("Stock Adjustment", "Addition, deduction and reconciliation", "open-stock-adjustment")}
-    </section>
-    <section class="panel">
-      <div class="panel-head"><h2>Stock Workflow Register</h2></div>
-      ${table(["Ref No", "Date", "Workflow", "Action", "Party", "Item", "Qty", "Gross", "Issue", "Receive", "Balance", "Status"], state.workLogs.map((w) => [w.refNo, w.date, w.workflow, w.action, w.party, w.item, w.qty, grams(w.gross), grams(w.issue), grams(w.receive), grams(w.balance), w.status]))}
-    </section>
-  `;
+  const columns=['Item Name','Barcode','Purity','HUID/BIS','Qty','Opening (g)','Addition (g)','Deduction (g)','Closing (g)','Gross (g)','Stone (g)','Net (g)','Location','Status'];
+  const weight=value=>Number(value||0).toLocaleString('en-IN',{minimumFractionDigits:3,maximumFractionDigits:3});
+  return `<section class="panel stock-register-panel" aria-label="Stock Register"><header class="stock-register-heading"><h2>Stock Register</h2><span>${state.stock.length} records</span></header><div class="stock-register-table-wrap" tabindex="0" role="region" aria-label="Stock balances"><table class="stock-register-table"><colgroup>${[128,160,52,98,40,70,70,70,70,70,70,70,110,90].map(width=>`<col style="width:${width}px">`).join('')}</colgroup><thead><tr>${columns.map(label=>`<th scope="col">${label}</th>`).join('')}</tr></thead><tbody>${state.stock.map(item=>{
+    const status=String(item.status||'Available');
+    const statusClass=/sold|returned|out/i.test(status)?'stock-status-out':/review|low/i.test(status)?'stock-status-review':'stock-status-ready';
+    return `<tr><td>${escapeHtml(item.item||item.itemName||'—')}</td><td class="stock-barcode">${escapeHtml(item.barcode||'—')}</td><td>${escapeHtml(item.purity||'—')}</td><td>${escapeHtml(item.huid||item.bisUid||'—')}</td><td class="stock-number">${Number(item.qty??item.nos??0).toLocaleString('en-IN')}</td>${[item.opening,item.addition,item.deduction,item.closing,item.gross,item.stone,item.net??item.closing].map(value=>`<td class="stock-number">${weight(value)}</td>`).join('')}<td>${escapeHtml(item.stockLocation||"Main Stock")}</td><td><span class="stock-status ${statusClass}">${escapeHtml(status)}</span></td></tr>`;
+  }).join('')||`<tr><td colspan="14" class="stock-register-empty">No stock records yet.</td></tr>`}</tbody></table></div></section>`;
 }
 
 function management() {
@@ -6121,12 +6081,7 @@ function workOrders() {
   `;
 }
 
-function itemTransferScreen() {
-  state.itemTransfers ||= [];
-  itemTransferDraft = normalizeItemTransfer(itemTransferDraft || state.itemTransfers[0] || {});
-  const record = itemTransferDraft, totals = itemTransferTotals(record);
-  return `<section class="panel item-transfer-detail-window"><div class="entry-actions body-toolbar">${toolbarButton("Update", "noop")}${toolbarButton("Refresh", "noop")}${toolbarButton("Edit", "noop")}${toolbarButton("Delete", "noop")}${toolbarButton("Previous", "noop")}${toolbarButton("Next", "noop")}${toolbarButton("Close", "close-item-transfer-detail")}</div><div class="item-transfer-detail-header"><label><span>Entry No</span><input readonly value="${escapeHtml(record.entryNo)}" /></label><label><span>S.man</span><input readonly value="${escapeHtml(record.salesman)}" /></label><label><span>Entry Date</span><input readonly value="${escapeHtml(displaySalesDate(record.date))}" /></label><label><span>Time</span><span class="field-pair"><input readonly value="${escapeHtml(record.time)}" /><input readonly value="${escapeHtml(record.stockLocation)}" /></span></label><label class="item-transfer-remark"><span>Remark</span><textarea readonly>${escapeHtml(record.remark)}</textarea></label></div><div class="item-transfer-detail-table-wrap"><table><thead><tr><th>Sl</th><th>Barcode</th><th>Item</th><th>Mode</th><th>Nos</th><th>Weight</th><th>Stone</th><th>B.codeWght</th></tr></thead><tbody>${record.lines.map((line, index) => `<tr class="${index === 0 ? "selected" : ""}"><td>${index + 1}</td><td>${escapeHtml(line.barcode)}</td><td>${escapeHtml(line.itemName)}</td><td>${line.mode}</td><td>${numberValue(line.qty, 0)}</td><td>${numberValue(line.gross, 3)}</td><td>${numberValue(line.stone, 3)}</td><td>${numberValue(line.barcodeWeight, 3)}</td></tr>`).join("")}</tbody></table></div><footer class="item-transfer-detail-totals"><span>Total IN</span><strong>${numberValue(totals.inQty, 0)}</strong><strong>${numberValue(totals.inGross, 3)}</strong><strong>${numberValue(totals.inStone, 3)}</strong><span>Total OUT</span><strong>${numberValue(totals.outQty, 0)}</strong><strong>${numberValue(totals.outGross, 3)}</strong><strong>${numberValue(totals.outStone, 3)}</strong></footer></section>`;
-}
+function itemTransferScreen() { return editableItemTransferScreen(); }
 
 function serviceWorkOrders() {
   const tabs = ["New Service / Job", "Close Service / Job"];
@@ -6144,6 +6099,7 @@ function serviceWorkOrders() {
         ${tabs.map((tab) => `<button class="module-tab ${serviceWorkView === tab ? "active" : ""}" data-service-view="${tab}">${tab}</button>`).join("")}
       </div>
     </section>
+    ${type==="Close"?servicePendingJobSelector():""}
     ${serviceJobScreen(type)}
   `;
 }
@@ -6246,7 +6202,8 @@ function serviceBottom(record, totals) {
       <label class="classic-field remarks-wide"><span>Remarks</span><textarea data-service-field="remarks">${record.remarks}</textarea></label>
       <div class="bill-totals return-bottom service-totals">
         <label><span>Aprx Amount</span><input data-service-field="approxAmount" inputmode="decimal" value="${moneyValue(totals.approxAmount)}" /></label>
-        <label><span>Advance</span><input data-service-field="advance" inputmode="decimal" value="${moneyValue(totals.advance)}" /></label>
+        <label><span>Advance</span><input ${record.type==="Close"?"readonly":""} data-service-field="advance" inputmode="decimal" value="${moneyValue(totals.advance)}" /></label>
+        ${record.type==="Close"?`<label><span>Final Payment</span><input data-service-field="cashPayment" inputmode="decimal" value="${moneyValue(totals.cashPayment)}" /></label>`:""}
         <label><span>Balance</span><input class="orange-readout" value="${moneyValue(totals.balance)}" readonly /></label>
       </div>
     </div>
@@ -6397,6 +6354,7 @@ function polishingScreen() {
         ${toolbarButton("Print", "print-polishing")}
         ${toolbarButton("Close", "close-work-orders")}
       </div>
+      <label class="classic-field"><span>Movement</span><select data-polishing-movement><option value="Issue" ${record.movement!=="Return"?"selected":""}>Issue for polishing</option><option value="Return" ${record.movement==="Return"?"selected":""}>Return from polishing</option></select></label>
       ${polishingHeader(record)}
       ${classicTransactionTable("polishing-item-entry", polishingEntryColumns(), polishingEntryRow(defaultPolishingLine()), polishingColumns(), record.lines.map(polishingRow))}
       ${classicTransactionTable("polishing-stone-entry", polishingStoneEntryColumns(), polishingStoneEntryRow(defaultPolishingStoneLine()), polishingStoneColumns(), record.stones.map(polishingStoneRow))}
@@ -7161,7 +7119,7 @@ function smithWorkOrderScreen() {
         ${toolbarButton("Previous", "previous-bill")}
         ${toolbarButton("Next", "next-bill")}
         ${toolbarButton("Print", "print-smith-work")}
-        ${toolbarButton("Add Exp", "open-account")}
+        ${toolbarButton("Add Exp", "work-add-expense")}
         ${toolbarButton("Close", "close-work-orders")}
         <strong class="classic-rate">Gold Rate <input class="mini-rate" data-smith-field="goldRate" value="${moneyValue(activeGoldRate())}" readonly /></strong>
       </div>
@@ -7215,7 +7173,7 @@ function jewellerWorkOrderScreen() {
         ${toolbarButton("Export", "export-report")}
         ${toolbarButton("Import", "import-stock")}
         ${toolbarButton("Close", "close-work-orders")}
-        ${toolbarButton("AccRepost", "open-account")}
+        ${toolbarButton("AccRepost", "work-repost")}
         <strong class="classic-rate">Gold Rate <input class="mini-rate" value="${moneyValue(activeGoldRate())}" readonly /></strong>
       </div>
       ${jewellerWorkHeader(bill)}
@@ -7567,26 +7525,26 @@ function smithWorkFinancials(bill) {
   const totalInWeight = sumField(totalIn, "smWeight");
   const totalOutWeight = sumField(totalOut, "smWeight");
   const smWeight = totalInWeight - totalOutWeight;
-  const opening = smithOpeningWeight(bill.smithName);
-  const closing = opening + smWeight;
-  const stoneAmt = sumField(lines, "stoneCharge");
-  const smithMc = sumField(lines, "mc");
-  const lineTotal = sumField(lines, "total");
-  const totalAmt = bill.postOnlyMc ? stoneAmt + smithMc + sumField(lines, "hmc") : lineTotal;
-  const taxableBase = totalAmt + Number(bill.addition || 0) - Number(bill.discount || 0);
-  const gst = bill.taxable ? taxableBase * (Number(bill.gstPct || 0) / 100) : 0;
-  const netTotal = taxableBase + gst;
-  const balance = netTotal - Number(bill.cashPayment || 0);
+  const opening = operationalPartyOpening("smith",bill);
+  const closing = workflowRound(opening - smWeight);
+  const stoneAmt = dmdMoneySum(lines.map(line=>line.stoneCharge||0));
+  const smithMc = dmdMoneySum(lines.map(line=>line.mc||0));
+  const lineTotal = dmdMoneySum(lines.map(line=>line.total||0));
+  const totalAmt = bill.postOnlyMc ? dmdMoneySum([stoneAmt,smithMc,...lines.map(line=>line.hmc||0)]) : lineTotal;
+  const taxableBase = dmdMoneySum([totalAmt,bill.addition||0,-Number(bill.discount||0)]);
+  const gst = bill.taxable ? dmdMoneyTerms([[taxableBase,bill.gstPct||0,.01]]) : 0;
+  const netTotal = dmdMoneySum([taxableBase,gst]);
+  const balance = dmdMoneySum([netTotal,-Number(bill.cashPayment||0)]);
   return { totalInQty, totalOutQty, totalInWeight, totalOutWeight, smWeight, opening, closing, stoneAmt, totalAmt, smithMc, gst, netTotal, balance };
 }
 
 function cashWeightSmithFinancials(record) {
   const lines = (record.lines || []).map(normalizeCashWeightSmithLine);
-  const amount = sumField(lines, "amount");
+  const amount = dmdMoneySum(lines.map(line=>line.amount||0));
   const weight = sumField(lines, "weight");
   const netWeight = sumField(lines, "netWeight");
-  const opening = smithOpeningWeight(record.partyName);
-  const closing = opening + netWeight;
+  const opening = operationalPartyOpening("smith",record);
+  const closing = workflowRound(opening + (record.mode === "Receipt" ? netWeight : -netWeight));
   return { amount, weight, netWeight, opening, closing };
 }
 
@@ -7599,24 +7557,24 @@ function jewellerWorkFinancials(bill) {
   const totalInWeight = sumField(totalIn, "jwWeight");
   const totalOutWeight = sumField(totalOut, "jwWeight");
   const jwWeight = totalInWeight - totalOutWeight;
-  const opening = jewellerOpeningWeight(bill.jewellerName);
-  const closing = opening + jwWeight;
-  const jewellerMc = sumField(lines, "mc");
-  const totalAmount = sumField(lines, "total");
-  const taxableBase = totalAmount + Number(bill.addition || 0) - Number(bill.discount || 0);
-  const gst = taxableBase * (Number(bill.gstPct || 0) / 100);
-  const netTotal = taxableBase + gst;
-  const balance = netTotal - Number(bill.cashPayment || 0);
+  const opening = operationalPartyOpening("jeweller",bill);
+  const closing = workflowRound(opening - jwWeight);
+  const jewellerMc = dmdMoneySum(lines.map(line=>line.mc||0));
+  const totalAmount = dmdMoneySum(lines.map(line=>line.total||0));
+  const taxableBase = dmdMoneySum([totalAmount,bill.addition||0,-Number(bill.discount||0)]);
+  const gst = dmdMoneyTerms([[taxableBase,bill.gstPct||0,.01]]);
+  const netTotal = dmdMoneySum([taxableBase,gst]);
+  const balance = dmdMoneySum([netTotal,-Number(bill.cashPayment||0)]);
   return { totalInQty, totalOutQty, totalInWeight, totalOutWeight, jwWeight, opening, closing, totalAmount, jewellerMc, gst, netTotal, balance };
 }
 
 function cashWeightJewellerFinancials(record) {
   const lines = (record.lines || []).map(normalizeCashWeightSmithLine);
-  const amount = sumField(lines, "amount");
+  const amount = dmdMoneySum(lines.map(line=>line.amount||0));
   const weight = sumField(lines, "weight");
   const netWeight = sumField(lines, "netWeight");
-  const opening = jewellerOpeningWeight(record.partyName);
-  const closing = opening + netWeight;
+  const opening = operationalPartyOpening("jeweller",record);
+  const closing = workflowRound(opening + (record.mode === "Receipt" ? netWeight : -netWeight));
   return { amount, weight, netWeight, opening, closing };
 }
 
@@ -12492,6 +12450,7 @@ function reportGroupCard(group) {
 }
 
 function reportPreview(name) {
+  if (name === "Barcode Entry") return barcodeReportsScreen();
   if (name === "Audit Trail") {
     return table(["Time", "User", "Action"], state.audit.map((a) => [a.time, a.user, a.action]));
   }
@@ -14728,12 +14687,12 @@ function diamondPurchaseRegisterRow(bill) {
   const totals = diamondPurchaseFinancials(bill);
   const billAmount = totals.ornamentAmount, diamondAmount = totals.diamondAmount;
   const addition = totals.addition, discount = totals.discount;
-  const tax = totals.gst + totals.tcs - totals.tds;
+  const tax = dmdMoneySum([totals.gst, totals.tcs, -totals.tds]);
   const invoiceTotal = totals.invoiceTotal, cashPaid = Number(bill.cashPayment || 0);
   return {
     bill, entryNo: bill.entryNo || bill.id, referenceNo: bill.refNo || "", entryDate: displaySalesDate(bill.date), purchaseMode: bill.paymentMode || "Credit",
     invoiceNo: bill.invoiceNo || "", invoiceDate: displaySalesDate(bill.invoiceDate || bill.date), partyName: bill.supplierSmith || bill.partyName || "",
-    billAmount, addition, discount, tax, diamondAmount, invoiceTotal, cashPaid, billBalance: invoiceTotal - cashPaid,
+    billAmount, addition, discount, tax, diamondAmount, invoiceTotal, cashPaid, billBalance: totals.balance,
     sourceBillId: bill.id || "", sourceEntryNo: bill.entryNo || "", sourceBillNo: bill.invoiceNo || "", sourceSection: "diamond",
     drillTarget: "purchase", drillStorage: "diamondPurchases", drillView: "Diamond Purchase"
   };
@@ -18682,6 +18641,7 @@ function classicColumnValuesForFilter(reportKey, columnKey) {
 }
 
 function classicReportColumnConfig(reportKey) {
+  if (reportKey.startsWith("barcodeReport:")) return barcodeReportConfig(reportKey.slice(14));
   if (reportKey === "reconciliationGross") return { rows: reconciliationRows(), columns: reconciliationGrossColumns() };
   if (reportKey === "reconciliationNet") return { rows: reconciliationRows(), columns: reconciliationNetColumns() };
   if (reportKey === "reconciliationDiamondBarcode") return { rows: reconciliationDiamondBarcodeRows(), columns: reconciliationDiamondBarcodeColumns() };
@@ -19196,10 +19156,10 @@ function diamondPurchaseHeader(bill) {
   return `
     <div class="transaction-entry-header dmd-header diamond-purchase-header">
       <div class="classic-fields left">
-        <label class="classic-field split-field"><span>Entry No, Ref No.</span><span class="field-pair"><input value="${bill.entryNo || "3"}" /><input value="${bill.refNo || ""}" /></span></label>
-        <label class="classic-field split-field"><span>Date, Time</span><span class="field-pair"><input type="date" value="${dateValue}" /><input value="${bill.time || nowTime()}" readonly /></span></label>
-        <label class="classic-field split-field"><span>Invoice No, Date</span><span class="field-pair"><input value="${bill.invoiceNo || ""}" /><input type="date" value="${invoiceDate}" /></span></label>
-        <label class="classic-field split-field"><span>Invoice Mode, Type</span><span class="field-pair"><select><option ${bill.paymentMode === "Credit" ? "selected" : ""}>Credit</option><option ${bill.paymentMode === "Cash" ? "selected" : ""}>Cash</option><option ${bill.paymentMode === "Bank" ? "selected" : ""}>Bank</option></select><select><option ${bill.itemCategory === "B2C" ? "selected" : ""}>B2C</option><option ${bill.itemCategory === "B2B" ? "selected" : ""}>B2B</option></select></span></label>
+        <label class="classic-field split-field"><span>Entry No, Ref No.</span><span class="field-pair"><input readonly data-header-field="entryNo" value="${bill.entryNo || "3"}" /><input data-header-field="refNo" value="${bill.refNo || ""}" /></span></label>
+        <label class="classic-field split-field"><span>Date, Time</span><span class="field-pair"><input data-header-field="date" type="date" value="${dateValue}" /><input value="${bill.time || nowTime()}" readonly /></span></label>
+        <label class="classic-field split-field"><span>Invoice No, Date</span><span class="field-pair"><input data-header-field="invoiceNo" value="${bill.invoiceNo || ""}" /><input data-header-field="invoiceDate" type="date" value="${invoiceDate}" /></span></label>
+        <label class="classic-field split-field"><span>Invoice Mode, Type</span><span class="field-pair"><select data-header-field="paymentMode"><option ${bill.paymentMode === "Credit" ? "selected" : ""}>Credit</option><option ${bill.paymentMode === "Cash" ? "selected" : ""}>Cash</option><option ${bill.paymentMode === "Bank" ? "selected" : ""}>Bank</option></select><select data-header-field="itemCategory"><option ${bill.itemCategory === "B2C" ? "selected" : ""}>B2C</option><option ${bill.itemCategory === "B2B" ? "selected" : ""}>B2B</option></select></span></label>
       </div>
       <div class="classic-fields right">
         ${partyIdLookupField("Party ID", bill, bill.partyId || "")}
@@ -19239,10 +19199,10 @@ function dmdStonePurchaseHeader(bill) {
   return `
     <div class="transaction-entry-header dmd-header dmd-stone-purchase-header">
       <div class="classic-fields left">
-        <label class="classic-field split-field"><span>Entry No, Ref No.</span><span class="field-pair"><input value="${bill.entryNo || ""}" /><input value="${bill.refNo || ""}" /></span></label>
-        <label class="classic-field split-field"><span>Date, Time</span><span class="field-pair"><input type="date" value="${dateValue}" /><input value="${bill.time || nowTime()}" readonly /></span></label>
-        <label class="classic-field split-field"><span>Invoice No, Date</span><span class="field-pair"><input value="${bill.invoiceNo || ""}" /><input type="date" value="${invoiceDate}" /></span></label>
-        <label class="classic-field split-field"><span>Invoice Mode, Type</span><span class="field-pair"><select><option ${bill.paymentMode === "Credit" ? "selected" : ""}>Credit</option><option ${bill.paymentMode === "Cash" ? "selected" : ""}>Cash</option><option ${bill.paymentMode === "Bank" ? "selected" : ""}>Bank</option></select><select><option ${bill.itemCategory === "B2C" ? "selected" : ""}>B2C</option><option ${bill.itemCategory === "B2B" ? "selected" : ""}>B2B</option></select></span></label>
+        <label class="classic-field split-field"><span>Entry No, Ref No.</span><span class="field-pair"><input data-header-field="entryNo" value="${bill.entryNo || ""}" /><input data-header-field="refNo" value="${bill.refNo || ""}" /></span></label>
+        <label class="classic-field split-field"><span>Date, Time</span><span class="field-pair"><input data-header-field="date" type="date" value="${dateValue}" /><input value="${bill.time || nowTime()}" readonly /></span></label>
+        <label class="classic-field split-field"><span>Invoice No, Date</span><span class="field-pair"><input data-header-field="invoiceNo" value="${bill.invoiceNo || ""}" /><input data-header-field="invoiceDate" type="date" value="${invoiceDate}" /></span></label>
+        <label class="classic-field split-field"><span>Invoice Mode, Type</span><span class="field-pair"><select data-header-field="paymentMode"><option ${bill.paymentMode === "Credit" ? "selected" : ""}>Credit</option><option ${bill.paymentMode === "Cash" ? "selected" : ""}>Cash</option><option ${bill.paymentMode === "Bank" ? "selected" : ""}>Bank</option></select><select data-header-field="itemCategory"><option ${bill.itemCategory === "B2C" ? "selected" : ""}>B2C</option><option ${bill.itemCategory === "B2B" ? "selected" : ""}>B2B</option></select></span></label>
       </div>
       <div class="classic-fields right">
         ${partyIdLookupField("Party ID", bill, bill.partyId || "")}
@@ -20250,22 +20210,26 @@ function dmdWholesaleFinancials(bill) {
 }
 
 function diamondPurchaseFinancials(bill) {
-  const round = value => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
-  const ornamentAmount = round((bill.ornamentLines || []).reduce((sum,line) => sum + diamondPurchaseGoldAmount(line),0));
-  const diamondAmount = round((bill.diamondLines || []).reduce((sum,line) => sum + normalizeDmdPurchaseStoneLine(line).amount,0));
-  const billAmount = round(ornamentAmount + diamondAmount);
-  const addition = round(bill.addition || 0), discount = round(bill.discount || 0);
-  const taxable = round(Math.max(0,billAmount+addition-discount));
-  const gst = round(taxable * Number(bill.gstPct || 0) / 100);
-  const tcs = round(taxable * Number(bill.tcsPct || 0) / 100);
-  const tds = round(taxable * Number(bill.tdsPct || 0) / 100);
-  const invoiceTotal = round(taxable+gst+tcs-tds);
-  const cashPayment = round(bill.cashPayment || 0), balance = round(invoiceTotal-cashPayment);
+  const ornamentAmount=dmdMoneySum((bill.ornamentLines||[]).map(diamondPurchaseGoldAmount));
+  const diamondAmount=dmdMoneySum((bill.diamondLines||[]).map(line=>normalizeDmdPurchaseStoneLine(line).amount));
+  const billAmount=dmdMoneySum([ornamentAmount,diamondAmount]);
+  const addition=dmdMoneySum([bill.addition||0]),discount=dmdMoneySum([bill.discount||0]);
+  const taxable=Math.max(0,dmdMoneySum([billAmount,addition,-discount]));
+  const gst=dmdMoneyTerms([[taxable,bill.gstPct||0,.01]]),tcs=dmdMoneyTerms([[taxable,bill.tcsPct||0,.01]]),tds=dmdMoneyTerms([[taxable,bill.tdsPct||0,.01]]);
+  const invoiceTotal=dmdMoneySum([taxable,gst,tcs,-tds]);
+  const cashPayment=dmdMoneySum([bill.cashPayment||0]),balance=dmdMoneySum([invoiceTotal,-cashPayment]);
   return {ornamentAmount,billAmount,addition,discount,diamondAmount,taxable,gst,tcs,tds,invoiceTotal,cashPayment,balance};
 }
 function diamondPurchaseGoldAmount(line) {
-  const calculated = line.goldAmount === undefined ? normalizeDmdWholesaleLine(line) : line;
-  return Number(calculated.goldAmount || 0)+Number(calculated.vaAmount || 0)+Number(calculated.stoneAmount || 0)+Number(calculated.purchaseMaking || 0);
+  // Recalculate from entered values; cached amounts must never override changed weights/rates.
+  if(line.gross!==undefined&&line.goldRate!==undefined){
+    const net=dmdDecimalNumber(dmdDecimalAdd(dmdDecimal(line.gross),dmdDecimal(-Number(line.stone||0))));
+    const basis=line.salesType==='Nos'?Number(line.nos??line.qty??1):Math.max(0,net);
+    return dmdMoneyTerms([[basis,line.goldRate],[basis,line.goldRate,line.va||0,.01],[line.stone||0,line.stonePrice||0],[Math.max(0,net),line.purMc||0]]);
+  }
+  // Compatibility for imported rows that contain only monetary components.
+  const calculated=line.goldAmount===undefined?normalizeDmdWholesaleLine(line):line;
+  return dmdMoneySum([calculated.goldAmount||0,calculated.vaAmount||0,calculated.stoneAmount||0,calculated.purchaseMaking||0]);
 }
 
 function diamondPurchaseReturnFinancials(bill) {
@@ -20280,13 +20244,11 @@ function diamondPurchaseReturnFinancials(bill) {
 }
 
 function dmdStonePurchaseFinancials(bill) {
-  const billAmount = (bill.lines || []).reduce((sum, line) => sum + normalizeDmdPurchaseStoneLine(line).amount, 0);
-  const addition = Number(bill.addition || 0);
-  const discount = Number(bill.discount || 0);
-  const invoiceTotal = Math.max(0, billAmount + addition - discount);
-  const cashPayment = Number(bill.cashPayment || 0);
-  const balance = invoiceTotal - cashPayment;
-  return { billAmount, addition, discount, invoiceTotal, cashPayment, balance };
+  const billAmount=dmdMoneySum((bill.lines||[]).map(line=>normalizeDmdPurchaseStoneLine(line).amount));
+  const addition=dmdMoneySum([bill.addition||0]),discount=dmdMoneySum([bill.discount||0]);
+  const invoiceTotal=Math.max(0,dmdMoneySum([billAmount,addition,-discount]));
+  const cashPayment=dmdMoneySum([bill.cashPayment||0]),balance=dmdMoneySum([invoiceTotal,-cashPayment]);
+  return {billAmount,addition,discount,invoiceTotal,cashPayment,balance};
 }
 
 function directPurchaseFinancials(bill) {
@@ -20801,6 +20763,7 @@ function openMenuTarget(target) {
 }
 
 function selectReport(name) {
+  if (name === "Barcode Entry") { barcodeReportUi.shown=false; barcodeReportUi.page=0; }
   active = "Reports";
   // Diamond is a navigation parent, not a standalone report. Land on its
   // first implemented child instead of falling through to the placeholder.
@@ -23216,73 +23179,20 @@ function deleteComplimentaryIssueRow(index) {
   render();
 }
 
-function saveComplimentaryPurchase() {
-  const record = normalizeComplimentaryPurchase(complimentaryPurchaseDraft || defaultComplimentaryPurchase());
-  if (!record.lines.some((line) => line.itemName && Number(line.quantity || 0) > 0)) {
-    toast("Add at least one complimentary purchase item.");
-    return;
-  }
-  state.complimentaryPurchases = [record, ...(state.complimentaryPurchases || []).filter((item) => item.id !== record.id)];
-  rebuildComplimentaryStock();
-  complimentaryPurchaseDraft = defaultComplimentaryPurchase();
-  complimentaryPurchaseSelectedRow = 0;
-  state.audit.unshift(audit(`Saved complimentary item purchase ${record.entryNo}`));
-  saveState();
-  complimentaryPurchaseDraft = defaultComplimentaryPurchase();
-  render();
-  toast("Complimentary item purchase saved.");
-}
+function saveComplimentaryPurchase() { return saveComplimentaryDocument('purchase'); }
 
-function saveComplimentaryIssue() {
-  const record = normalizeComplimentaryIssue(complimentaryIssueDraft || defaultComplimentaryIssue());
-  if (!record.lines.some((line) => line.itemName && Number(line.quantity || 0) > 0)) {
-    toast("Add at least one complimentary issue item.");
-    return;
-  }
-  const stockCheck = validateComplimentaryIssueStock(record);
-  if (!stockCheck.ok) {
-    toast(stockCheck.message);
-    return;
-  }
-  state.complimentaryIssues = [record, ...(state.complimentaryIssues || []).filter((item) => item.id !== record.id)];
-  rebuildComplimentaryStock();
-  complimentaryIssueDraft = defaultComplimentaryIssue();
-  complimentaryIssueSelectedRow = 0;
-  state.audit.unshift(audit(`Saved complimentary item issue ${record.entryNo}`));
-  saveState();
-  complimentaryIssueDraft = defaultComplimentaryIssue();
-  render();
-  toast("Complimentary item issue saved.");
-}
+function saveComplimentaryIssue() { return saveComplimentaryDocument('issue'); }
 
-function deleteComplimentaryPurchase() {
-  const draft = complimentaryPurchaseDraft;
-  if (draft?.id) state.complimentaryPurchases = (state.complimentaryPurchases || []).filter((item) => item.id !== draft.id);
-  complimentaryPurchaseDraft = defaultComplimentaryPurchase();
-  rebuildComplimentaryStock();
-  state.audit.unshift(audit("Deleted complimentary item purchase entry"));
-  saveState();
-  render();
-  toast("Complimentary purchase cleared.");
-}
+function deleteComplimentaryPurchase() { return removeComplimentaryDocument('purchase'); }
 
-function deleteComplimentaryIssue() {
-  const draft = complimentaryIssueDraft;
-  if (draft?.id) state.complimentaryIssues = (state.complimentaryIssues || []).filter((item) => item.id !== draft.id);
-  complimentaryIssueDraft = defaultComplimentaryIssue();
-  rebuildComplimentaryStock();
-  state.audit.unshift(audit("Deleted complimentary item issue entry"));
-  saveState();
-  render();
-  toast("Complimentary issue cleared.");
-}
+function deleteComplimentaryIssue() { return removeComplimentaryDocument('issue'); }
 
 function setupStockAdjustmentScreen() {
   document.querySelectorAll("[data-stock-adjust-field]").forEach((field) => {
     field.addEventListener("input", () => updateStockAdjustmentDraftField(field.dataset.stockAdjustField, field.value));
     field.addEventListener("change", () => {
       updateStockAdjustmentDraftField(field.dataset.stockAdjustField, field.value);
-      render();
+      if((field.dataset.refineryReturnField||field.dataset.refineryFinalField||field.dataset.meltingReturnField)==='pendingIssueId')render();else updateOperationalTotalsPreview();
     });
   });
 }
@@ -23314,7 +23224,7 @@ function setupGoldDepositScreens() {
     field.addEventListener("input", update);
     field.addEventListener("change", () => {
       update();
-      render();
+      if((field.dataset.refineryReturnField||field.dataset.refineryFinalField||field.dataset.meltingReturnField)==='pendingIssueId')render();else updateOperationalTotalsPreview();
     });
   });
 }
@@ -23323,7 +23233,7 @@ function setupSampleScreens() {
   document.querySelectorAll("[data-sample-view]").forEach((button) => {
     button.addEventListener("click", () => {
       sampleWorkView = button.dataset.sampleView;
-      render();
+      renderOperationalKeepingEntry();
     });
   });
   document.querySelectorAll("[data-sample-issue-field], [data-sample-return-field]").forEach((field) => {
@@ -23333,7 +23243,7 @@ function setupSampleScreens() {
     field.addEventListener("input", update);
     field.addEventListener("change", () => {
       update();
-      render();
+      if((field.dataset.refineryReturnField||field.dataset.refineryFinalField||field.dataset.meltingReturnField)==='pendingIssueId')render();else updateOperationalTotalsPreview();
     });
   });
 }
@@ -23342,7 +23252,7 @@ function setupServiceScreens() {
   document.querySelectorAll("[data-service-view]").forEach((button) => {
     button.addEventListener("click", () => {
       serviceWorkView = button.dataset.serviceView;
-      render();
+      renderOperationalKeepingEntry();
     });
   });
   document.querySelectorAll("[data-service-field]").forEach((field) => {
@@ -23350,7 +23260,7 @@ function setupServiceScreens() {
     field.addEventListener("input", update);
     field.addEventListener("change", () => {
       update();
-      render();
+      if((field.dataset.refineryReturnField||field.dataset.refineryFinalField||field.dataset.meltingReturnField)==='pendingIssueId')render();else updateOperationalTotalsPreview();
     });
   });
   document.querySelectorAll(".service-job-entry tr").forEach((row) => {
@@ -23371,7 +23281,7 @@ function setupServiceScreens() {
     field.addEventListener("input", update);
     field.addEventListener("change", () => {
       update();
-      render();
+      if((field.dataset.refineryReturnField||field.dataset.refineryFinalField||field.dataset.meltingReturnField)==='pendingIssueId')render();else updateOperationalTotalsPreview();
     });
   });
 }
@@ -23382,7 +23292,7 @@ function setupPolishingScreen() {
     field.addEventListener("input", update);
     field.addEventListener("change", () => {
       update();
-      render();
+      if((field.dataset.refineryReturnField||field.dataset.refineryFinalField||field.dataset.meltingReturnField)==='pendingIssueId')render();else updateOperationalTotalsPreview();
     });
   });
 }
@@ -23391,63 +23301,63 @@ function setupSmithWorkScreens() {
   document.querySelectorAll("[data-smith-work-view]").forEach((button) => {
     button.addEventListener("click", () => {
       smithWorkView = button.dataset.smithWorkView;
-      render();
+      renderOperationalKeepingEntry();
     });
   });
   document.querySelectorAll("[data-smith-field]").forEach((field) => {
     field.addEventListener("input", () => updateSmithWorkDraftField(field.dataset.smithField, field.value));
     field.addEventListener("change", () => {
       updateSmithWorkDraftField(field.dataset.smithField, field.value);
-      render();
+      if((field.dataset.refineryReturnField||field.dataset.refineryFinalField||field.dataset.meltingReturnField)==='pendingIssueId')render();else updateOperationalTotalsPreview();
     });
   });
   document.querySelectorAll("[data-smith-check]").forEach((field) => {
     field.addEventListener("change", () => {
       smithWorkDraft = normalizeSmithWorkOrder(smithWorkDraft || defaultSmithWorkOrder());
       smithWorkDraft[field.dataset.smithCheck] = field.checked;
-      render();
+      if((field.dataset.refineryReturnField||field.dataset.refineryFinalField||field.dataset.meltingReturnField)==='pendingIssueId')render();else updateOperationalTotalsPreview();
     });
   });
   document.querySelectorAll("[data-cash-smith-field]").forEach((field) => {
     field.addEventListener("input", () => updateCashSmithDraftField(field.dataset.cashSmithField, field.value));
     field.addEventListener("change", () => {
       updateCashSmithDraftField(field.dataset.cashSmithField, field.value);
-      render();
+      if((field.dataset.refineryReturnField||field.dataset.refineryFinalField||field.dataset.meltingReturnField)==='pendingIssueId')render();else updateOperationalTotalsPreview();
     });
   });
   document.querySelectorAll("[data-cash-smith-check]").forEach((field) => {
     field.addEventListener("change", () => {
       cashWeightSmithDraft = normalizeCashWeightSmith(cashWeightSmithDraft || defaultCashWeightSmith());
       cashWeightSmithDraft[field.dataset.cashSmithCheck] = field.checked;
-      render();
+      if((field.dataset.refineryReturnField||field.dataset.refineryFinalField||field.dataset.meltingReturnField)==='pendingIssueId')render();else updateOperationalTotalsPreview();
     });
   });
   document.querySelectorAll("[data-jeweller-field]").forEach((field) => {
     field.addEventListener("input", () => updateJewellerWorkDraftField(field.dataset.jewellerField, field.value));
     field.addEventListener("change", () => {
       updateJewellerWorkDraftField(field.dataset.jewellerField, field.value);
-      render();
+      if((field.dataset.refineryReturnField||field.dataset.refineryFinalField||field.dataset.meltingReturnField)==='pendingIssueId')render();else updateOperationalTotalsPreview();
     });
   });
   document.querySelectorAll("[data-jeweller-check]").forEach((field) => {
     field.addEventListener("change", () => {
       jewellerWorkDraft = normalizeJewellerWorkOrder(jewellerWorkDraft || defaultJewellerWorkOrder());
       jewellerWorkDraft[field.dataset.jewellerCheck] = field.checked;
-      render();
+      if((field.dataset.refineryReturnField||field.dataset.refineryFinalField||field.dataset.meltingReturnField)==='pendingIssueId')render();else updateOperationalTotalsPreview();
     });
   });
   document.querySelectorAll("[data-cash-jeweller-field]").forEach((field) => {
     field.addEventListener("input", () => updateCashJewellerDraftField(field.dataset.cashJewellerField, field.value));
     field.addEventListener("change", () => {
       updateCashJewellerDraftField(field.dataset.cashJewellerField, field.value);
-      render();
+      if((field.dataset.refineryReturnField||field.dataset.refineryFinalField||field.dataset.meltingReturnField)==='pendingIssueId')render();else updateOperationalTotalsPreview();
     });
   });
   document.querySelectorAll("[data-cash-jeweller-check]").forEach((field) => {
     field.addEventListener("change", () => {
       cashWeightJewellerDraft = normalizeCashWeightJeweller(cashWeightJewellerDraft || defaultCashWeightJeweller());
       cashWeightJewellerDraft[field.dataset.cashJewellerCheck] = field.checked;
-      render();
+      if((field.dataset.refineryReturnField||field.dataset.refineryFinalField||field.dataset.meltingReturnField)==='pendingIssueId')render();else updateOperationalTotalsPreview();
     });
   });
 }
@@ -23456,81 +23366,81 @@ function setupRefineryScreens() {
   document.querySelectorAll("[data-refinery-view]").forEach((button) => {
     button.addEventListener("click", () => {
       refineryView = button.dataset.refineryView;
-      render();
+      renderOperationalKeepingEntry();
     });
   });
   document.querySelectorAll("[data-refinery-return-view]").forEach((button) => {
     button.addEventListener("click", () => {
       refineryReturnView = button.dataset.refineryReturnView;
-      render();
+      renderOperationalKeepingEntry();
     });
   });
   document.querySelectorAll("[data-refinery-final-view]").forEach((button) => {
     button.addEventListener("click", () => {
       refineryFinalView = button.dataset.refineryFinalView;
-      render();
+      renderOperationalKeepingEntry();
     });
   });
   document.querySelectorAll("[data-melting-return-view]").forEach((button) => {
     button.addEventListener("click", () => {
       meltingReturnView = button.dataset.meltingReturnView;
-      render();
+      renderOperationalKeepingEntry();
     });
   });
   document.querySelectorAll("[data-refinery-issue-field]").forEach((field) => {
     field.addEventListener("input", () => updateRefineryIssueDraftField(field.dataset.refineryIssueField, field.value));
     field.addEventListener("change", () => {
       updateRefineryIssueDraftField(field.dataset.refineryIssueField, field.value);
-      render();
+      if((field.dataset.refineryReturnField||field.dataset.refineryFinalField||field.dataset.meltingReturnField)==='pendingIssueId')render();else updateOperationalTotalsPreview();
     });
   });
   document.querySelectorAll("[data-refinery-return-field]").forEach((field) => {
     field.addEventListener("input", () => updateRefineryReturnDraftField(field.dataset.refineryReturnField, field.value));
     field.addEventListener("change", () => {
       updateRefineryReturnDraftField(field.dataset.refineryReturnField, field.value);
-      render();
+      if((field.dataset.refineryReturnField||field.dataset.refineryFinalField||field.dataset.meltingReturnField)==='pendingIssueId')render();else updateOperationalTotalsPreview();
     });
   });
   document.querySelectorAll("[data-refinery-final-field]").forEach((field) => {
     field.addEventListener("input", () => updateRefineryFinalDraftField(field.dataset.refineryFinalField, field.value));
     field.addEventListener("change", () => {
       updateRefineryFinalDraftField(field.dataset.refineryFinalField, field.value);
-      render();
+      if((field.dataset.refineryReturnField||field.dataset.refineryFinalField||field.dataset.meltingReturnField)==='pendingIssueId')render();else updateOperationalTotalsPreview();
     });
   });
   document.querySelectorAll("[data-refinery-return-line-field]").forEach((field) => {
     field.addEventListener("input", () => updateRefineryReturnLineField(field.dataset.index, field.dataset.refineryReturnLineField, field.value));
     field.addEventListener("change", () => {
       updateRefineryReturnLineField(field.dataset.index, field.dataset.refineryReturnLineField, field.value);
-      render();
+      if((field.dataset.refineryReturnField||field.dataset.refineryFinalField||field.dataset.meltingReturnField)==='pendingIssueId')render();else updateOperationalTotalsPreview();
     });
   });
   document.querySelectorAll("[data-refinery-final-line-field]").forEach((field) => {
     field.addEventListener("input", () => updateRefineryFinalLineField(field.dataset.index, field.dataset.refineryFinalLineField, field.value));
     field.addEventListener("change", () => {
       updateRefineryFinalLineField(field.dataset.index, field.dataset.refineryFinalLineField, field.value);
-      render();
+      if((field.dataset.refineryReturnField||field.dataset.refineryFinalField||field.dataset.meltingReturnField)==='pendingIssueId')render();else updateOperationalTotalsPreview();
     });
   });
   document.querySelectorAll("[data-melting-issue-field]").forEach((field) => {
     field.addEventListener("input", () => updateMeltingIssueDraftField(field.dataset.meltingIssueField, field.value));
     field.addEventListener("change", () => {
       updateMeltingIssueDraftField(field.dataset.meltingIssueField, field.value);
-      render();
+      if((field.dataset.refineryReturnField||field.dataset.refineryFinalField||field.dataset.meltingReturnField)==='pendingIssueId')render();else updateOperationalTotalsPreview();
     });
   });
   document.querySelectorAll("[data-melting-return-field]").forEach((field) => {
     field.addEventListener("input", () => updateMeltingReturnDraftField(field.dataset.meltingReturnField, field.value));
     field.addEventListener("change", () => {
       updateMeltingReturnDraftField(field.dataset.meltingReturnField, field.value);
-      render();
+      if((field.dataset.refineryReturnField||field.dataset.refineryFinalField||field.dataset.meltingReturnField)==='pendingIssueId')render();else updateOperationalTotalsPreview();
     });
   });
   document.querySelectorAll("[data-melting-return-line-field]").forEach((field) => {
     field.addEventListener("input", () => updateMeltingReturnLineField(field.dataset.index, field.dataset.meltingReturnLineField, field.value));
     field.addEventListener("change", () => {
       updateMeltingReturnLineField(field.dataset.index, field.dataset.meltingReturnLineField, field.value);
-      render();
+      if((field.dataset.refineryReturnField||field.dataset.refineryFinalField||field.dataset.meltingReturnField)==='pendingIssueId')render();else updateOperationalTotalsPreview();
     });
   });
 }
@@ -23630,6 +23540,7 @@ function updateRefineryIssueDraftField(field, value) {
 }
 
 function updateRefineryReturnDraftField(field, value) {
+  if(field==="pendingIssueId"&&refineryReturnDraft?.pendingIssueId!==value&&state[operationalConfig("refineryReturn").collection]?.some(record=>record.id===refineryReturnDraft?.id))refineryReturnDraft=freshOperationalRecord(operationalConfig("refineryReturn"));
   refineryReturnDraft = normalizeRefineryReturn(refineryReturnDraft || defaultRefineryReturn());
   refineryReturnDraft[field] = value;
   if (field === "pendingIssueId") {
@@ -23639,6 +23550,7 @@ function updateRefineryReturnDraftField(field, value) {
 }
 
 function updateRefineryFinalDraftField(field, value) {
+  if(field==="pendingIssueId"&&refineryFinalDraft?.pendingIssueId!==value&&state[operationalConfig("refineryFinal").collection]?.some(record=>record.id===refineryFinalDraft?.id))refineryFinalDraft=freshOperationalRecord(operationalConfig("refineryFinal"));
   refineryFinalDraft = normalizeRefineryFinalReturn(refineryFinalDraft || defaultRefineryFinalReturn());
   const numericFields = ["expectedTouch", "diffTouch", "refinerCharge", "addition", "discount", "cashPaid"];
   refineryFinalDraft[field] = numericFields.includes(field) ? parseEntryNumber(value) : value;
@@ -23673,6 +23585,7 @@ function updateMeltingIssueDraftField(field, value) {
 }
 
 function updateMeltingReturnDraftField(field, value) {
+  if(field==="pendingIssueId"&&meltingReturnDraft?.pendingIssueId!==value&&state[operationalConfig("meltingReturn").collection]?.some(record=>record.id===meltingReturnDraft?.id))meltingReturnDraft=freshOperationalRecord(operationalConfig("meltingReturn"));
   meltingReturnDraft = normalizeMeltingReturn(meltingReturnDraft || defaultMeltingReturn());
   const numericFields = ["refinerCharge", "addition", "discount", "cashPaid"];
   meltingReturnDraft[field] = numericFields.includes(field) ? parseEntryNumber(value) : value;
@@ -23961,6 +23874,7 @@ function setupEntryGridCalculations() {
       }
       if (row.closest(".dmd-stone-purchase")) {
         updateDmdStonePreview(row, readDmdStonePurchaseEntryLine(row));
+        updateDmdStonePurchaseInvoicePreview();
         return;
       }
       if (row.closest(".direct-purchase-return")) {
@@ -24396,12 +24310,14 @@ function readEntryLine(row, section) {
     return parseEntryNumber(fieldElement?.value);
   };
   const readText = (field) => row.querySelector(`[data-line-field="${field}"]`)?.value || "";
+  const barcodeStock=findStockByBarcode(readText("barcode"));
   const contextBill = row.closest(".sales-order-shell") ? salesOrderBill() : row.closest(".purchase-entry, .purchase-return") ? purchaseBill() : state.bills[0] || {};
   const editedField = document.activeElement?.closest?.("[data-line-field]")?.dataset?.lineField || "";
   return normalizeBillLine(enrichLineFromItemCatalog({
     id: crypto.randomUUID(),
     barcode: readText("barcode"),
-    itemCode: readText("itemCode"),
+    itemCode: readText("itemCode")||barcodeStock?.itemId||"",
+    itemId: barcodeStock?.itemId||"",
     item: readText("item"),
     itemName: readText("itemName") || readText("item") || "Ornament",
     description: readText("description"),
@@ -24425,11 +24341,11 @@ function readEntryLine(row, section) {
     discount: readNumber("discount"),
     taxPct: readNumber("taxPct"),
     cessPct: readNumber("cessPct"),
-    huid: readText("huid"),
+    huid: readText("huid")||barcodeStock?.bisUid||barcodeStock?.huid||"",
     itemDescription: readText("itemDescription"),
     length: readText("length"),
     breadth: readText("breadth"),
-    model: readText("model"),
+    model: readText("model")||barcodeStock?.model||"",
     _editedField: editedField
   }), 0, contextBill, section === "return" ? "return" : section);
 }
@@ -24483,7 +24399,7 @@ function readDmdWholesaleEntryLine(row) {
     itemId: readText("itemId"),
     itemDescription: readText("itemDescription"),
     itemName: readText("itemId") || "DMD Wholesale",
-    nos: readNumber("nos") || 1,
+    nos: row.querySelector(`[data-line-field="nos"]`)?.value === "" ? 1 : readNumber("nos"),
     gross: readNumber("gross"),
     stone: readNumber("stone"),
     stonePrice: readNumber("stonePrice"),
@@ -24623,19 +24539,10 @@ function updateSmithWorkPreview(row, line) {
 }
 
 function readCashWeightSmithEntryLine(row) {
-  const readNumber = (field) => parseEntryNumber(row.querySelector(`[data-line-field="${field}"]`)?.value);
-  const line = normalizeCashWeightSmithLine({
-    amount: readNumber("amount"),
-    rate: readNumber("rate"),
-    weight: readNumber("weight"),
-    touch: readNumber("touch"),
-    convert: readNumber("convert")
-  });
-  const activeField = document.activeElement?.dataset?.lineField;
-  if (activeField === "amount" && line.rate) line.weight = line.amount / line.rate;
-  if (activeField === "weight" && line.rate) line.amount = line.weight * line.rate;
-  line.netWeight = line.convert ? line.weight * line.touch / line.convert : line.weight;
-  return normalizeCashWeightSmithLine(line);
+ const read=field=>parseEntryNumber(row.querySelector(`[data-line-field="${field}"]`)?.value);
+ const rate=read('rate'),activeField=document.activeElement?.dataset?.lineField;
+ const amount=activeField==='weight'?dmdMoneyTerms([[read('weight'),rate]]):read('amount');
+ return normalizeCashWeightSmithLine({amount,rate,weight:rate?amount/rate:0,touch:read('touch'),convert:read('convert')});
 }
 
 function updateCashWeightSmithPreview(row, line) {
@@ -24745,11 +24652,12 @@ function readGoldDepositEntryLine(row) {
   if (draft?.byAmount && line.amount > 0 && line.rate > 0) {
     line.partyWeight = line.amount / line.rate;
   }
-  return normalizeGoldDepositLine(line);
+  return normalizeGoldDepositLine(draft?.byAmount?goldDepositAmountWeights(line):line);
 }
 
 function updateGoldDepositPreview(row, line) {
   const updates = {
+    gross: numericValue(line.gross),
     net: numericValue(line.net),
     partyWeight: numericValue(line.partyWeight),
     amount: moneyValue(line.amount)
@@ -24785,7 +24693,7 @@ function readDmdStoneEntryLine(row) {
 
 function readDmdPurchaseStoneEntryLine(row) {
   const line = readDmdStoneEntryLine(row);
-  line.amount = Math.round(Number(line.caratCent || 0) * Number(line.purchaseRate || 0) * 100) / 100;
+  line.amount = dmdMoneyTerms([[line.caratCent,line.purchaseRate]]);
   return line;
 }
 
@@ -24794,7 +24702,7 @@ function readDmdStonePurchaseEntryLine(row) {
   const readText = (field) => row.querySelector(`[data-line-field="${field}"]`)?.value || "";
   const line = normalizeDmdPurchaseStoneLine({
     itemName: readText("itemName") || readText("colorType") || "DMD Stone",
-    nos: readNumber("nos") || 1,
+    nos: row.querySelector(`[data-line-field="nos"]`)?.value === "" ? 1 : readNumber("nos"),
     colorType: readText("colorType"),
     colorScale: readText("colorScale"),
     shape: readText("shape"),
@@ -24807,7 +24715,7 @@ function readDmdStonePurchaseEntryLine(row) {
     purchaseRate: readNumber("purchaseRate"),
     sellingRate: readNumber("sellingRate")
   });
-  line.amount = Math.round(Number(line.caratCent || 0) * Number(line.purchaseRate || 0) * 100) / 100;
+  line.amount = dmdMoneyTerms([[line.caratCent,line.purchaseRate]]);
   return line;
 }
 
@@ -25325,145 +25233,17 @@ function deleteMeltingIssueLine(index) {
   toast("Melting issue line removed.");
 }
 
-function saveSmithWork() {
-  smithWorkDraft = normalizeSmithWorkOrder(smithWorkDraft || defaultSmithWorkOrder());
-  const totals = smithWorkFinancials(smithWorkDraft);
-  state.smithWorkOrders ||= [];
-  const index = state.smithWorkOrders.findIndex((item) => item.id === smithWorkDraft.id || item.entryNo === smithWorkDraft.entryNo);
-  if (index >= 0) state.smithWorkOrders[index] = smithWorkDraft;
-  else state.smithWorkOrders.unshift(smithWorkDraft);
-  state.workLogs.unshift(normalizeWorkLog({
-    refNo: smithWorkDraft.entryNo,
-    date: smithWorkDraft.date,
-    workflow: "Smith",
-    action: smithWorkDraft.transType,
-    party: smithWorkDraft.smithName,
-    item: `${smithWorkDraft.lines.length} item(s)`,
-    qty: totals.totalInQty + totals.totalOutQty,
-    gross: sumField(smithWorkDraft.lines, "gross"),
-    issue: totals.totalOutWeight,
-    receive: totals.totalInWeight,
-    balance: totals.closing,
-    status: "Posted"
-  }));
-  state.audit.unshift(audit(`Saved Smith work order ${smithWorkDraft.entryNo}`));
-  saveState();
-  smithWorkDraft = defaultSmithWorkOrder();
-  render();
-  toast("Smith work order saved.");
-}
+function saveSmithWork() { return saveOperationalRecord("smith"); }
 
-function saveCashWeightSmith() {
-  cashWeightSmithDraft = normalizeCashWeightSmith(cashWeightSmithDraft || defaultCashWeightSmith());
-  const totals = cashWeightSmithFinancials(cashWeightSmithDraft);
-  state.cashWeightSmiths ||= [];
-  const index = state.cashWeightSmiths.findIndex((item) => item.id === cashWeightSmithDraft.id || item.entryNo === cashWeightSmithDraft.entryNo);
-  if (index >= 0) state.cashWeightSmiths[index] = cashWeightSmithDraft;
-  else state.cashWeightSmiths.unshift(cashWeightSmithDraft);
-  state.workLogs.unshift(normalizeWorkLog({
-    refNo: cashWeightSmithDraft.entryNo,
-    date: cashWeightSmithDraft.date,
-    workflow: "Smith",
-    action: "Cash for Weight Smith",
-    party: cashWeightSmithDraft.partyName,
-    item: "Cash for weight",
-    qty: cashWeightSmithDraft.lines.length,
-    gross: totals.weight,
-    issue: 0,
-    receive: totals.netWeight,
-    balance: totals.closing,
-    status: "Posted"
-  }));
-  state.audit.unshift(audit(`Saved cash for weight Smith ${cashWeightSmithDraft.entryNo}`));
-  saveState();
-  cashWeightSmithDraft = defaultCashWeightSmith();
-  render();
-  toast("Cash for weight Smith saved.");
-}
+function saveCashWeightSmith() { return saveOperationalRecord("cashSmith"); }
 
-function saveJewellerWork() {
-  jewellerWorkDraft = normalizeJewellerWorkOrder(jewellerWorkDraft || defaultJewellerWorkOrder());
-  const totals = jewellerWorkFinancials(jewellerWorkDraft);
-  state.jewellerWorkOrders ||= [];
-  const index = state.jewellerWorkOrders.findIndex((item) => item.id === jewellerWorkDraft.id || item.entryNo === jewellerWorkDraft.entryNo);
-  if (index >= 0) state.jewellerWorkOrders[index] = jewellerWorkDraft;
-  else state.jewellerWorkOrders.unshift(jewellerWorkDraft);
-  state.workLogs.unshift(normalizeWorkLog({
-    refNo: jewellerWorkDraft.entryNo,
-    date: jewellerWorkDraft.date,
-    workflow: "Jeweller",
-    action: jewellerWorkDraft.transType,
-    party: jewellerWorkDraft.jewellerName,
-    item: `${jewellerWorkDraft.lines.length} item(s)`,
-    qty: totals.totalInQty + totals.totalOutQty,
-    gross: sumField(jewellerWorkDraft.lines, "gross"),
-    issue: totals.totalOutWeight,
-    receive: totals.totalInWeight,
-    balance: totals.closing,
-    status: "Posted"
-  }));
-  state.audit.unshift(audit(`Saved Jeweller work order ${jewellerWorkDraft.entryNo}`));
-  saveState();
-  jewellerWorkDraft = defaultJewellerWorkOrder();
-  render();
-  toast("Jeweller work order saved.");
-}
+function saveJewellerWork() { return saveOperationalRecord("jeweller"); }
 
-function saveCashWeightJeweller() {
-  cashWeightJewellerDraft = normalizeCashWeightJeweller(cashWeightJewellerDraft || defaultCashWeightJeweller());
-  const totals = cashWeightJewellerFinancials(cashWeightJewellerDraft);
-  state.cashWeightJewellers ||= [];
-  const index = state.cashWeightJewellers.findIndex((item) => item.id === cashWeightJewellerDraft.id || item.entryNo === cashWeightJewellerDraft.entryNo);
-  if (index >= 0) state.cashWeightJewellers[index] = cashWeightJewellerDraft;
-  else state.cashWeightJewellers.unshift(cashWeightJewellerDraft);
-  state.workLogs.unshift(normalizeWorkLog({
-    refNo: cashWeightJewellerDraft.entryNo,
-    date: cashWeightJewellerDraft.date,
-    workflow: "Jeweller",
-    action: "Cash for Weight Jeweller",
-    party: cashWeightJewellerDraft.partyName,
-    item: "Cash for weight",
-    qty: cashWeightJewellerDraft.lines.length,
-    gross: totals.weight,
-    issue: 0,
-    receive: totals.netWeight,
-    balance: totals.closing,
-    status: "Posted"
-  }));
-  state.audit.unshift(audit(`Saved cash for weight Jeweller ${cashWeightJewellerDraft.entryNo}`));
-  saveState();
-  cashWeightJewellerDraft = defaultCashWeightJeweller();
-  render();
-  toast("Cash for weight Jeweller saved.");
-}
+function saveCashWeightJeweller() { return saveOperationalRecord("cashJeweller"); }
 
-function saveStockAdjustment() {
-  stockAdjustmentDraft = normalizeStockAdjustment(stockAdjustmentDraft || defaultStockAdjustment());
-  state.stockAdjustments ||= [];
-  const index = state.stockAdjustments.findIndex((item) => item.id === stockAdjustmentDraft.id || item.entryNo === stockAdjustmentDraft.entryNo);
-  if (index >= 0) state.stockAdjustments[index] = stockAdjustmentDraft;
-  else state.stockAdjustments.unshift(stockAdjustmentDraft);
-  stockAdjustmentDraft.lines.forEach(applyStockAdjustmentLineToStock);
-  state.audit.unshift(audit(`Saved stock adjustment ${stockAdjustmentDraft.entryNo}`));
-  saveState();
-  stockAdjustmentDraft = defaultStockAdjustment();
-  render();
-  toast("Stock adjustment saved.");
-}
+function saveStockAdjustment() { return saveOperationalRecord("adjustment"); }
 
-function saveOpeningStock() {
-  openingStockDraft = normalizeOpeningStockEntry(openingStockDraft || defaultOpeningStockEntry());
-  state.openingStockEntries ||= [];
-  const index = state.openingStockEntries.findIndex((item) => item.openingDate === openingStockDraft.openingDate);
-  if (index >= 0) state.openingStockEntries[index] = openingStockDraft;
-  else state.openingStockEntries.unshift(openingStockDraft);
-  applyOpeningStockToStock(openingStockDraft);
-  state.audit.unshift(audit(`Saved opening stock for ${openingStockDraft.openingDate}`));
-  saveState();
-  openingStockDraft = defaultOpeningStockEntry();
-  render();
-  toast("Opening stock saved.");
-}
+function saveOpeningStock() { return saveOperationalRecord("opening"); }
 
 function showOpeningStock() {
   const selectedDate = openingStockDraft?.openingDate || financialYearOpeningDate();
@@ -25472,141 +25252,12 @@ function showOpeningStock() {
   render();
 }
 
-function applyOpeningStockToStock(record) {
-  state.stock ||= [];
-  (record.lines || []).forEach((line) => {
-    const clean = normalizeOpeningStockLine(line);
-    if (!clean.weight && !clean.stone && !clean.netWeight && !clean.amount) return;
-    let item = state.stock.find((stockItem) => stockItem.item === clean.description);
-    if (!item) {
-      item = normalizeStock({
-        id: crypto.randomUUID(),
-        item: clean.description,
-        purity: clean.percent ? `${numericValue(clean.percent, 2)}%` : "-",
-        huid: "",
-        qty: clean.description.toLowerCase().includes("nos") ? clean.weight : 0,
-        status: "Ready"
-      });
-      state.stock.push(item);
-    }
-    item.opening = clean.netWeight;
-    item.gross = clean.weight;
-    item.stone = clean.stone;
-    item.rate = clean.rate;
-    item.openingAmount = clean.amount;
-    item.pureWeight = clean.pureWeight;
-    item.closing = Number(item.opening || 0) + Number(item.addition || 0) - Number(item.deduction || 0);
-  });
-}
 
-function saveGoldDeposit(type = "Deposit") {
-  const isWithdrawal = type === "Withdrawal";
-  const collection = isWithdrawal ? "goldWithdrawals" : "goldDeposits";
-  const draft = normalizeGoldDeposit((isWithdrawal ? goldWithdrawalDraft : goldDepositDraft) || defaultGoldDeposit(type), type);
-  if (!draft.lines.length) {
-    toast(`Add at least one item before saving ${isWithdrawal ? "withdrawal" : "deposit"}.`);
-    return;
-  }
-  state[collection] ||= [];
-  const index = state[collection].findIndex((item) => item.id === draft.id || item.entryNo === draft.entryNo);
-  if (index >= 0) state[collection][index] = draft;
-  else state[collection].unshift(draft);
-  draft.lines.forEach((line) => applyGoldDepositLineToStock(line, type));
-  const totals = goldDepositFinancials(draft);
-  state.workLogs ||= [];
-  state.workLogs.unshift(normalizeWorkLog({
-    refNo: draft.entryNo,
-    date: draft.date,
-    workflow: "Stock",
-    action: isWithdrawal ? "Gold Deposit Withdrawal" : "Gold Deposit",
-    party: draft.partyName,
-    item: `${draft.lines.length} item(s)`,
-    qty: draft.lines.length,
-    gross: totals.gross,
-    issue: isWithdrawal ? totals.totalWeight : 0,
-    receive: isWithdrawal ? 0 : totals.totalWeight,
-    balance: totals.totalWeight,
-    status: "Posted"
-  }));
-  state.audit.unshift(audit(`Saved ${isWithdrawal ? "gold deposit withdrawal" : "gold deposit"} ${draft.entryNo}`));
-  if (isWithdrawal) goldWithdrawalDraft = draft;
-  else goldDepositDraft = draft;
-  saveState();
-  if (isWithdrawal) goldWithdrawalDraft = defaultGoldDeposit(type); else goldDepositDraft = defaultGoldDeposit(type);
-  render();
-  toast(`${isWithdrawal ? "Gold withdrawal" : "Gold deposit"} saved.`);
-}
+function saveGoldDeposit(type = "Deposit") { return saveOperationalRecord(type==='Withdrawal'?'withdrawal':'deposit'); }
 
-function saveSample(type = "Issue") {
-  const isReturn = type === "Return";
-  const collection = isReturn ? "sampleReturns" : "sampleIssues";
-  const draft = normalizeSample((isReturn ? sampleReturnDraft : sampleIssueDraft) || defaultSample(type), type);
-  if (!draft.lines.length) {
-    toast(`Add at least one item before saving sample ${type.toLowerCase()}.`);
-    return;
-  }
-  state[collection] ||= [];
-  const index = state[collection].findIndex((item) => item.id === draft.id || item.entryNo === draft.entryNo);
-  if (index >= 0) state[collection][index] = draft;
-  else state[collection].unshift(draft);
-  draft.lines.forEach((line) => applySampleLineToStock(line, type));
-  const totals = sampleFinancials(draft);
-  state.workLogs ||= [];
-  state.workLogs.unshift(normalizeWorkLog({
-    refNo: draft.entryNo,
-    date: draft.date,
-    workflow: "Sample",
-    action: `Sample ${type}`,
-    party: draft.jewellerName,
-    item: `${draft.lines.length} item(s)`,
-    qty: totals.qty,
-    gross: totals.gross,
-    issue: isReturn ? 0 : totals.net,
-    receive: isReturn ? totals.net : 0,
-    balance: totals.net,
-    status: "Posted"
-  }));
-  state.audit.unshift(audit(`Saved sample ${type.toLowerCase()} ${draft.entryNo}`));
-  if (isReturn) sampleReturnDraft = draft;
-  else sampleIssueDraft = draft;
-  saveState();
-  if (type === "Return") sampleReturnDraft = defaultSample(type); else sampleIssueDraft = defaultSample(type);
-  render();
-  toast(`Sample ${type.toLowerCase()} saved.`);
-}
+function saveSample(type = "Issue") { return saveOperationalRecord(type==='Return'?'sampleReturn':'sampleIssue'); }
 
-function savePolishing() {
-  polishingDraft = normalizePolishingEntry(polishingDraft || defaultPolishingEntry());
-  if (!polishingDraft.lines.length && !polishingDraft.stones.length) {
-    toast("Add at least one item before updating polishing.");
-    return;
-  }
-  state.polishingEntries ||= [];
-  const index = state.polishingEntries.findIndex((item) => item.id === polishingDraft.id || item.entryNo === polishingDraft.entryNo);
-  if (index >= 0) state.polishingEntries[index] = polishingDraft;
-  else state.polishingEntries.unshift(polishingDraft);
-  const totals = polishingFinancials(polishingDraft);
-  state.workLogs ||= [];
-  state.workLogs.unshift(normalizeWorkLog({
-    refNo: polishingDraft.entryNo,
-    date: polishingDraft.date,
-    workflow: "Polishing",
-    action: "Polishing",
-    party: polishingDraft.partyName,
-    item: `${polishingDraft.lines.length} item(s)`,
-    qty: totals.qty,
-    gross: totals.gross,
-    issue: totals.net,
-    receive: 0,
-    balance: totals.net,
-    status: "Posted"
-  }));
-  state.audit.unshift(audit(`Saved polishing ${polishingDraft.entryNo}`));
-  saveState();
-  polishingDraft = defaultPolishingEntry();
-  render();
-  toast("Polishing entry updated.");
-}
+function savePolishing() { return saveOperationalRecord("polishing"); }
 
 function currentServiceType() {
   return serviceWorkView === "Close Service / Job" ? "Close" : "New";
@@ -25624,7 +25275,7 @@ function setServiceDraft(type, draft) {
 
 function updateServiceDraftField(type, field, value) {
   const draft = activeServiceDraft(type);
-  const numericFields = ["dueDays", "approxAmount", "advance"];
+  const numericFields = ["dueDays", "approxAmount", "advance", "cashPayment"];
   draft[field] = numericFields.includes(field) ? parseEntryNumber(value) : value;
   if (field === "partyName") {
     const party = [...(state.parties || []), ...(state.customers || [])].find((item) => item.name === value || item.customerName === value);
@@ -25696,349 +25347,30 @@ function resetServiceJob(type) {
   render();
 }
 
-function deleteServiceJob(type) {
-  const collection = type === "Close" ? "serviceClosures" : "serviceJobs";
-  const draft = activeServiceDraft(type);
-  state[collection] ||= [];
-  const index = state[collection].findIndex((item) => item.id === draft.id || item.entryNo === draft.entryNo);
-  if (index >= 0) state[collection].splice(index, 1);
-  setServiceDraft(type, defaultServiceJob(type));
-  state.audit.unshift(audit(`Deleted ${type.toLowerCase()} service job ${draft.entryNo}`));
-  saveState();
-  render();
-  toast("Service job deleted.");
-}
+function deleteServiceJob(type) { return deleteOperationalRecord(type==='Close'?'serviceClose':'serviceNew'); }
 
-function saveServiceJob(type) {
-  const collection = type === "Close" ? "serviceClosures" : "serviceJobs";
-  const draft = activeServiceDraft(type);
-  if (!draft.partyName && !draft.lines.length) {
-    toast("Enter party or service item before saving.");
-    return;
-  }
-  state[collection] ||= [];
-  const index = state[collection].findIndex((item) => item.id === draft.id || item.entryNo === draft.entryNo);
-  if (index >= 0) state[collection][index] = draft;
-  else state[collection].unshift(draft);
-  const totals = serviceFinancials(draft);
-  state.workLogs ||= [];
-  state.workLogs.unshift(normalizeWorkLog({
-    refNo: draft.entryNo,
-    date: draft.date,
-    workflow: "Service / Job",
-    action: type === "Close" ? "Close Service / Job" : "New Service / Job",
-    party: draft.partyName,
-    item: draft.lines[0]?.itemName || `${draft.lines.length} item(s)`,
-    qty: totals.nos,
-    gross: totals.gross,
-    issue: type === "New" ? totals.net : 0,
-    receive: type === "Close" ? totals.net : 0,
-    balance: totals.balance,
-    status: draft.jobStatus
-  }));
-  setServiceDraft(type, draft);
-  state.audit.unshift(audit(`Saved ${type.toLowerCase()} service job ${draft.entryNo}`));
-  saveState();
-  setServiceDraft(type, defaultServiceJob(type));
-  render();
-  toast(`${type === "Close" ? "Close service" : "New service"} saved.`);
-}
+function saveServiceJob(type) { return saveOperationalRecord(type==='Close'?'serviceClose':'serviceNew'); }
 
-function saveRefineryIssue() {
-  refineryIssueDraft = normalizeRefineryIssue(refineryIssueDraft || defaultRefineryIssue());
-  const totals = refineryIssueFinancials(refineryIssueDraft);
-  state.refineryIssues ||= [];
-  const index = state.refineryIssues.findIndex((item) => item.id === refineryIssueDraft.id || item.entryNo === refineryIssueDraft.entryNo);
-  if (index >= 0) state.refineryIssues[index] = refineryIssueDraft;
-  else state.refineryIssues.unshift(refineryIssueDraft);
-  state.workLogs ||= [];
-  state.workLogs.unshift(normalizeWorkLog({
-    refNo: refineryIssueDraft.entryNo,
-    date: refineryIssueDraft.date,
-    workflow: "Refiner",
-    action: "Refinery Issue",
-    party: refineryIssueDraft.refinerName,
-    item: `${refineryIssueDraft.lines.length} item(s)`,
-    qty: totals.qty,
-    gross: totals.gross,
-    issue: totals.issueWeight,
-    receive: 0,
-    balance: totals.issueWeight,
-    status: "Issued"
-  }));
-  state.audit.unshift(audit(`Saved refinery issue ${refineryIssueDraft.entryNo}`));
-  saveState();
-  refineryIssueDraft = defaultRefineryIssue();
-  render();
-  toast("Refinery issue saved.");
-}
+function saveRefineryIssue() { return saveOperationalRecord("refineryIssue"); }
 
-function saveRefineryReturn() {
-  refineryReturnDraft = normalizeRefineryReturn(refineryReturnDraft || defaultRefineryReturn());
-  const totals = refineryReturnFinancials(refineryReturnDraft);
-  const issue = selectedRefineryIssue(refineryReturnDraft.pendingIssueId);
-  state.refineryReturns ||= [];
-  const index = state.refineryReturns.findIndex((item) => item.id === refineryReturnDraft.id || item.entryNo === refineryReturnDraft.entryNo);
-  if (index >= 0) state.refineryReturns[index] = refineryReturnDraft;
-  else state.refineryReturns.unshift(refineryReturnDraft);
-  state.workLogs ||= [];
-  state.workLogs.unshift(normalizeWorkLog({
-    refNo: refineryReturnDraft.entryNo,
-    date: refineryReturnDraft.date,
-    workflow: "Refiner",
-    action: "Refinery Return",
-    party: issue?.refinerName || "",
-    item: `${refineryReturnDraft.lines.length} item(s)`,
-    qty: refineryReturnDraft.lines.length,
-    gross: totals.issuedWeight,
-    issue: totals.issuedWeight,
-    receive: totals.receivedWeight,
-    balance: Math.max(0, totals.issuedWeight - totals.receivedWeight - totals.bottleStockWeight - totals.reissueWeight),
-    status: "Returned"
-  }));
-  state.audit.unshift(audit(`Saved refinery return ${refineryReturnDraft.entryNo}`));
-  saveState();
-  refineryReturnDraft = defaultRefineryReturn();
-  render();
-  toast("Refinery return saved.");
-}
+function saveRefineryReturn() { return saveOperationalRecord("refineryReturn"); }
 
-function saveRefineryFinalReturn() {
-  refineryFinalDraft = normalizeRefineryFinalReturn(refineryFinalDraft || defaultRefineryFinalReturn());
-  const totals = refineryFinalFinancials(refineryFinalDraft);
-  const issue = selectedRefineryIssue(refineryFinalDraft.pendingIssueId);
-  state.refineryFinalReturns ||= [];
-  const index = state.refineryFinalReturns.findIndex((item) => item.id === refineryFinalDraft.id || item.entryNo === refineryFinalDraft.entryNo);
-  if (index >= 0) state.refineryFinalReturns[index] = refineryFinalDraft;
-  else state.refineryFinalReturns.unshift(refineryFinalDraft);
-  state.workLogs ||= [];
-  state.workLogs.unshift(normalizeWorkLog({
-    refNo: refineryFinalDraft.entryNo,
-    date: refineryFinalDraft.date,
-    workflow: "Refiner",
-    action: "Refinery Final Return",
-    party: issue?.refinerName || "",
-    item: `${refineryFinalDraft.lines.length} item(s)`,
-    qty: refineryFinalDraft.lines.length,
-    gross: totals.receivedWeight,
-    issue: totals.receivedWeight,
-    receive: totals.testWeight,
-    balance: totals.balance,
-    status: "Final returned"
-  }));
-  state.audit.unshift(audit(`Saved refinery final return ${refineryFinalDraft.entryNo}`));
-  saveState();
-  refineryFinalDraft = defaultRefineryFinalReturn();
-  render();
-  toast("Refinery final return saved.");
-}
+function saveRefineryFinalReturn() { return saveOperationalRecord("refineryFinal"); }
 
-function saveMeltingIssue() {
-  meltingIssueDraft = normalizeMeltingIssue(meltingIssueDraft || defaultMeltingIssue());
-  const totals = meltingIssueFinancials(meltingIssueDraft);
-  state.meltingIssues ||= [];
-  const index = state.meltingIssues.findIndex((item) => item.id === meltingIssueDraft.id || item.entryNo === meltingIssueDraft.entryNo);
-  if (index >= 0) state.meltingIssues[index] = meltingIssueDraft;
-  else state.meltingIssues.unshift(meltingIssueDraft);
-  state.workLogs ||= [];
-  state.workLogs.unshift(normalizeWorkLog({
-    refNo: meltingIssueDraft.entryNo,
-    date: meltingIssueDraft.date,
-    workflow: "Refiner",
-    action: "Melting Issue",
-    party: meltingIssueDraft.refinerName,
-    item: `${meltingIssueDraft.lines.length} item(s)`,
-    qty: totals.qty,
-    gross: totals.gross,
-    issue: totals.issueWeight,
-    receive: 0,
-    balance: totals.issueWeight,
-    status: "Issued"
-  }));
-  state.audit.unshift(audit(`Saved melting issue ${meltingIssueDraft.entryNo}`));
-  saveState();
-  meltingIssueDraft = defaultMeltingIssue();
-  render();
-  toast("Melting issue saved.");
-}
+function saveMeltingIssue() { return saveOperationalRecord("meltingIssue"); }
 
-function saveMeltingReturn() {
-  meltingReturnDraft = normalizeMeltingReturn(meltingReturnDraft || defaultMeltingReturn());
-  const totals = meltingReturnFinancials(meltingReturnDraft);
-  const issue = selectedMeltingIssue(meltingReturnDraft.pendingIssueId);
-  state.meltingReturns ||= [];
-  const index = state.meltingReturns.findIndex((item) => item.id === meltingReturnDraft.id || item.entryNo === meltingReturnDraft.entryNo);
-  if (index >= 0) state.meltingReturns[index] = meltingReturnDraft;
-  else state.meltingReturns.unshift(meltingReturnDraft);
-  state.workLogs ||= [];
-  state.workLogs.unshift(normalizeWorkLog({
-    refNo: meltingReturnDraft.entryNo,
-    date: meltingReturnDraft.date,
-    workflow: "Refiner",
-    action: "Melting Return",
-    party: issue?.refinerName || "",
-    item: `${meltingReturnDraft.lines.length} item(s)`,
-    qty: meltingReturnDraft.lines.length,
-    gross: totals.issuedWeight,
-    issue: totals.issuedWeight,
-    receive: totals.receivedWeight,
-    balance: Math.max(0, totals.issuedWeight - totals.receivedWeight - totals.bottleStockWeight),
-    status: "Returned"
-  }));
-  state.audit.unshift(audit(`Saved melting return ${meltingReturnDraft.entryNo}`));
-  saveState();
-  meltingReturnDraft = defaultMeltingReturn();
-  render();
-  toast("Melting return saved.");
-}
+function saveMeltingReturn() { return saveOperationalRecord("meltingReturn"); }
 
-function applyStockAdjustmentLineToStock(line) {
-  const key = `${line.itemName || ""}`.trim().toLowerCase();
-  const barcode = `${line.barcode || ""}`.trim().toLowerCase();
-  let item = state.stock.find((stockItem) => `${stockItem.item || ""}`.trim().toLowerCase() === key || `${stockItem.huid || ""}`.trim().toLowerCase() === barcode);
-  if (!item) {
-    item = normalizeStock({
-      item: line.itemName || line.barcode || "Adjusted Item",
-      purity: "",
-      huid: line.barcode,
-      qty: 0,
-      opening: 0,
-      addition: 0,
-      deduction: 0,
-      closing: 0,
-      gross: 0,
-      status: "Adjusted"
-    });
-    state.stock.unshift(item);
-  }
-  item.qty = Number(line.closingNos || 0);
-  item.addition = Number(item.addition || 0) + Number(line.grossAdd || 0);
-  item.deduction = Number(item.deduction || 0) + Number(line.grossLess || 0);
-  item.closing = Number(line.closingGross || 0);
-  item.gross = Number(line.closingGross || 0);
-  item.stone = Number(line.closingStone || 0);
-  item.net = Number(line.closingNet || 0);
-  item.status = "Adjusted";
-}
 
-function applyGoldDepositLineToStock(line, type = "Deposit") {
-  state.stock ||= [];
-  const key = `${line.itemName || ""}`.trim().toLowerCase();
-  const itemId = `${line.itemId || ""}`.trim().toLowerCase();
-  let item = state.stock.find((stockItem) => {
-    const itemName = `${stockItem.item || ""}`.trim().toLowerCase();
-    const huid = `${stockItem.huid || ""}`.trim().toLowerCase();
-    const id = `${stockItem.id || ""}`.trim().toLowerCase();
-    return itemName === key || huid === itemId || id === itemId;
-  });
-  if (!item) {
-    item = normalizeStock({
-      item: line.itemName || "OLD GOLD",
-      purity: "Old Gold",
-      huid: line.itemId || "OG",
-      qty: 0,
-      opening: 0,
-      addition: 0,
-      deduction: 0,
-      closing: 0,
-      gross: 0,
-      stone: 0,
-      net: 0,
-      status: "Deposit"
-    });
-    state.stock.unshift(item);
-  }
-  const weight = Number(line.partyWeight || line.net || 0);
-  const gross = Number(line.gross || 0);
-  const stone = Number(line.stone || 0);
-  const net = Number(line.net || 0);
-  if (type === "Withdrawal") {
-    item.deduction = Number(item.deduction || 0) + weight;
-    item.closing = Math.max(0, Number(item.closing || 0) - weight);
-    item.gross = Math.max(0, Number(item.gross || 0) - gross);
-    item.stone = Math.max(0, Number(item.stone || 0) - stone);
-    item.net = Math.max(0, Number(item.net || 0) - net);
-    item.status = "Withdrawn";
-  } else {
-    item.addition = Number(item.addition || 0) + weight;
-    item.closing = Number(item.closing || 0) + weight;
-    item.gross = Number(item.gross || 0) + gross;
-    item.stone = Number(item.stone || 0) + stone;
-    item.net = Number(item.net || 0) + net;
-    item.status = "Deposited";
-  }
-}
 
-function applySampleLineToStock(line, type = "Issue") {
-  state.stock ||= [];
-  const key = `${line.itemName || ""}`.trim().toLowerCase();
-  const barcode = `${line.barcode || ""}`.trim().toLowerCase();
-  const itemId = `${line.itemId || ""}`.trim().toLowerCase();
-  let item = state.stock.find((stockItem) => {
-    const itemName = `${stockItem.item || ""}`.trim().toLowerCase();
-    const huid = `${stockItem.huid || ""}`.trim().toLowerCase();
-    const id = `${stockItem.id || ""}`.trim().toLowerCase();
-    return itemName === key || huid === barcode || huid === itemId || id === itemId;
-  });
-  if (!item) {
-    item = normalizeStock({
-      item: line.itemName || line.barcode || line.itemId || "Sample Item",
-      purity: "Sample",
-      huid: line.barcode || line.itemId || "",
-      qty: 0,
-      opening: 0,
-      addition: 0,
-      deduction: 0,
-      closing: 0,
-      gross: 0,
-      stone: 0,
-      net: 0,
-      status: "Sample"
-    });
-    state.stock.unshift(item);
-  }
-  const qty = Number(line.qty || 0);
-  const gross = Number(line.gross || 0);
-  const stone = Number(line.stone || 0);
-  const net = Number(line.net || 0);
-  if (type === "Return") {
-    item.qty = Number(item.qty || 0) + qty;
-    item.addition = Number(item.addition || 0) + net;
-    item.closing = Number(item.closing || 0) + net;
-    item.gross = Number(item.gross || 0) + gross;
-    item.stone = Number(item.stone || 0) + stone;
-    item.net = Number(item.net || 0) + net;
-    item.status = "Sample returned";
-  } else {
-    item.qty = Math.max(0, Number(item.qty || 0) - qty);
-    item.deduction = Number(item.deduction || 0) + net;
-    item.closing = Math.max(0, Number(item.closing || 0) - net);
-    item.gross = Math.max(0, Number(item.gross || 0) - gross);
-    item.stone = Math.max(0, Number(item.stone || 0) - stone);
-    item.net = Math.max(0, Number(item.net || 0) - net);
-    item.status = "Sample issued";
-  }
-}
 
-function resetSmithWork() {
-  smithWorkDraft = defaultSmithWorkOrder();
-  render();
-}
+function resetSmithWork() { const config=operationalConfig("smith");config.set(freshOperationalRecord(config));render(); }
 
-function resetCashWeightSmith() {
-  cashWeightSmithDraft = defaultCashWeightSmith();
-  render();
-}
+function resetCashWeightSmith() { const config=operationalConfig("cashSmith");config.set(freshOperationalRecord(config));render(); }
 
-function resetJewellerWork() {
-  jewellerWorkDraft = defaultJewellerWorkOrder();
-  render();
-}
+function resetJewellerWork() { const config=operationalConfig("jeweller");config.set(freshOperationalRecord(config));render(); }
 
-function resetCashWeightJeweller() {
-  cashWeightJewellerDraft = defaultCashWeightJeweller();
-  render();
-}
+function resetCashWeightJeweller() { const config=operationalConfig("cashJeweller");config.set(freshOperationalRecord(config));render(); }
 
 function appendDirectPurchaseLine(row) {
   const line = readDirectPurchaseEntryLine(row);
@@ -26355,6 +25687,26 @@ function removeDiscount(button) {
 
 function handleAction(action, source) {
   if (blockedByDayLock(action)) return;
+  if(action==='work-add-expense'){
+    const kind=currentOperationalKind(),config=kind?operationalConfig(kind):null,draft=config?.get();
+    if(config&&draft){config.set(captureOperationalPending(kind,structuredClone(draft)));expenseEntryDraft=defaultExpenseEntry();expenseEntryDraft.refNo=draft.entryNo;expenseEntryDraft.remarks='Work order '+draft.entryNo+' — '+operationalPartyName(draft);expenseEntryDraft.workSourceId=draft.id;}
+    active='Accounts';expandedNavGroups.add('Accounts');accountView='Expense Entry';render();return;
+  }
+  if(action==='work-repost'){
+    const kind=currentOperationalKind();if(!kind)return;const config=operationalConfig(kind);
+    try{const record=commitOperationalRecord(kind,captureOperationalPending(kind,structuredClone(config.get()||config.fresh())));config.set(record);saveState();render();toast('Work entry reposted without duplicating stock.');}catch(error){toast(error.message);}return;
+  }
+
+  const operationalRefreshKinds={'refresh-smith-work':'smith','refresh-cash-smith':'cashSmith','refresh-jeweller-work':'jeweller','refresh-cash-jeweller':'cashJeweller','refresh-stock-adjustment':'adjustment','refresh-opening-stock':'opening','refresh-gold-deposit':'deposit','refresh-gold-withdrawal':'withdrawal','refresh-refinery-issue':'refineryIssue','refresh-refinery-return':'refineryReturn','refresh-refinery-final':'refineryFinal','refresh-melting-issue':'meltingIssue','refresh-melting-return':'meltingReturn','refresh-sample-issue':'sampleIssue','refresh-sample-return':'sampleReturn','refresh-service-new':'serviceNew','refresh-service-close':'serviceClose','refresh-polishing':'polishing'};
+  if(operationalRefreshKinds[action]){const config=operationalConfig(operationalRefreshKinds[action]);config.set(freshOperationalRecord(config));render();return;}
+
+  if(action==='previous-bill'||action==='next-bill'){if(operationalNavigate(action==='previous-bill'?'previous':'next'))return;}
+  if(action==='transfer-save'){saveOperationalRecord('transfer');return;}
+  if(action==='transfer-new'||action==='transfer-refresh'){itemTransferDraft=freshOperationalRecord(operationalConfig('transfer'));render();return;}
+  if(action==='transfer-add'){itemTransferDraft ||= freshOperationalRecord(operationalConfig('transfer'));itemTransferDraft.lines.push(normalizeItemTransferLine({mode:'OUT'}));render();return;}
+  if(action==='transfer-delete'){deleteOperationalRecord('transfer');return;}
+  if(action==='transfer-previous'||action==='transfer-next'){operationalNavigate(action==='transfer-previous'?'previous':'next');return;}
+
   if (action === "print-page") { window.print(); return; }
   if (action === "barcode-list-back") { selectedBarcodeListItem = ""; render(); return; }
   if (action === "barcode-list-show") { barcodeListFilter.value = document.querySelector("[data-barcode-filter-value]")?.value || ""; render(); return; }
@@ -26384,7 +25736,7 @@ function handleAction(action, source) {
   if (action === "open-card-transactions") return openCardTransactionsModal(source);
   if (action === "save-card-transactions") return saveCardTransactions();
   if (action === "open-bill") return openBillModal();
-  if (action === "open-stock") return openStockModal();
+  if (action === "open-stock") { active = "Barcode"; barcodeView = "Barcode Entry"; return render(); }
   if (action === "open-opening-stock") {
     openOpeningStockEntry();
     return;
@@ -26843,85 +26195,11 @@ function handleAction(action, source) {
     polishingDraft = defaultPolishingEntry();
     render();
   }
-  if (action === "delete-smith-work") {
-    smithWorkDraft = defaultSmithWorkOrder();
-    render();
-  }
-  if (action === "delete-cash-smith") {
-    cashWeightSmithDraft = defaultCashWeightSmith();
-    render();
-  }
-  if (action === "delete-jeweller-work") {
-    jewellerWorkDraft = defaultJewellerWorkOrder();
-    render();
-  }
-  if (action === "delete-cash-jeweller") {
-    cashWeightJewellerDraft = defaultCashWeightJeweller();
-    render();
-  }
-  if (action === "delete-stock-adjustment") {
-    stockAdjustmentDraft = defaultStockAdjustment();
-    render();
-  }
-  if (action === "delete-opening-stock") {
-    openingStockDraft = defaultOpeningStockEntry(openingStockDraft?.openingDate || financialYearOpeningDate());
-    render();
-  }
-  if (action === "delete-gold-deposit") {
-    goldDepositDraft = defaultGoldDeposit("Deposit");
-    render();
-  }
-  if (action === "delete-gold-withdrawal") {
-    goldWithdrawalDraft = defaultGoldDeposit("Withdrawal");
-    render();
-  }
-  if (action === "delete-refinery-issue") {
-    refineryIssueDraft = defaultRefineryIssue();
-    render();
-  }
-  if (action === "delete-refinery-return") {
-    refineryReturnDraft = defaultRefineryReturn();
-    render();
-  }
-  if (action === "delete-refinery-final") {
-    refineryFinalDraft = defaultRefineryFinalReturn();
-    render();
-  }
-  if (action === "delete-melting-issue") {
-    meltingIssueDraft = defaultMeltingIssue();
-    render();
-  }
-  if (action === "delete-melting-return") {
-    meltingReturnDraft = defaultMeltingReturn();
-    render();
-  }
-  if (action === "delete-sample-issue") {
-    sampleIssueDraft = defaultSample("Issue");
-    render();
-  }
-  if (action === "delete-sample-return") {
-    sampleReturnDraft = defaultSample("Return");
-    render();
-  }
-  if (action === "delete-service-new") {
-    deleteServiceJob("New");
-  }
-  if (action === "delete-service-close") {
-    deleteServiceJob("Close");
-  }
-  if (action === "delete-polishing") {
-    polishingDraft = defaultPolishingEntry();
-    render();
-  }
-  if (action === "find-service-job") {
-    toast("Saved service jobs are available in the Service / Job register.");
-  }
-  if (action === "find-refinery-final") {
-    toast("Select a pending refinery issue to load final return details.");
-  }
-  if (action === "find-melting-return") {
-    toast("Select a pending melting issue to load return details.");
-  }
+  const operationalDeleteKinds = {'delete-smith-work':'smith','delete-cash-smith':'cashSmith','delete-jeweller-work':'jeweller','delete-cash-jeweller':'cashJeweller','delete-stock-adjustment':'adjustment','delete-opening-stock':'opening','delete-gold-deposit':'deposit','delete-gold-withdrawal':'withdrawal','delete-refinery-issue':'refineryIssue','delete-refinery-return':'refineryReturn','delete-refinery-final':'refineryFinal','delete-melting-issue':'meltingIssue','delete-melting-return':'meltingReturn','delete-sample-issue':'sampleIssue','delete-sample-return':'sampleReturn','delete-service-new':'serviceNew','delete-service-close':'serviceClose','delete-polishing':'polishing'};
+  if (operationalDeleteKinds[action]) { deleteOperationalRecord(operationalDeleteKinds[action]); return; }
+  if (action === "find-service-job") { openExistingRecordPicker(); return; }
+  if (action === "find-refinery-final") { openExistingRecordPicker(); return; }
+  if (action === "find-melting-return") { openExistingRecordPicker(); return; }
   if (action === "print-smith-work" || action === "print-cash-smith" || action === "print-jeweller-work" || action === "print-cash-jeweller" || action === "print-stock-adjustment" || action === "print-opening-stock" || action === "print-gold-deposit" || action === "print-sample" || action === "print-service-job" || action === "print-polishing") {
     window.print();
     const printLabel = action === "print-sample" ? sampleWorkView : action === "print-service-job" ? serviceWorkView : action === "print-polishing" ? "Polishing" : (stockView === "Gold Deposit" || stockView === "Gold Withdrawal" ? stockView : smithWorkView);
@@ -26990,13 +26268,14 @@ function handleAction(action, source) {
   if (action === "save-dmd-stone-purchase" || (action === "save-current-bill" && active === "Purchase" && ["Diamond Purchase", "Diamond Purchase Return"].includes(purchaseView))) {
     const bill = currentPurchaseRecord();
     if (!bill) return;
-    document.querySelectorAll("[data-header-field]").forEach(field => bill[field.dataset.headerField] = field.value);
-    if (purchaseView === "Diamond Purchase") {
-      const pending = diamondPurchasePendingEntries();
-      const updated = diamondPurchaseWithPending(bill, pending);
-      bill.ornamentLines = updated.ornamentLines; bill.diamondLines = updated.diamondLines;
-    }
-    saveDmdPurchaseStock(bill, purchaseView === "Diamond Purchase Return");
+    try {
+      let candidate = structuredClone(bill);
+      document.querySelectorAll("[data-header-field]").forEach(field => candidate[field.dataset.headerField] = field.value);
+      if (purchaseView === "Diamond Purchase") candidate = diamondPurchaseWithPending(candidate, diamondPurchasePendingEntries());
+      if (purchaseView === "DMD Stone Purchase") candidate = dmdStonePurchaseWithPending(candidate);
+      saveDmdPurchaseStock(candidate, purchaseView === "Diamond Purchase Return");
+      Object.assign(bill, candidate);
+    } catch (error) { toast(error.message); return; }
     bill.saved = true; bill.updatedAt = new Date().toISOString();
     saveState(); resetSavedBillEntry(); saveState(); render(); toast("Purchase saved. New entry ready."); return;
   }
@@ -27004,17 +26283,20 @@ function handleAction(action, source) {
     const bill = active === "Purchase" ? currentPurchaseRecord() : captureSalesHeaderFields();
     if (!bill) return;
     document.querySelectorAll("[data-header-field]").forEach(field => bill[field.dataset.headerField] = field.value);
+    try { const candidate=structuredClone(bill); capturePendingStockEntry(candidate); postBillStock(candidate,{purchase:active==='Purchase',view:active==='Purchase'?purchaseView:salesView}); Object.assign(bill,candidate); }
+    catch(error){toast(error.message);return;}
     bill.saved = true; bill.updatedAt = new Date().toISOString();
-    saveState(); resetSavedBillEntry(); saveState(); render(); toast("Bill saved. New entry ready."); return;
+    saveState(); resetSavedBillEntry(); saveState(); render(); toast("Bill saved. Stock updated. New entry ready."); return;
   }
   if (action === "new-sales-bill") { newSalesRecord(); return; }
   if (action === "previous-bill") { navigateSalesRecord("previous"); return; }
   if (action === "next-bill") { navigateSalesRecord("next"); return; }
-  if (action === "void-bill") {
-    const records = currentSalesRecordCollection(), bill = records?.[0];
+  if (action === "void-bill" || action === "delete-dmd-stone-purchase") {
+    const records = currentSalesRecordCollection(), bill = active==='Purchase'?currentPurchaseRecord():records?.[0];
     if (!bill) return toast("No bill is selected.");
     if (!window.confirm(`Delete bill ${bill.billNo || bill.entryNo || "current"}?`)) return;
-    records.shift();
+    try{reverseBillStock(bill);}catch(error){toast(error.message);return;}
+    const billIndex=records.findIndex(record=>record.id===bill.id);if(billIndex>=0)records.splice(billIndex,1);
     state.audit.unshift(audit(`Deleted sales bill ${bill.billNo || bill.entryNo || bill.id}`));
     if (!records.length) newSalesRecord(); else { saveState(); render(); toast("Bill deleted."); }
     return;
@@ -27811,6 +27093,8 @@ function existingRecordsForCurrentScreen(filter = "current") {
     return records;
   }
 
+  const operationalKind=currentOperationalKind();
+  if(operationalKind){const config=operationalConfig(operationalKind);(state[config.collection]||[]).forEach(record=>{const totals=config.totals(record);add(config.workflow,config.collection,{...record,date:record.date||record.openingDate,partyName:operationalPartyName(record),total:totals.netTotal??totals.totalAmount??totals.total??totals.amount??totals.approxAmount??0},{view:operationalKind});});return records;}
   if (active === "Sales") {
     if (salesView === "Sales Order") (state.salesOrders || []).forEach((order) => add("Sales Order", "salesOrders", order, { view: "Sales Order" }));
     else if (salesView === "DMD Return/DMD OP") (state.dmdReturns || []).forEach((bill) => add("DMD Return/DMD OP", "dmdReturns", bill, { view: salesView }));
@@ -27844,6 +27128,8 @@ function loadExistingRecord(key) {
   }
   const [record] = list.splice(index, 1);
   list.unshift(record);
+  const operationalKind=currentOperationalKind();
+  if(operationalKind&&operationalConfig(operationalKind).collection===item.storage){const config=operationalConfig(operationalKind);config.set(config.normalize(structuredClone(record)));closeModal();render();toast('Saved entry loaded.');return;}
   if (item.storage === "salesOrders") {
     active = "Sales";
     expandedNavGroups.add("Sales");
@@ -29294,10 +28580,18 @@ function dmdAdjustmentField(label, key, value) {
   return '<label class="readout editable-readout dmd-adjustment-readout"><span>' + label + '</span><input type="number" min="0" step="0.01" data-dmd-adjustment="' + key + '" value="' + Number(value || 0) + '" /></label>';
 }
 function setupDmdPurchaseControls() {
-  document.querySelectorAll('[data-dmd-adjustment]').forEach(input => input.addEventListener('change', () => {
-    const bill = currentCustomerBill(input.closest('.classic-billing-shell'));
-    bill[input.dataset.dmdAdjustment] = Math.max(0, parseEntryNumber(input.value)); saveState(); render();
-  }));
+  document.querySelectorAll('[data-dmd-adjustment]').forEach(input => {
+    const update = () => {
+      const bill = currentCustomerBill(input.closest('.classic-billing-shell'));
+      if (!bill) return;
+      bill[input.dataset.dmdAdjustment] = Number(input.value || 0);
+      saveState();
+      if (purchaseView === 'Diamond Purchase') updateDiamondPurchaseInvoicePreview();
+      if (purchaseView === 'DMD Stone Purchase') updateDmdStonePurchaseInvoicePreview();
+    };
+    input.addEventListener('input', update);
+    input.addEventListener('change', () => { update(); if (!['Diamond Purchase','DMD Stone Purchase'].includes(purchaseView)) render(); });
+  });
   document.querySelectorAll('[data-dmd-tab]').forEach(button => button.addEventListener('click', () => {
     dmdDetailsTab = button.dataset.dmdTab;
     const shell = button.closest('.classic-billing-shell');
@@ -29305,27 +28599,71 @@ function setupDmdPurchaseControls() {
     shell.querySelectorAll('.classic-entry-area').forEach(area => area.hidden = area.dataset.entryKind.endsWith('stone') !== (button.dataset.dmdTab === 'diamond'));
   }));
   document.querySelectorAll('.diamond-purchase-shell').forEach(shell => shell.querySelector('[data-dmd-tab=' + dmdDetailsTab + ']')?.click());
-  document.querySelectorAll('[data-line-field=barcode], [data-line-field=itemCode]').forEach(input => input.addEventListener('change', () => {
-    if (active !== 'Sales') return;
-    const stock = (state.stock || []).find(item => item.purchaseSource && (item.barcode === input.value || item.huid === input.value));
-    if (stock) fillEntryRow(input.closest('tr'), { ...stock, itemName: stock.item, itemCode: stock.barcode, stoneCharge: stock.diamondAmount, dmdAmount: stock.diamondAmount });
-  }));
+  document.querySelectorAll('[data-line-field=barcode], [data-line-field=itemCode]').forEach(input => {
+    const autofill=()=>{
+      const entryRow=input.closest('tr');
+      if(active!=='Sales'||salesView==='Sales Order'||!entryRow||entryRow.dataset.stockFilling)return;
+      const stock=findStockByBarcode(input.value);if(!stock)return;
+      if(Number(stock.qty??stock.nos??0)<=0){input.setCustomValidity?.('This barcode is sold out.');return;}
+      input.setCustomValidity?.('');entryRow.dataset.stockFilling='1';
+      try{fillEntryRow(entryRow,saleDetailsFromStock(stock));}finally{delete entryRow.dataset.stockFilling;}
+    };
+    input.addEventListener('input',autofill);input.addEventListener('change',autofill);
+  });
+}
+function validateDmdPurchase(bill) {
+  const ornaments=bill.ornamentLines||[], diamonds=bill.diamondLines||bill.lines||[];
+  if(!ornaments.length&&!diamonds.length) throw Error('Add at least one purchase item.');
+  const nonnegative=(value,label)=>{const n=Number(value??0);if(!Number.isFinite(n)||n<0)throw Error(label+' must be a finite, non-negative number.');return n;};
+  for(const line of ornaments){
+    const gross=nonnegative(line.gross,'Gross weight'),stone=nonnegative(line.stone,'Stone weight');
+    if(gross<=0||stone>gross)throw Error('Gross weight must be positive and stone weight cannot exceed gross weight.');
+    const nos=nonnegative(line.nos??line.qty??1,'Nos');if(!Number.isInteger(nos)||nos<1)throw Error('Nos must be a positive whole number.');
+    for(const key of ['goldRate','stonePrice','purMc','salesMc','va'])nonnegative(line[key],key);
+    if(Number(line.va||0)>100)throw Error('VA percentage cannot exceed 100.');
+  }
+  for(const line of diamonds){
+    if(nonnegative(line.caratCent,'Diamond weight')<=0)throw Error('Diamond weight must be positive.');
+    for(const key of ['purchaseRate','sellingRate'])nonnegative(line[key],key);
+    const nos=nonnegative(line.nos??1,'Nos');if(!Number.isInteger(nos)||nos<1)throw Error('Nos must be a positive whole number.');
+    const pcs=nonnegative(line.pcs,'Diamond pieces');if(!Number.isInteger(pcs))throw Error('Diamond pieces must be a whole number.');
+  }
+  for(const key of ['addition','discount','cashPayment','gstPct','tcsPct','tdsPct']){
+    const n=nonnegative(bill[key],key);if(key.endsWith('Pct')&&n>100)throw Error(key+' must be between 0 and 100.');
+  }
+  const amount=dmdMoneySum([...ornaments.map(diamondPurchaseGoldAmount),...diamonds.map(line=>normalizeDmdPurchaseStoneLine(line).amount),bill.addition||0]);
+  if(Number(bill.discount||0)>amount)throw Error('Discount cannot exceed the purchase amount plus additions.');
 }
 function saveDmdPurchaseStock(bill, isReturn = false) {
-  const ornaments = bill.ornamentLines || [];
-  const diamonds = bill.diamondLines || bill.lines || [];
-  const rows = ornaments.length ? [...ornaments, ...diamonds.filter(stone => !ornaments.some(line => (stone.barcode && stone.barcode === line.barcode) || (stone.itemId && stone.itemId === line.itemId)))] : diamonds;
-  rows.forEach(line => {
-    line.barcode ||= 'DMD-' + crypto.randomUUID().replaceAll('-', '').slice(0, 12).toUpperCase();
-    const isOrnament = ornaments.includes(line);
-    const linked = isOrnament ? diamonds.filter(stone => stone.barcode === line.barcode || (stone.itemId && stone.itemId === line.itemId)) : [line];
-    linked.forEach(stone => stone.barcode = line.barcode);
-    const sellingAmount = linked.reduce((sum, stone) => sum + Number(stone.caratCent || 0) * Number(stone.sellingRate || 0), 0);
-    const existing = (state.stock || []).find(item => item.barcode === line.barcode || item.huid === line.barcode);
-    if (isReturn) { if (existing) { existing.qty = 0; existing.closing = 0; existing.status = 'Returned'; } return; }
-    const item = normalizeStock({ ...line, id: existing?.id || crypto.randomUUID(), purchaseSource: bill.id, barcode: line.barcode, huid: line.barcode, item: line.itemName || line.colorType || 'Diamond', category: 'Diamond', purity: line.goldType || '', qty: line.nos || 1, gross: line.gross || 0, stone: line.stone || 0, net: line.netWeight || 0, closing: line.gross || 0, rate: isOrnament ? line.goldRate : 0, makingCharge: line.salesMc || 0, diamondAmount: sellingAmount, dmdAmount: sellingAmount, dmdWgt: linked.reduce((sum, stone) => sum + Number(stone.caratCent || 0), 0), sellingRate: linked[0]?.sellingRate || 0, diamondLines: linked.map(stone => ({ ...stone })), status: 'Available' });
-    state.stock ||= []; if (existing) Object.assign(existing, item); else state.stock.push(item);
-  });
+  validateDmdPurchase(bill);
+  // Plan the whole receipt privately; a failed validation must not partially change stock.
+  const candidate=structuredClone(bill), ornaments=candidate.ornamentLines||[], diamonds=candidate.diamondLines||candidate.lines||[];
+  for(const line of ornaments)line.barcode ||= 'DMD-'+crypto.randomUUID().replaceAll('-','').slice(0,12).toUpperCase();
+  const standalone=diamonds.filter(stone=>!ornaments.some(line=>stone.barcode&&stone.barcode===line.barcode));
+  for(const line of standalone)line.barcode ||= 'DMD-'+crypto.randomUUID().replaceAll('-','').slice(0,12).toUpperCase();
+  const rows=[...ornaments,...standalone];
+  const codes=new Set();for(const line of rows){const key=String(line.barcode).trim().toUpperCase();if(codes.has(key))throw Error('Duplicate purchase barcode: '+line.barcode);codes.add(key);}
+  const fingerprint=JSON.stringify({ornaments,diamonds,isReturn});
+  if(bill.dmdStockPosting?.fingerprint===fingerprint)return;
+  const stockSnapshot=item=>JSON.stringify([item.qty,item.gross,item.stone,item.net,item.closing,item.deduction,item.status]);
+  const previous=bill.dmdStockPosting;
+  if(previous){for(const entry of previous.entries){const item=(state.stock||[]).find(row=>row.id===entry.id);if(!item||stockSnapshot(item)!==entry.snapshot)throw Error('This purchase has subsequent stock movements. Reverse them before editing the receipt.');}}
+  const next=structuredClone(state.stock||[]);
+  if(previous)for(const entry of previous.entries){const index=next.findIndex(row=>row.id===entry.id);if(index>=0)next.splice(index,1);}
+  const entries=[];
+  for(const line of rows){
+    const existing=next.find(item=>String(item.barcode||item.huid||'').toUpperCase()===String(line.barcode).toUpperCase());
+    if(existing&&!isReturn)throw Error('Barcode already exists in stock: '+line.barcode);
+    const isOrnament=ornaments.includes(line),linked=isOrnament?diamonds.filter(stone=>stone.barcode===line.barcode):[line];
+    if(isReturn){if(!existing||Number(existing.qty||0)<Number(line.nos||1))throw Error('Returned barcode is unavailable: '+line.barcode);existing.qty=0;existing.gross=0;existing.stone=0;existing.net=0;existing.closing=0;existing.status='Returned';continue;}
+    const net=isOrnament?dmdDecimalNumber(dmdDecimalAdd(dmdDecimal(line.gross||0),dmdDecimal(-Number(line.stone||0)))):0;
+    const sellingAmount=dmdMoneyTerms(linked.map(stone=>[stone.caratCent||0,stone.sellingRate||0]));
+    const prior=previous?.entries.find(entry=>entry.barcode===line.barcode);
+    const item=normalizeStock({...line,id:prior?.id||crypto.randomUUID(),purchaseSource:bill.id,barcode:line.barcode,huid:line.barcode,item:line.itemName||line.colorType||'Diamond',category:'Diamond',purity:line.goldType||'',qty:line.nos??1,gross:line.gross||0,stone:line.stone||0,net,opening:0,addition:net,deduction:0,closing:net,rate:isOrnament?line.goldRate:0,makingCharge:line.salesMc||0,diamondAmount:sellingAmount,dmdAmount:sellingAmount,dmdWgt:dmdDiamondWeightCents(linked),diamondWtCent:dmdDiamondWeightCents(linked),dmdType:'Cnt',sellingRate:linked[0]?.sellingRate||0,diamondLines:linked.map(stone=>({...stone})),status:'Available'});
+    next.push(item);entries.push({id:item.id,barcode:line.barcode,snapshot:stockSnapshot(item)});
+  }
+  candidate.dmdStockPosting={fingerprint,entries};
+  state.stock=next;Object.assign(bill,candidate);
 }
 
 function purchaseRecordDefinition() {
@@ -29349,7 +28687,7 @@ function resetSavedBillEntry() {
    records.unshift(normalize({id:crypto.randomUUID(),entryNo,billNo:entryNo,date,type:salesView === 'Sales Order' ? 'Sales Order' : salesView === 'Sales Return' ? 'Return' : 'Sale',sections:{sales:[],exchange:[],return:[]}}));
  }
  const fresh = active === 'Purchase' ? currentPurchaseRecord() : currentSalesRecord();
- if (fresh) { fresh.refNo = ''; if (fresh.sections) fresh.line = null; }
+ if (fresh) { fresh.saved=false; fresh.refNo = ''; if (fresh.sections) fresh.line = null; }
 }
 
 function billAdjustmentField(label, key, value, context = 'record') {
@@ -29378,8 +28716,8 @@ function setupBillAdjustmentFields() {
 
 function diamondPurchaseItemTotal(line, bill) {
  const linked = diamondPurchaseLinkedStones(line, bill);
- const diamondAmount = linked.reduce((sum,stone)=>sum+normalizeDmdPurchaseStoneLine(stone).amount,0);
- return Math.round((diamondPurchaseGoldAmount(line)+diamondAmount+Number.EPSILON)*100)/100;
+ const diamondAmount = dmdMoneySum(linked.map(stone=>normalizeDmdPurchaseStoneLine(stone).amount));
+ return dmdMoneySum([diamondPurchaseGoldAmount(line),diamondAmount]);
 }
 
 function diamondPurchasePendingEntries() {
@@ -29426,4 +28764,1116 @@ function diamondPurchaseItemSaleAmount(line,bill) {
  const gold = Number(calculated.goldAmount||0)+Number(calculated.vaAmount||0)+Number(calculated.stoneAmount||0)+Number(calculated.salesMaking||0);
  const diamonds = diamondPurchaseLinkedStones(line,bill).reduce((sum,stone)=>sum+Number(stone.caratCent||0)*Number(stone.sellingRate||0),0);
  return Math.round((gold+diamonds+Number.EPSILON)*100)/100;
+}
+
+// Barcode receipt entries: one saved row represents one physical jewellery tag.
+var barcodeEntryDraft = null;
+var barcodeEntryLine = {};
+var barcodeEntryEditIndex = -1;
+var barcodeEntryMessage = '';
+var barcodeEntryPicker = false;
+const barcodeEntryFields = [
+ ['itemId','ID','text'],['itemName','Name','text'],['description','Description','text'],['barcode','Barcode','text'],['bisUid','BIS UID','text'],['itemType','Item Type',['Ormt','Nos','Stone']],['qty','Qty','number'],['gross','Gross','number'],['wastage','Wstge/Grm','number'],['stone','Stone','number'],['net','Net','readonly'],['stoneMode','Stn Mode',['Amt','/Grm']],['stoneCharge','Stn Amt','number'],['va','VA%','number'],['mcGram','MC/Grm','number'],['mc','MC','number'],['other','Other','number'],['price','Price','number'],['smith','Smith','text'],['pmcGram','PMC/Grm','number'],['vaLimit','VA Limit','number'],['pmc','PMC','number'],['purchaseVa','Purchase VA %','number'],['itemWastage','Item Wastage','number'],['barSlno','Bar Sln','text'],['model','Model','text'],['size','Size','text']
+];
+function newBarcodeEntry() {
+ const records=state.barcodeEntries||[];
+ return {id:crypto.randomUUID(),entryNo:String(Math.max(0,...records.map(r=>Number(r.entryNo)||0))+1),date:new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()),time:new Date().toLocaleTimeString('en-GB'),refNo:'',remarks:'',reversePrice:true,popupModel:false,autoUpdate:false,lines:[]};
+}
+function barcodeEntryCalculate(line) {
+ const result={...line};
+ for(const [key,,type] of barcodeEntryFields) if(type==='number') result[key]=Number(line[key]||0);
+ result.qty=Number(line.qty??1); if(line.mc==null||result.mcGram>0)result.mc=dmdMoneyTerms([[workflowRound(result.gross-result.stone),result.mcGram]]); if(line.pmc==null||result.pmcGram>0)result.pmc=dmdMoneyTerms([[workflowRound(result.gross-result.stone),result.pmcGram]]); result.net=Number((result.gross-result.stone).toFixed(3));
+ return result;
+}
+function barcodeEntryUsedCodes(excludeId='') {
+ return new Set([...barcodeMovementData().filter(r=>r.sourceId!==excludeId).map(r=>r.barcode),...BARCODE_WISE_CLOSING_STOCK.map(r=>r.barcode)].filter(Boolean).map(x=>String(x).toUpperCase()));
+}
+function barcodeEntryNextCode(itemId,used) {
+ const prefix=String(itemId).toUpperCase().replace(/[^A-Z0-9]/g,'')||'GL';
+ let n=1; for(const code of used){const tail=code.slice(prefix.length);if(code.startsWith(prefix)&&/^\d{6,}$/.test(tail))n=Math.max(n,Number(tail)+1);} while(used.has(prefix+String(n).padStart(6,'0'))) n++;
+ return prefix+String(n).padStart(6,'0');
+}
+function barcodeEntryAddLine() {
+ const line=barcodeEntryCalculate(barcodeEntryLine);
+ if(!line.itemId?.trim()||!line.itemName?.trim()) throw Error('Select an item ID or name from the item master.');
+ if(!state.itemMasters.some(m=>m.itemId===line.itemId)) throw Error('Choose an existing item from Item Creation.');
+ if(!Number.isInteger(line.qty)||line.qty<1) throw Error('Qty must be a positive whole number (pairs may use Qty 2).');
+ if(barcodeEntryFields.some(([k,,t])=>t==='number'&&(!Number.isFinite(line[k])||line[k]<0))||line.stone>line.gross) throw Error('Enter valid positive values; stone weight cannot exceed gross weight.');
+ if(line.itemType!=='Nos'&&line.gross<=0) throw Error('Enter the gross weight of this item.');
+ const used=barcodeEntryUsedCodes(barcodeEntryDraft.id);
+ barcodeEntryDraft.lines.forEach((r,i)=>{if(i!==barcodeEntryEditIndex)used.add(r.barcode.toUpperCase());});
+ line.barcode=String(line.barcode||barcodeEntryNextCode(line.itemId,used)).trim().toUpperCase();
+ if(used.has(line.barcode)) throw Error('This barcode is already assigned. Enter a unique barcode.');
+ if(barcodeEntryEditIndex<0) barcodeEntryDraft.lines.push(line); else barcodeEntryDraft.lines[barcodeEntryEditIndex]=line;
+ barcodeEntryLine={}; barcodeEntryEditIndex=-1;
+}
+function barcodeEntryGuard(record) {
+ const codes=new Set(record.lines.map(line=>workflowKey(line.barcode)));
+ return barcodeMovementData().some(m=>codes.has(workflowKey(m.barcode))&&m.sourceId!==record.id&&m.transactionType!=='Barcode Entry')||Object.values(state.operationalPostings||{}).some(posting=>(posting.entries||[]).some(entry=>{const item=(state.stock||[]).find(item=>item.id===entry.stockId);return codes.has(workflowKey(item?.barcode||entry.before?.barcode));}));
+}
+
+function barcodeEntrySave() {
+ if(barcodeEntryLine.itemId) barcodeEntryAddLine();
+ if(!barcodeEntryDraft.lines.length) throw Error('Add at least one item before saving.');
+ if(!barcodeEntryDraft.date) throw Error('Choose an entry date.');
+ const records=state.barcodeEntries||[]; const index=records.findIndex(r=>r.id===barcodeEntryDraft.id);
+ if(index>=0&&barcodeEntryGuard(records[index])) throw Error('These tags have subsequent transactions; this receipt cannot be changed.');
+ const used=barcodeEntryUsedCodes(barcodeEntryDraft.id), seen=new Set();
+ const validated=barcodeEntryDraft.lines.map(raw=>{
+   const line=barcodeEntryCalculate(raw);line.barcode=workflowKey(line.barcode);
+   if(!line.barcode||used.has(line.barcode)||seen.has(line.barcode))throw Error('A barcode is already assigned; correct it before saving.');seen.add(line.barcode);
+   if(!state.itemMasters.some(master=>master.itemId===line.itemId))throw Error('Choose an existing item.');
+   if(!Number.isInteger(line.qty)||line.qty<1||barcodeEntryFields.some(([key,,type])=>type==='number'&&(!Number.isFinite(line[key])||line[key]<0))||line.stone>line.gross||(line.itemType!=='Nos'&&line.gross<=0))throw Error('Enter valid item quantity and weights before saving.');
+   return line;
+ });
+ barcodeEntryDraft.lines=validated;
+ const record=structuredClone(barcodeEntryDraft);
+ if(index<0) records.push(record); else records[index]=record;
+ state.barcodeEntries=records;
+ state.stock=state.stock.filter(r=>r.barcodeEntryId!==record.id);
+ record.lines.forEach(line=>state.stock.push({...line,id:crypto.randomUUID(),barcodeEntryId:record.id,item:line.itemName,nos:line.qty,huid:line.bisUid,purity:state.itemMasters.find(m=>m.itemId===line.itemId)?.typeWastage||'',category:state.itemMasters.find(m=>m.itemId===line.itemId)?.product||'',opening:0,addition:line.net,deduction:0,closing:line.net,status:'Available',location:'Shop',date:record.date,vaPerc:line.va,makingCharge:line.mc,mcPerGrm:line.mcGram}));
+ state.audit.unshift(audit(`Saved barcode entry ${record.entryNo} (${record.lines.length} items)`)); saveState(); barcodeEntryMessage=`Entry ${record.entryNo} saved. ${record.lines.length} barcode(s) assigned.`;
+ barcodeEntryDraft=null;
+}
+function barcodeEntryField(field, line) {
+ const [key,label,type]=field;
+ const control=Array.isArray(type)
+  ? `<select data-be-line="${key}" aria-label="${label}">${type.map(value=>`<option ${line[key]===value?'selected':''}>${value}</option>`).join('')}</select>`
+  : `<input aria-label="${label}" data-be-line="${key}" ${key==='itemId'?'list="be-items"':key==='itemName'?'list="be-names"':''} type="${type==='number'?'number':'text'}" ${type==='readonly'?'readonly':''} ${type==='number'?`min="0" step="${key==='qty'?'1':'0.001'}"`:''} value="${escapeHtml(String(line[key]??''))}" />`;
+ return `<label class="be-field be-field-${key}"><span title="${label}">${label}</span>${control}</label>`;
+}
+function barcodeEntryScreen() {
+ barcodeEntryDraft ||= newBarcodeEntry();
+ const d=barcodeEntryDraft,line=barcodeEntryCalculate({qty:1,itemType:'Ormt',stoneMode:'Amt',...barcodeEntryLine});
+ const input=(key,label,type,value,attr='')=>`<label class="be-field"><span>${label}</span><input ${attr} type="${type}" data-be-header="${key}" value="${escapeHtml(String(value??''))}" /></label>`;
+ const totals=d.lines.reduce((a,r)=>{for(const k of ['qty','gross','wastage','stone','net'])a[k]+=Number(r[k]||0);return a;},{qty:0,gross:0,wastage:0,stone:0,net:0});
+
+ const width=key=>({itemId:60,itemName:130,description:120,barcode:112,bisUid:95,itemType:90,qty:55}[key]||85);
+ const gridLabels={itemName:'Item Name',bisUid:'BIS ID',itemType:'Type',qty:'Nos',wastage:'Wastage',net:'Net Wght',stoneMode:'StnMode',stoneCharge:'StnCharge',va:'VA %',pmcGram:'PMC/Grm',vaLimit:'VaLimit',purchaseVa:'Purchase VA Perc',itemWastage:'ItemWastage'};
+ return `${moduleSwitcher('Barcode',BARCODE_ITEMS,'Barcode Entry','data-barcode-section')}<section class="be-window" aria-label="Barcode Entry">
+ <div class="be-toolbar">${[['save','💾',(state.barcodeEntries||[]).some(r=>r.id===d.id)?'Update':'Save'],['refresh','↻','Refresh'],['print','▣','Print'],['barcodes','▥','Barcode'],['delete','▤','Delete'],['edit','▣','Edit'],['previous','←','Previous'],['next','→','Next'],['close','↪','Close']].map(([cmd,icon,label])=>`<button type="button" data-be-command="${cmd}"><b aria-hidden="true">${icon}</b>${label}</button>`).join('')}</div>
+ <div class="be-header">
+ <fieldset class="be-meta"><legend>Entry details</legend>${input('entryNo','Entry No','text',d.entryNo,'readonly')}${input('refNo','Ref No','text',d.refNo)}${input('date','Date','date',d.date)}${input('time','Time','time',d.time)}<label class="be-check"><input type="checkbox" data-be-header="refChecked" ${d.refChecked?'checked':''}>Reference checked</label></fieldset>
+ <fieldset class="be-options"><legend>Entry options</legend>${[['reversePrice','Nos Item Reverse Price'],['popupModel','Popup Model & Size'],['autoUpdate','Auto Update']].map(([k,label])=>`<label class="be-check"><input type="checkbox" data-be-header="${k}" ${d[k]?'checked':''}>${label}</label>`).join('')}</fieldset>
+ <fieldset class="be-transfer"><legend>Transfer details</legend><label class="be-field"><span>Transfer No</span><select data-be-header="transferNo"><option value="">Select transfer</option>${(state.itemTransfers||[]).map(r=>`<option value="${escapeHtml(r.entryNo)}" ${d.transferNo===r.entryNo?'selected':''}>${escapeHtml(r.entryNo)}</option>`).join('')}</select></label>${input('transferRef','Transfer Ref','text',d.transferRef)}<button type="button" data-be-command="transfer-refresh" aria-label="Refresh transfer details" title="Refresh transfer details">↻</button>${input('transferItemId','ID','text',d.transferItemId)}${input('transferWeight','Weight','number',d.transferWeight??'0.000','min="0" step="0.001"')}</fieldset>
+ </div>
+ ${barcodeEntryMessage?`<div class="be-message" role="status">${escapeHtml(barcodeEntryMessage)}</div>`:''}
+ ${barcodeEntryPicker?barcodeEditDialog():''}${barcodePrintState?barcodePrintingDialog():''}
+ <datalist id="be-items">${state.itemMasters.map(m=>`<option value="${escapeHtml(m.itemId)}">${escapeHtml(m.itemName)}</option>`).join('')}</datalist><datalist id="be-names">${state.itemMasters.map(m=>`<option value="${escapeHtml(m.itemName)}">${escapeHtml(m.itemId)}</option>`).join('')}</datalist>
+ <div class="be-entry-strip" role="group" aria-label="Barcode item entry">${barcodeEntryFields.slice(0,20).map(field=>barcodeEntryField(field,line)).join('')}</div>
+ <div class="be-add-actions"><span>Leave Barcode blank to assign automatically. Double-click a saved row to edit.</span><button data-be-command="add">${barcodeEntryEditIndex<0?'Add item':'Update item'}</button></div>
+ <div class="be-grid" tabindex="0" role="region" aria-label="Barcode entry items — scroll for all columns"><table><colgroup><col style="width:36px">${barcodeEntryFields.map(([key])=>`<col style="width:${width(key)}px">`).join('')}<col style="width:72px"></colgroup><thead><tr><th>Sl</th>${barcodeEntryFields.map(([key,label])=>`<th>${gridLabels[key]||label}</th>`).join('')}<th>Action</th></tr></thead><tbody>${d.lines.map((r,i)=>`<tr data-be-row="${i}" title="Double-click to edit"><td>${i+1}</td>${barcodeEntryFields.map(([k,,t],column)=>`<td>${column>=20?`<input aria-label="${barcodeEntryFields[column][1]} for item ${i+1}" data-be-cell="${k}" data-be-cell-row="${i}" type="${t==='number'?'number':'text'}" ${t==='number'?'min="0" step="0.001"':''} value="${escapeHtml(String(r[k]??(t==='number'?0:'')))}" />`:escapeHtml(t==='number'||t==='readonly'?Number(r[k]||0).toFixed(k==='qty'?0:3):String(r[k]||''))}</td>`).join('')}<td><button data-be-remove="${i}" aria-label="Remove item ${i+1}">×</button></td></tr>`).join('')}</tbody></table>${!d.lines.length?'<p class="be-empty">No items added yet.</p>':''}</div>
+ <footer class="be-totals">${input('remarks','Remarks','text',d.remarks)}<div>${Object.entries(totals).map(([k,v])=>`<label><span>${({qty:'Total Qty',gross:'G. Wght',wastage:'Wastage',stone:'Stn. Wght',net:'N. Wght'})[k]}</span><output data-be-total="${k}">${v.toFixed(k==='qty'?0:3)}</output></label>`).join('')}</div></footer></section>`;
+}
+function barcodeEntryCommand(cmd) {
+ barcodeEntryMessage='';
+ try {
+ if(cmd==='add') {barcodeEntryAddLine();render();document.querySelector('[data-be-line="itemId"]')?.focus();return;}
+ if(cmd==='save') barcodeEntrySave();
+ if(cmd==='refresh') {barcodeEntryDraft=null;barcodeEntryLine={};barcodeEntryEditIndex=-1;barcodeEntryPicker=false;}
+ if(cmd==='edit') {barcodeEntryPicker=true;barcodeEditQuery='';barcodeEditSelected=0;}
+ if(cmd==='print') {window.print();return;}
+ if(cmd==='barcodes') barcodePrintingOpen();
+ if(cmd==='transfer-refresh') barcodeEntryRefreshTransfer();
+ if(cmd==='close') {active='Dashboard';render();return;}
+ if(cmd==='previous'||cmd==='next') {
+ const rows=state.barcodeEntries||[];let index=rows.findIndex(r=>r.id===barcodeEntryDraft.id);index=index<0?rows.length-1:index+(cmd==='previous'?-1:1);
+ if(!rows[index]) throw Error('No more saved entries.');barcodeEntryDraft=structuredClone(rows[index]);barcodeEntryLine={};barcodeEntryEditIndex=-1;
+ }
+ if(cmd==='delete') {
+ const record=(state.barcodeEntries||[]).find(r=>r.id===barcodeEntryDraft.id);
+ if(!record) throw Error('Open a saved entry using Edit before deleting.');
+ if(barcodeEntryGuard(record)) throw Error('Tags have subsequent transactions; this entry cannot be deleted.');
+ if(!window.confirm(`Delete barcode entry ${record.entryNo} and its stock tags?`))return;
+ state.barcodeEntries=state.barcodeEntries.filter(r=>r.id!==record.id);state.stock=state.stock.filter(r=>r.barcodeEntryId!==record.id);state.audit.unshift(audit(`Deleted barcode entry ${record.entryNo}`));saveState();barcodeEntryDraft=null;barcodeEntryLine={};barcodeEntryEditIndex=-1;
+ }
+ }catch(error){barcodeEntryMessage=error.message;}
+ render();
+ if(cmd==='edit')document.querySelector('[data-be-edit-query]')?.focus();
+}
+document.addEventListener('input',event=>{
+ const el=event.target;
+ if(el.dataset.beHeader) barcodeEntryDraft[el.dataset.beHeader]=el.type==='checkbox'?el.checked:el.value;
+ if(el.dataset.beLine){barcodeEntryLine[el.dataset.beLine]=el.value;
+ const line=barcodeEntryCalculate(barcodeEntryLine);const net=document.querySelector('[data-be-line="net"]');if(net)net.value=line.net.toFixed(3);
+ }
+});
+document.addEventListener('change',event=>{
+ const el=event.target,k=el.dataset.beLine;
+ if(el.dataset.beHeader&&el.type==='checkbox')barcodeEntryDraft[el.dataset.beHeader]=el.checked;
+ if(!k)return;
+ barcodeEntryLine[k]=el.value;
+ if(k==='itemId'||k==='itemName') {
+ const item=state.itemMasters.find(m=>String(m[k]).toLowerCase()===el.value.toLowerCase());
+ if(item){barcodeEntryLine={...barcodeEntryLine,itemId:item.itemId,itemName:item.itemName,qty:1,itemType:item.ornament?'Ormt':'Nos',va:item.va,mcGram:item.mcGram,model:item.model};
+ for(const [field] of barcodeEntryFields){const input=document.querySelector(`[data-be-line="${field}"]`);if(input&&barcodeEntryLine[field]!=null)input.value=barcodeEntryLine[field];}}
+ }
+ if(k==='mcGram'||k==='gross'||k==='stone'){const l=barcodeEntryCalculate(barcodeEntryLine);barcodeEntryLine.mc=dmdMoneyTerms([[l.net,l.mcGram]]);const mc=document.querySelector('[data-be-line="mc"]');if(mc)mc.value=barcodeEntryLine.mc;}
+ if(k==='pmcGram'||k==='gross'||k==='stone'){const l=barcodeEntryCalculate(barcodeEntryLine);barcodeEntryLine.pmc=dmdMoneyTerms([[l.net,l.pmcGram]]);const pmc=document.querySelector('[data-be-line="pmc"]');if(pmc)pmc.value=barcodeEntryLine.pmc;}
+});
+document.addEventListener('click',event=>{
+ const cmd=event.target.closest('[data-be-command]');if(cmd)return barcodeEntryCommand(cmd.dataset.beCommand);
+ const load=event.target.closest('[data-be-load]');if(load){barcodeEntryDraft=structuredClone(state.barcodeEntries.find(r=>r.id===load.dataset.beLoad));barcodeEntryLine={};barcodeEntryEditIndex=-1;barcodeEntryPicker=false;barcodeEntryMessage='';render();}
+ const remove=event.target.closest('[data-be-remove]');if(remove){barcodeEntryDraft.lines.splice(Number(remove.dataset.beRemove),1);barcodeEntryLine={};barcodeEntryEditIndex=-1;render();}
+});
+document.addEventListener('dblclick',event=>{const row=event.target.closest('[data-be-row]');if(row&&!event.target.closest('[data-be-cell]')){barcodeEntryEditIndex=Number(row.dataset.beRow);barcodeEntryLine={...barcodeEntryDraft.lines[barcodeEntryEditIndex]};render();document.querySelector('[data-be-line="itemId"]')?.focus();}});
+document.addEventListener('keydown',event=>{if(event.key!=='Enter'||!event.target.matches('[data-be-line]'))return;event.preventDefault();const fields=[...document.querySelectorAll('[data-be-line]:not([readonly])')];const index=fields.indexOf(event.target);if(index===fields.length-1)barcodeEntryCommand('add');else fields[index+1]?.focus();});
+
+var barcodeEditQuery = '';
+var barcodeEditSelected = 0;
+var barcodePrintState = null;
+const barcodePrintColumns = [
+ ['itemId','ID'],['itemName','Item Name'],['description','Description'],['barcode','Barcode'],['qty','Nos'],['selected','Select'],['itemType','Item Type'],['gross','Gross Weight'],['stone','Stone Weight'],['net','Net Weight'],['stoneMode','StnChrMode'],['stoneCharge','Stn Charge'],['va','VA %'],['mc','MC'],['price','Price'],['goldType','Gold Type'],['mcGram','MCperGrm'],['bisUid','BisUid'],['smith','Smith'],['dmdWeight','DmdWeight'],['pcs','Pcs'],['saleRate','salerate'],['dmdSaleamt','DmdSaleamt'],['otherStone','otherStone'],['priceWithTax','Pricewithtax'],['mVaPerc','M_VaPerc'],['mPrice','M_Price'],['clrStn','ClrStn'],['clrStnRate','ClrStnRate']
+];
+function barcodeEntryTotals(record) {
+ return record.lines.reduce((sum,line)=>{const row=barcodeEntryCalculate(line);for(const key of ['gross','wastage','stone','net'])sum[key]+=row[key];return sum;},{gross:0,wastage:0,stone:0,net:0});
+}
+function barcodeEditRecords() {
+ return (state.barcodeEntries||[]).filter(r=>String(r.entryNo).toLowerCase().includes(barcodeEditQuery.trim().toLowerCase())).slice().sort((a,b)=>Number(b.entryNo)-Number(a.entryNo));
+}
+function barcodeEditRows() {
+ return barcodeEditRecords().map((record,index)=>{
+ const totals=barcodeEntryTotals(record);
+ return `<tr tabindex="0" data-be-edit-row="${index}" class="${index===barcodeEditSelected?'selected':''}" aria-selected="${index===barcodeEditSelected}"><td>${index+1}</td><td>${escapeHtml(record.entryNo)}</td><td>${escapeHtml(toDateInputValue(record.date).split('-').reverse().join('-'))}</td>${['gross','wastage','stone','net'].map(key=>`<td>${totals[key].toFixed(3)}</td>`).join('')}</tr>`;
+ }).join('')||'<tr><td colspan="7">No saved entries match this entry number.</td></tr>';
+}
+function barcodeEditDialog() {
+ return `<div class="be-dialog-backdrop"><section class="be-edit-dialog" role="dialog" aria-modal="true" aria-label="Barcode Edit"><header><strong>▣ Barcode Edit</strong><button data-bp-action="close-edit" aria-label="Close Barcode Edit">×</button></header><label class="be-edit-search">Entry NO: <input autofocus data-be-edit-query value="${escapeHtml(barcodeEditQuery)}" autocomplete="off" /></label><div class="be-edit-grid"><table><thead><tr>${['SL','Entry NO','Entry Date','Gross','Wastage','Stone','Net'].map(label=>`<th>${label}</th>`).join('')}</tr></thead><tbody data-be-edit-body>${barcodeEditRows()}</tbody></table></div><footer><span>Double-click an entry or press Enter to open.</span><button data-bp-action="open-entry">Open</button></footer></section></div>`;
+}
+function barcodeEditOpen(index) {
+ const record=barcodeEditRecords()[index];if(!record)return;
+ barcodeEntryDraft=structuredClone(record);barcodeEntryLine={};barcodeEntryEditIndex=-1;barcodeEntryPicker=false;barcodeEntryMessage='';render();
+}
+function barcodePrintingOpen(sourceLines=null) {
+ if(!sourceLines&&barcodeEntryLine.itemId) barcodeEntryAddLine();
+ if(!(sourceLines||barcodeEntryDraft?.lines)?.length) throw Error('Add items or open an existing entry before printing barcodes.');
+ barcodePrintState={rows:structuredClone(sourceLines||barcodeEntryDraft.lines).map(line=>{
+ const master=state.itemMasters.find(item=>item.itemId===line.itemId);
+ return {...line,category:master?.product||'Gold',goldType:line.goldType||master?.typeWastage||'',dmdWeight:line.dmdWeight??line.dmdWgt??0,pcs:line.pcs??line.dmdPcs??'',saleRate:line.saleRate??line.sellingRate??0,dmdSaleamt:line.dmdSaleamt??line.dmdSaleAmt??0,otherStone:line.otherStone??0,priceWithTax:line.priceWithTax??0,mVaPerc:line.mVaPerc??'',mPrice:line.mPrice??'',clrStn:line.clrStn??0,clrStnRate:line.clrStnRate??0};
+ }),selected:[],type:'Gold',designer:true,stickerQty:0,newRow:false,pauseAfter:100,width:55,height:25,batch:0,preview:false,message:''};
+}
+function barcodePrintingRows() {
+ const p=barcodePrintState;return p.rows.map((line,index)=>({...line,index})).filter(line=>p.type==='All'||String(line.category).toLowerCase()===p.type.toLowerCase());
+}
+function barcodePrintingLabels() {
+ const p=barcodePrintState,labels=[];
+ for(const row of barcodePrintingRows().filter(row=>p.selected.includes(row.index))) {
+ // Zero uses the tagged item's number of pieces; a positive override applies per selected row.
+ const copies=p.stickerQty||Number(row.qty||1);
+ if(!Number.isInteger(copies)||copies<1||labels.length+copies>5000)throw Error('Select at most 5,000 stickers per print job.');
+ for(let copy=0;copy<copies;copy++)labels.push({...row,copy});
+ }
+ if(labels.length>5000)throw Error('Select at most 5,000 stickers per print job.');
+ return labels;
+}
+function barcodePrintingDialog() {
+ const p=barcodePrintState,rows=barcodePrintingRows();
+ const cell=(row,key)=>{
+ if(key==='selected')return `<input aria-label="Select ${escapeHtml(row.barcode)}" type="checkbox" data-bp-select="${row.index}" ${p.selected.includes(row.index)?'checked':''}>`;
+ if(key==='itemType')return row.itemType==='Ormt'?'Ornament':escapeHtml(row.itemType||'Ornament');
+ if(key==='stoneMode')return row.stoneMode==='Amt'?'Amount':escapeHtml(row.stoneMode||'Amount');
+ if(key==='va')return Number(row.va||0).toFixed(2)+'%';
+ if(['gross','stone','net','stoneCharge','mc','price','priceWithTax'].includes(key))return Number(row[key]||0).toFixed(3);
+ if(key==='mcGram')return Number(row[key]||0).toFixed(2);
+ return escapeHtml(String(row[key]??''));
+ };
+ return `<div class="be-dialog-backdrop bp-backdrop"><section class="bp-dialog" role="dialog" aria-modal="true" aria-label="BarcodePrinting"><header><strong>▣ BarcodePrinting</strong><button data-bp-action="close-print" aria-label="Close BarcodePrinting">×</button></header><div class="bp-controls"><label>Barcode Type <select data-bp-option="type">${['Gold','Silver','Diamond','All'].map(type=>`<option ${p.type===type?'selected':''}>${type}</option>`).join('')}</select></label><label><input type="checkbox" data-bp-option="designer" ${p.designer?'checked':''}>Designer</label><label>Sticker Qty <input type="number" min="0" max="5000" step="1" data-bp-option="stickerQty" value="${p.stickerQty}" title="0 = number of pieces; otherwise copies per selected row"></label><div><button data-bp-action="all">${rows.length&&rows.every(r=>p.selected.includes(r.index))?'Clear All':'Select All'}</button><button data-bp-action="preview">Print</button><button data-bp-action="close-print">Close</button></div><label class="bp-new-row"><input type="checkbox" data-bp-option="newRow" ${p.newRow?'checked':''}>Start New Row after each Item</label><label class="bp-pause">Pause after Print <input type="number" min="1" max="5000" step="1" data-bp-option="pauseAfter" value="${p.pauseAfter}"></label></div><div class="bp-status" role="status">${escapeHtml(p.message||`${p.selected.length} tag(s) selected. Sticker Qty 0 uses Nos; a positive value sets copies per selected tag.`)}</div>${p.preview?barcodePrintPreview():`<div class="bp-grid" tabindex="0" role="region" aria-label="Barcode printing items — scroll for all columns"><table><colgroup><col style="width:36px">${barcodePrintColumns.map(([key])=>`<col style="width:${({itemId:50,itemName:120,description:110,barcode:115}[key]||105)}px">`).join('')}</colgroup><thead><tr><th>Sl</th>${barcodePrintColumns.map(([,label])=>`<th>${label}</th>`).join('')}</tr></thead><tbody>${rows.map((row,i)=>`<tr><td>${i+1}</td>${barcodePrintColumns.map(([key])=>`<td class="bp-${key}">${cell(row,key)}</td>`).join('')}</tr>`).join('')||'<tr><td colspan="30">No items for this barcode type. Choose All to view every item.</td></tr>'}</tbody></table></div>`}</section></div>`;
+}
+// Code 39 symbol table verified against https://github.com/lindell/JsBarcode/blob/master/src/barcodes/CODE39/index.js
+function barcodeTagSvg(value) {
+ const chars='0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-. $/+%*';
+ const patterns=[20957,29783,23639,30485,20951,29813,23669,20855,29789,23645,29975,23831,30533,22295,30149,24005,21623,29981,23837,22301,30023,23879,30545,22343,30161,24017,21959,30065,23921,22385,29015,18263,29141,17879,29045,18293,17783,29021,18269,17477,17489,17681,20753,35770];
+ const text=String(value).toUpperCase();
+ if(!/^[0-9A-Z. $/+%\-]+$/.test(text))throw Error(`Barcode ${text} contains characters unsupported by Code 39.`);
+ const bits='*'.concat(text,'*').split('').map(c=>patterns[chars.indexOf(c)].toString(2)).join('0');
+ const bars=Array.from(bits,(bit,index)=>bit==='1'?`<rect x="${index+12}" y="0" width="1" height="30"/>`:'').join('');
+ return `<svg xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Barcode ${escapeHtml(text)}" viewBox="0 0 ${bits.length+24} 30" preserveAspectRatio="none" shape-rendering="crispEdges">${bars}</svg>`;
+}
+function barcodePrintPreview() {
+ const p=barcodePrintState,labels=barcodePrintingLabels(),start=p.batch*p.pauseAfter,batch=labels.slice(start,start+p.pauseAfter),totalBatches=Math.max(1,Math.ceil(labels.length/p.pauseAfter));
+ return `<div class="bp-preview-controls"><button data-bp-action="back">← Selection</button><span>${labels.length} stickers · Batch ${p.batch+1} / ${totalBatches}</span>${p.designer?`<label>Width (mm)<input data-bp-option="width" type="number" min="30" max="100" value="${p.width}"></label><label>Height (mm)<input data-bp-option="height" type="number" min="20" max="80" value="${p.height}"></label>`:''}<button data-bp-action="batch-prev" ${p.batch===0?'disabled':''}>Previous batch</button><button data-bp-action="batch-next" ${p.batch+1>=totalBatches?'disabled':''}>Next batch</button><button data-bp-action="browser-print">Print this batch</button></div><div class="bp-label-sheet" style="--tag-width:${p.width}mm;--tag-height:${p.height}mm">${batch.map((row,i)=>`${p.newRow&&i&&batch[i-1].index!==row.index?'<div class="bp-row-break"></div>':''}<article class="bp-tag"><strong>${escapeHtml(row.itemName)}</strong>${barcodeTagSvg(row.barcode)}<b>${escapeHtml(row.barcode)}</b><div>G: ${Number(row.gross).toFixed(3)} · S: ${Number(row.stone).toFixed(3)} · N: ${Number(row.net).toFixed(3)}</div><div>${escapeHtml(row.goldType)} · VA: ${Number(row.va||0).toFixed(2)}% · MC: ${Number(row.mc||0).toFixed(2)}</div>${row.bisUid?`<div>BIS: ${escapeHtml(row.bisUid)}</div>`:''}</article>`).join('')}</div>`;
+}
+function barcodePrintAction(action) {
+ const p=barcodePrintState;
+ if(action==='close-edit'){barcodeEntryPicker=false;render();return;}
+ if(action==='open-entry'){barcodeEditOpen(barcodeEditSelected);return;}
+ if(action==='close-print'){barcodePrintState=null;render();return;}
+ if(!p)return;
+ try {
+ p.message='';
+ if(action==='all'){const ids=barcodePrintingRows().map(r=>r.index);p.selected=ids.every(id=>p.selected.includes(id))?p.selected.filter(id=>!ids.includes(id)):[...new Set([...p.selected,...ids])];p.preview=false;}
+ if(action==='preview'){
+ if(!barcodePrintingLabels().length)throw Error('Select at least one barcode to print.');
+ barcodePrintingLabels().forEach(row=>barcodeTagSvg(row.barcode));p.preview=true;p.batch=0;
+ }
+ if(action==='back')p.preview=false;
+ if(action==='batch-prev')p.batch=Math.max(0,p.batch-1);
+ if(action==='batch-next')p.batch=Math.min(Math.ceil(barcodePrintingLabels().length/p.pauseAfter)-1,p.batch+1);
+ if(action==='browser-print'){window.print();return;}
+ } catch(error){p.message=error.message;p.preview=false;}
+ render();
+}
+document.addEventListener('input',event=>{
+ if(!event.target.matches('[data-be-edit-query]'))return;
+ barcodeEditQuery=event.target.value;barcodeEditSelected=0;
+ const body=document.querySelector('[data-be-edit-body]');if(body)body.innerHTML=barcodeEditRows();
+});
+document.addEventListener('change',event=>{
+ const el=event.target,p=barcodePrintState;
+ if(el.dataset.bpSelect!==undefined&&p){const index=Number(el.dataset.bpSelect);p.selected=el.checked?[...new Set([...p.selected,index])]:p.selected.filter(i=>i!==index);render();return;}
+ const key=el.dataset.bpOption;if(!key||!p)return;
+ if(['designer','newRow'].includes(key))p[key]=el.checked;
+ else if(key==='type'){p.type=el.value;p.selected=[];p.preview=false;}
+ else {const value=Number(el.value),limits={stickerQty:[0,5000],pauseAfter:[1,5000],width:[30,100],height:[20,80]};const [min,max]=limits[key]||[0,5000];if(!Number.isInteger(value)||value<min||value>max){p.message=`Enter a whole number from ${min} to ${max}.`;render();return;}p[key]=value;p.batch=0;}
+ render();
+});
+document.addEventListener('click',event=>{
+ const button=event.target.closest('[data-bp-action]');if(button){barcodePrintAction(button.dataset.bpAction);return;}
+ const row=event.target.closest('[data-be-edit-row]');if(row){barcodeEditSelected=Number(row.dataset.beEditRow);document.querySelectorAll('[data-be-edit-row]').forEach(r=>{r.classList.toggle('selected',r===row);r.setAttribute('aria-selected',String(r===row));});}
+});
+document.addEventListener('dblclick',event=>{const row=event.target.closest('[data-be-edit-row]');if(row)barcodeEditOpen(Number(row.dataset.beEditRow));});
+document.addEventListener('keydown',event=>{
+ if(event.key==='Escape'&&(barcodeEntryPicker||barcodePrintState)){barcodeEntryPicker=false;barcodePrintState=null;render();return;}
+ if(!barcodeEntryPicker||!event.target.closest('.be-edit-dialog'))return;
+ if(event.key==='Enter'){event.preventDefault();barcodeEditOpen(barcodeEditSelected);}
+ if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();barcodeEditSelected=Math.max(0,Math.min(barcodeEditRecords().length-1,barcodeEditSelected+(event.key==='ArrowDown'?1:-1)));const body=document.querySelector('[data-be-edit-body]');if(body)body.innerHTML=barcodeEditRows();document.querySelector(`[data-be-edit-row="${barcodeEditSelected}"]`)?.scrollIntoView({block:'nearest'});}
+});
+document.addEventListener('keydown',event=>{
+ if(event.key!=='Tab')return;
+ const dialog=document.querySelector('.bp-dialog')||document.querySelector('.be-edit-dialog');
+ if(!dialog)return;
+ const fields=[...dialog.querySelectorAll('button:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex="0"]')];
+ const first=fields[0],last=fields[fields.length-1];
+ if(event.shiftKey&&(document.activeElement===first||!dialog.contains(document.activeElement))){event.preventDefault();last?.focus();}
+ else if(!event.shiftKey&&(document.activeElement===last||!dialog.contains(document.activeElement))){event.preventDefault();first?.focus();}
+});
+function barcodeEntryRefreshTransfer() {
+ const record=(state.itemTransfers||[]).find(r=>String(r.entryNo)===String(barcodeEntryDraft.transferNo));
+ if(!record){barcodeEntryDraft.transferRef='';barcodeEntryDraft.transferItemId='';barcodeEntryDraft.transferWeight='0.000';barcodeEntryMessage=barcodeEntryDraft.transferNo?'Transfer not found.':'';return;}
+ barcodeEntryDraft.transferRef=record.refNo||'';
+ barcodeEntryDraft.transferItemId=[...new Set((record.lines||[]).map(r=>r.itemId).filter(Boolean))].join(', ');
+ barcodeEntryDraft.transferWeight=(record.lines||[]).filter(r=>r.mode==='IN').reduce((sum,r)=>sum+Number(r.gross||0),0).toFixed(3);
+}
+document.addEventListener('change',event=>{if(event.target.dataset.beHeader==='transferNo'){barcodeEntryDraft.transferNo=event.target.value;barcodeEntryRefreshTransfer();render();}});
+document.addEventListener('change',event=>{
+ const field=event.target.dataset.beCell;if(!field)return;
+ const index=Number(event.target.dataset.beCellRow),line=barcodeEntryDraft?.lines[index];if(!line)return;
+ const type=barcodeEntryFields.find(f=>f[0]===field)?.[2];
+ if(type==='number'&&(!Number.isFinite(Number(event.target.value))||Number(event.target.value)<0)){event.target.value=line[field]||0;return;}
+ line[field]=type==='number'?Number(event.target.value):event.target.value;
+ if(index===barcodeEntryEditIndex)barcodeEntryLine[field]=line[field];
+});
+var barcodeListViewAll=false;
+var barcodeListCategory='';
+var barcodeListRefresh=false;
+var barcodeListSelected=[];
+const barcodeListColumns=[['remove','X'],['pick','P'],['entryNo','EntryNo'],['iid','ID'],['name','Name'],['barcode','Barcode'],['bisUid','Bis_Uid'],['description','Description'],['nos','Nos'],['gross','GrossWeight'],['stone','StoneWeight'],['net','NetWeight'],['stnChr','StnCharge'],['vaPerc','VA_Perc'],['mcPerGrm','MCperGrm'],['mc','MC'],['otherCharge','OtherCharge'],['totalMC','TotalMC'],['smithName','Smith'],['pmcPerGrm','PMCperGrm'],['purchaseMC','PurchaseMC'],['dmdCarat','Dmdcarat'],['dmdPcs','DmdPcs'],['dmdSRate','DmdSRate'],['dmdPuRate','DmdPuRate'],['dmdSRate1','DmdSRate1'],['dmdSellRate1','dmdsellrate1'],['dmdSaleAmt','DmdSaleamt'],['clrStn','ClrStn'],['clrStnRate','ClrStnRate']];
+function barcodeListNormalize(row={},record={}) {
+ return {...row,entryNo:record.entryNo??row.entryNo??0,sourceEntryId:record.id||row.barcodeEntryId||row.sourceEntryId||'',iid:row.itemId||row.iid||'',name:row.itemName||row.name||row.item||'',category:row.category||row.itemCategory||'',type:row.goldType||row.type||row.purity||'',nos:Number(row.qty??row.nos??0),gross:Number(row.gross||0),stone:Number(row.stone||0),net:Number(row.net??row.netWeight??(Number(row.gross||0)-Number(row.stone||0))),bisUid:row.bisUid||row.bisUID||'',stnChr:Number(row.stoneCharge??row.stnChr??0),vaPerc:Number(row.va??row.vaPerc??0),mcPerGrm:Number(row.mcGram??row.mcPerGrm??0),mc:Number(row.mc??row.makingCharge??0),otherCharge:Number(row.other??row.otherCharge??0),totalMC:Number(row.totalMC??(Number(row.mc||0)+Number(row.other??row.otherCharge??0))),smithName:row.smith||row.smithName||'',pmcPerGrm:Number(row.pmcGram??row.pmcPerGrm??row.pmc??0),purchaseMC:Number(row.purchaseMC??row.pmc??0),dmdCarat:Number(row.dmdCarat??row.dmdWeight??row.dmdWgt??0),dmdPcs:Number(row.dmdPcs??row.pcs??0),dmdSRate:Number(row.dmdSRate??row.saleRate??row.sellingRate??0),dmdPuRate:Number(row.dmdPuRate??row.purchaseRate??0),dmdSaleAmt:Number(row.dmdSaleAmt??row.dmdSaleamt??0)};
+}
+function barcodeListData() {
+ const map=new Map();
+ const add=(row,record)=>{if(!row.barcode)return;const normalized=barcodeListNormalize(row,record);map.set(String(row.barcode).toUpperCase(),{...map.get(String(row.barcode).toUpperCase()),...normalized});};
+ BARCODE_WISE_CLOSING_STOCK.forEach(row=>add(row));
+ (state.stock||[]).filter(row=>row.barcode).forEach(row=>add(row));
+ (state.barcodeEntries||[]).forEach(record=>record.lines.forEach(row=>add(row,record)));
+ return [...map.values()].map(row=>{const stock=(state.stock||[]).find(item=>item.barcode===row.barcode);return {...row,...(state.barcodeOverrides||{})[row.barcode],...(stock?{nos:Number(stock.qty??stock.nos??0),gross:Number(stock.gross||0),stone:Number(stock.stone||0),net:Number(stock.net??stock.closing??0)}:{})};});
+}
+function barcodeListItems() {
+ const map=new Map(ITEM_WISE_CLOSING_STOCK.map(row=>[row.itemId,{itemId:row.itemId,name:row.name,category:row.itemType,type:row.itemType==='Gold'?'22ct':row.itemType}]));
+ state.itemMasters.forEach(row=>map.set(row.itemId,{itemId:row.itemId,name:row.itemName,category:row.product||'',type:row.typeWastage||''}));
+ barcodeListData().forEach(row=>{if(row.iid&&!map.has(row.iid))map.set(row.iid,{itemId:row.iid,name:row.name,category:row.category||'',type:row.type||''});});
+ return [...map.values()].filter(row=>!barcodeListCategory||row.category.toLowerCase()===barcodeListCategory.toLowerCase()).sort((a,b)=>a.name.localeCompare(b.name));
+}
+function barcodeListRows() {
+ const query=String(barcodeListFilter.value||'').trim().toLowerCase(),items=barcodeListItems();
+ return barcodeListData().filter(row=>(barcodeListViewAll||row.iid===selectedBarcodeListItem)&&(!barcodeListCategory||items.some(item=>item.itemId===row.iid))&&(!query||[row.iid,row.name,row.barcode].some(value=>String(value).toLowerCase().includes(query))));
+}
+function barcodeListCell(row,key) {
+ if(['entryNo','iid','name','barcode','bisUid','description','smithName'].includes(key))return escapeHtml(String(row[key]??''));
+ return Number(row[key]||0).toFixed(['nos','dmdPcs'].includes(key)?0:key==='vaPerc'?2:3);
+}
+function barcodeListPrint() {
+ const rows=barcodeListRows().filter(row=>!barcodeListSelected.length||barcodeListSelected.includes(row.barcode));
+ if(!rows.length){toast('No matching barcode records to print.');return;}
+ barcodePrintingOpen(rows.map(row=>({...row,itemId:row.iid,itemName:row.name,qty:row.nos||1,itemType:row.itemType||'Ormt',stoneMode:row.stoneMode||'Amt',stoneCharge:row.stnChr,va:row.vaPerc,mcGram:row.mcPerGrm,smith:row.smithName})));
+ barcodePrintState.type='All';barcodePrintState.selected=barcodePrintState.rows.map((_,i)=>i);render();
+}
+document.addEventListener('click',event=>{
+ const item=event.target.closest('[data-bl-item]');if(item){selectedBarcodeListItem=item.dataset.blItem;barcodeListFilter.value='';barcodeListSelected=[];render();return;}
+ const action=event.target.closest('[data-bl-action]')?.dataset.blAction;
+ if(action==='show'){const q=barcodeListFilter.value.trim().toLowerCase();if(q){const match=barcodeListData().find(row=>[row.iid,row.name,row.barcode].some(value=>String(value).toLowerCase()===q));if(match)selectedBarcodeListItem=match.iid;}render();}
+ if(action==='print')barcodeListPrint();
+ const remove=event.target.closest('[data-bl-remove]');if(remove&&!remove.disabled){const row=barcodeListData().find(r=>r.barcode===remove.dataset.blRemove),record=state.barcodeEntries?.find(r=>r.id===row?.sourceEntryId);if(!record)return;if(barcodeEntryGuard({id:record.id,lines:[row]})){toast('This barcode has subsequent transactions and cannot be removed.');return;}if(!window.confirm(`Remove barcode ${row.barcode} from entry ${record.entryNo}?`))return;record.lines=record.lines.filter(line=>line.barcode!==row.barcode);state.stock=state.stock.filter(line=>!(line.barcodeEntryId===record.id&&line.barcode===row.barcode));state.audit.unshift(audit(`Removed barcode ${row.barcode} from entry ${record.entryNo}`));saveState();barcodeListSelected=barcodeListSelected.filter(code=>code!==row.barcode);render();}
+});
+document.addEventListener('input',event=>{if(event.target.dataset.blFilter==='query')barcodeListFilter.value=event.target.value;});
+document.addEventListener('change',event=>{
+ const el=event.target;
+ if(el.dataset.blFilter==='category'){barcodeListCategory=el.value;selectedBarcodeListItem=barcodeListItems()[0]?.itemId||'';render();}
+ if(el.hasAttribute('data-bl-all')){barcodeListViewAll=el.checked;render();}
+ if(el.hasAttribute('data-bl-refresh')){barcodeListRefresh=el.checked;if(el.checked)Object.assign(state,loadState());barcodeListSelected=[];render();}
+ if(el.dataset.blPick){barcodeListSelected=el.checked?[...new Set([...barcodeListSelected,el.dataset.blPick])]:barcodeListSelected.filter(code=>code!==el.dataset.blPick);const counter=document.querySelector('.bl-options>span');if(counter)counter.textContent=`${barcodeListRows().length} records · ${barcodeListSelected.length} selected`;}
+});
+document.addEventListener('keydown',event=>{if(event.key==='Enter'&&event.target.dataset.blFilter==='query'){event.preventDefault();document.querySelector('[data-bl-action="show"]')?.click();}const row=event.target.closest('[data-bl-item]');if(row&&event.key==='Enter'){event.preventDefault();row.click();}});
+var barcodeMultipleRows=[];
+var barcodeMultipleScan='';
+var barcodeMultipleQty=1;
+var barcodeMultipleMessage='';
+const barcodeMultipleColumns=[['sl','Sl'],['iid','ID'],['name','Item Name'],['description','Description'],['barcode','Barcode'],['itemType','Item Type'],['nos','Nos'],['gross','Gross'],['stone','Stone'],['net','Net Weight'],['stoneMode','StnMode'],['stnChr','StnCharge'],['vaPerc','VA %'],['mcPerGrm','MC/Grm'],['totalMC','Total MC'],['price','Price'],['bisUid','BIS'],['smithName','Smith'],['dmdCarat','Cl_DmdWght'],['dmdPcs','Cl_pcs'],['dmdSRate','cl_sellrate'],['dmdSaleAmt','DmdSaleamt'],['otherStone','otherStone'],['priceWithTax','gpricewithtax'],['clrStn','ClrStn'],['clrStnRate','ClrStnRate']];
+function barcodeStandaloneEditScreen(){
+ const row=barcodeItemEditDraft,totals=row?{nos:Number(row.qty||0),gross:Number(row.gross||0),stone:Number(row.stone||0),net:Number(row.gross||0)-Number(row.stone||0)}:{nos:0,gross:0,stone:0,net:0};
+ return `${moduleSwitcher('Barcode',BARCODE_ITEMS,barcodeView,'data-barcode-section')}<section class="be-window bi-window" aria-label="Barcode Edit"><header class="bl-title">Barcode Edit</header><div class="bi-top"><div><label>Barcode<input data-bi-scan value="${escapeHtml(barcodeItemEditScan)}" autocomplete="off"></label><label>Item Name<input readonly value="${escapeHtml(row?.itemName||'')}"></label></div><div class="bi-actions"><button data-bi-action="show">Show</button><button data-bi-action="update">Update</button><button data-bi-action="print">Print</button></div></div>${barcodeItemEditMessage?`<div class="be-message" role="status">${escapeHtml(barcodeItemEditMessage)}</div>`:''}<div class="bl-grid bi-grid" tabindex="0" role="region" aria-label="Barcode edit details">${row?`<table><thead><tr>${barcodeEntryFields.map(([,label])=>`<th>${label}</th>`).join('')}</tr></thead><tbody><tr>${barcodeEntryFields.map(([key,label,type])=>`<td>${key==='net'?`<output data-bi-net>${totals.net.toFixed(3)}</output>`:Array.isArray(type)?`<select data-bi-field="${key}" aria-label="${label}">${type.map(value=>`<option ${row[key]===value?'selected':''}>${value}</option>`).join('')}</select>`:`<input data-bi-field="${key}" aria-label="${label}" ${['barcode','itemId','itemName'].includes(key)?'readonly':''} type="${type==='number'?'number':'text'}" ${type==='number'?'min="0" step="0.001"':''} value="${escapeHtml(String(row[key]??(type==='number'?0:'')))}">`}</td>`).join('')}</tr></tbody></table>`:''}</div><div class="bi-totals"><strong>Total</strong>${Object.entries(totals).map(([key,value])=>`<label>${({nos:'Nos',gross:'Gross',stone:'Stone',net:'Net'})[key]}<output data-bi-total="${key}">${row?value.toFixed(key==='nos'?0:3):''}</output></label>`).join('')}</div></section>`;
+}
+function barcodeMultipleAdd(){
+ const code=barcodeMultipleScan.trim().toUpperCase();
+ if(!code)throw Error('Scan or enter a barcode.');
+ if(!Number.isInteger(barcodeMultipleQty)||barcodeMultipleQty<1||barcodeMultipleQty>5000)throw Error('Qty must be a whole number from 1 to 5000.');
+ const row=barcodeListData().find(r=>r.barcode.toUpperCase()===code);
+ if(!row)throw Error(`Barcode ${code} was not found.`);
+ const existing=barcodeMultipleRows.find(r=>r.barcode===row.barcode);
+ if(existing)existing.printCopies+=barcodeMultipleQty;else barcodeMultipleRows.push({...row,printCopies:barcodeMultipleQty});
+ if(barcodeMultipleRows.reduce((sum,r)=>sum+r.printCopies,0)>5000){if(existing)existing.printCopies-=barcodeMultipleQty;else barcodeMultipleRows.pop();throw Error('Print at most 5,000 stickers per job.');}
+ barcodeMultipleScan='';barcodeMultipleMessage='';
+}
+function barcodeMultiplePrintScreen(){
+ return `${moduleSwitcher('Barcode',BARCODE_ITEMS,barcodeView,'data-barcode-section')}<section class="be-window bm-window" aria-label="Barcode Printing"><header class="bl-title">Barcode Printing</header><div class="bm-controls"><label>Barcode<input autofocus data-bm-scan value="${escapeHtml(barcodeMultipleScan)}" autocomplete="off" placeholder="Scan barcode and press Enter"></label><label>Qty<input data-bm-qty type="number" min="1" max="5000" step="1" value="${barcodeMultipleQty}"></label><button data-bm-action="add">Add</button><button data-bm-action="print">Barcode Print</button></div>${barcodeMultipleMessage?`<div class="be-message" role="status">${escapeHtml(barcodeMultipleMessage)}</div>`:''}<div class="bl-grid bm-grid" tabindex="0" role="region" aria-label="Barcode printing queue"><table><thead><tr>${barcodeMultipleColumns.map(([,label])=>`<th>${label}</th>`).join('')}<th>Print Qty</th><th>Remove</th></tr></thead><tbody>${barcodeMultipleRows.map((row,index)=>`<tr>${barcodeMultipleColumns.map(([key])=>`<td>${key==='sl'?index+1:key==='itemType'?escapeHtml(row.itemType==='Ormt'?'Ornament':row.itemType||'Ornament'):key==='stoneMode'?escapeHtml(row.stoneMode==='Amt'?'Amount':row.stoneMode||'Amount'):barcodeListCell(row,key)}</td>`).join('')}<td><input type="number" min="1" max="5000" step="1" data-bm-copies="${index}" value="${row.printCopies}" aria-label="Print Qty for ${escapeHtml(row.barcode)}"></td><td><button data-bm-remove="${index}" aria-label="Remove ${escapeHtml(row.barcode)}">×</button></td></tr>`).join('')||'<tr><td colspan="28">Scan a barcode and press Enter to add it to the print queue.</td></tr>'}</tbody></table></div><div class="bm-summary">${barcodeMultipleRows.length} barcodes · ${barcodeMultipleRows.reduce((sum,r)=>sum+r.printCopies,0)} stickers</div></section>`;
+}
+function barcodeMultiplePrint(){
+ if(barcodeMultipleScan.trim())barcodeMultipleAdd();
+ if(!barcodeMultipleRows.length)throw Error('Add at least one barcode to print.');
+ const total=barcodeMultipleRows.reduce((sum,row)=>sum+row.printCopies,0);
+ if(total>5000||barcodeMultipleRows.some(row=>!Number.isInteger(row.printCopies)||row.printCopies<1))throw Error('Enter valid print quantities, up to 5,000 stickers per job.');
+ const labels=barcodeMultipleRows.flatMap(row=>Array.from({length:row.printCopies},()=>row));
+ if(labels.length>5000)throw Error('Print at most 5,000 stickers per job.');
+ const paper=`<div class="bp-label-sheet bm-print-sheet" style="--tag-width:55mm;--tag-height:25mm">${labels.map(row=>`<article class="bp-tag"><strong>${escapeHtml(row.name)}</strong>${barcodeTagSvg(row.barcode)}<b>${escapeHtml(row.barcode)}</b><div>G: ${row.gross.toFixed(3)} · S: ${row.stone.toFixed(3)} · N: ${row.net.toFixed(3)}</div><div>VA: ${Number(row.vaPerc||0).toFixed(2)}% · MC: ${Number(row.mc||0).toFixed(2)}</div>${row.bisUid?`<div>BIS: ${escapeHtml(row.bisUid)}</div>`:''}</article>`).join('')}</div>`;
+ document.querySelector('.bm-print-sheet')?.remove();document.body.insertAdjacentHTML('beforeend',paper);
+ window.print();
+}
+window.addEventListener?.('afterprint',()=>document.querySelector('.bm-print-sheet')?.remove());
+document.addEventListener('input',event=>{if(event.target.hasAttribute('data-bm-scan'))barcodeMultipleScan=event.target.value;if(event.target.hasAttribute('data-bm-qty'))barcodeMultipleQty=Number(event.target.value);});
+document.addEventListener('change',event=>{if(event.target.hasAttribute('data-bm-copies')){const row=barcodeMultipleRows[Number(event.target.dataset.bmCopies)],qty=Number(event.target.value);if(Number.isInteger(qty)&&qty>0&&qty<=5000)row.printCopies=qty;else event.target.value=row.printCopies;}});
+document.addEventListener('click',event=>{
+ const remove=event.target.closest('[data-bm-remove]');if(remove){barcodeMultipleRows.splice(Number(remove.dataset.bmRemove),1);render();return;}
+ const action=event.target.closest('[data-bm-action]')?.dataset.bmAction;if(!action)return;
+ try{barcodeMultipleMessage='';if(action==='add')barcodeMultipleAdd();if(action==='print'){barcodeMultiplePrint();return;}}catch(error){barcodeMultipleMessage=error.message;}
+ render();document.querySelector('[data-bm-scan]')?.focus();
+});
+document.addEventListener('keydown',event=>{if(event.key==='Enter'&&event.target.hasAttribute('data-bm-scan')){event.preventDefault();document.querySelector('[data-bm-action="add"]')?.click();}});
+var barcodeItemEditScan='';
+var barcodeItemEditDraft=null;
+var barcodeItemEditSource=null;
+var barcodeItemEditMessage='';
+function barcodeItemEditShow(){
+ const row=barcodeListData().find(r=>r.barcode.toUpperCase()===barcodeItemEditScan.trim().toUpperCase());
+ barcodeItemEditDraft=null;barcodeItemEditSource=null;
+ if(!row)throw Error('Barcode not found. Scan or enter an existing barcode.');
+ barcodeItemEditSource=structuredClone(row);
+ barcodeItemEditDraft={...row,itemId:row.iid,itemName:row.name,qty:row.nos,gross:row.gross,stone:row.stone,itemType:row.itemType||'Ormt',stoneMode:row.stoneMode||'Amt',stoneCharge:row.stnChr,va:row.vaPerc,mcGram:row.mcPerGrm,other:row.otherCharge,smith:row.smithName,pmcGram:row.pmcPerGrm,pmc:row.purchaseMC};
+}
+function barcodeItemEditUpdate(){
+ if(!barcodeItemEditDraft||!barcodeItemEditSource)throw Error('Use Show to load a barcode before updating.');
+ if(barcodeItemEditScan.trim().toUpperCase()!==barcodeItemEditSource.barcode.toUpperCase())throw Error('Use Show to load the barcode currently entered.');
+ const line=barcodeEntryCalculate(barcodeItemEditDraft),source=barcodeItemEditSource;
+ if(!Number.isInteger(line.qty)||line.qty<0)throw Error('Nos must be a non-negative whole number.');
+ if(barcodeEntryFields.some(([key,,type])=>type==='number'&&(!Number.isFinite(line[key])||line[key]<0))||line.stone>line.gross)throw Error('Enter valid values. Stone weight cannot exceed gross weight.');
+ if(barcodeEntryGuard({id:source.sourceEntryId,lines:[line]}))throw Error('This barcode has subsequent transactions and cannot be changed.');
+ const record=(state.barcodeEntries||[]).find(r=>r.id===source.sourceEntryId);
+ if(record){const index=record.lines.findIndex(r=>r.barcode===source.barcode);if(index<0)throw Error('Source entry has changed. Reload the barcode.');record.lines[index]={...record.lines[index],...line};}
+ const stock=state.stock.find(r=>workflowKey(r.barcode)===workflowKey(source.barcode));
+ if(stock){
+   const previousNet=Number(stock.net??stock.closing??0),delta=workflowRound(line.net-previousNet);
+   const ledger=record?{opening:0,addition:line.net,deduction:0}:{addition:workflowRound(Number(stock.addition||0)+Math.max(0,delta)),deduction:workflowRound(Number(stock.deduction||0)+Math.max(0,-delta))};
+   Object.assign(stock,line,ledger,{item:line.itemName,nos:line.qty,closing:line.net,closingNos:line.qty,closingNet:line.net,vaPerc:line.va,makingCharge:line.mc,mcPerGrm:line.mcGram});
+ }
+ state.barcodeOverrides ||= {};
+ if(!record&&!stock)state.barcodeOverrides[line.barcode]=barcodeListNormalize(line,{entryNo:source.entryNo,id:source.sourceEntryId});else delete state.barcodeOverrides[line.barcode];
+ state.audit.unshift(audit(`Updated barcode ${line.barcode}`));saveState();barcodeItemEditDraft=line;barcodeItemEditMessage=`Barcode ${line.barcode} updated.`;
+}
+function barcodeItemEditPrint(){
+ if(!barcodeItemEditDraft)throw Error('Use Show to load a barcode before printing.');
+ const savedRows=barcodeMultipleRows,savedScan=barcodeMultipleScan;
+ try{barcodeMultipleRows=[{...barcodeListNormalize(barcodeItemEditDraft),printCopies:1}];barcodeMultipleScan='';barcodeMultiplePrint();}finally{barcodeMultipleRows=savedRows;barcodeMultipleScan=savedScan;}
+}
+document.addEventListener('input',event=>{
+ const el=event.target;
+ if(el.hasAttribute('data-bi-scan'))barcodeItemEditScan=el.value;
+ if(el.dataset.biField&&barcodeItemEditDraft){const key=el.dataset.biField,type=barcodeEntryFields.find(f=>f[0]===key)?.[2];if(['barcode','itemId','itemName'].includes(key))return;barcodeItemEditDraft[key]=type==='number'?Number(el.value):el.value;
+ const totals={nos:barcodeItemEditDraft.qty,gross:barcodeItemEditDraft.gross,stone:barcodeItemEditDraft.stone,net:Number(barcodeItemEditDraft.gross)-Number(barcodeItemEditDraft.stone)};
+ for(const [k,v] of Object.entries(totals)){const output=document.querySelector(`[data-bi-total="${k}"]`);if(output)output.textContent=Number(v||0).toFixed(k==='nos'?0:3);}const net=document.querySelector('[data-bi-net]');if(net)net.textContent=totals.net.toFixed(3);
+ }
+});
+document.addEventListener('change',event=>{if(event.target.dataset.biField&&barcodeItemEditDraft)barcodeItemEditDraft[event.target.dataset.biField]=event.target.type==='number'?Number(event.target.value):event.target.value;});
+document.addEventListener('click',event=>{const action=event.target.closest('[data-bi-action]')?.dataset.biAction;if(!action)return;try{barcodeItemEditMessage='';if(action==='show')barcodeItemEditShow();if(action==='update')barcodeItemEditUpdate();if(action==='print'){barcodeItemEditPrint();return;}}catch(error){barcodeItemEditMessage=error.message;}render();});
+document.addEventListener('keydown',event=>{if(event.key==='Enter'&&event.target.hasAttribute('data-bi-scan')){event.preventDefault();document.querySelector('[data-bi-action="show"]')?.click();}});
+
+var barcodeReportView='Barcode Entry';
+var barcodeReportUi={shown:false,page:0,pageSize:50,zoom:1,hidden:false,a4:false,dateOpen:false};
+const barcodeReportViews=['Barcode Entry','BarCode Reco','BarCode Reco- Full'];
+function barcodeReportConfig(view=barcodeReportView){
+ const full=view==='BarCode Reco- Full';
+ const within=date=>full||(!date||isDateWithinPeriod(date,salesReportOptions.from,salesReportOptions.to));
+ const weight=(key,label)=>({key,label,numeric:true,total:true,format:value=>numberValue(value,3),digits:3});
+ const qty=(key,label)=>({key,label,numeric:true,total:true,format:value=>numberValue(value,0),digits:0});
+ if(view==='Barcode Entry'){
+ const rows=(state.barcodeEntries||[]).filter(record=>within(record.date)).flatMap(record=>record.lines.map(line=>({entryNo:record.entryNo,refNo:record.refNo||'',date:displaySalesDate(record.date),itemId:line.itemId,itemName:line.itemName,barcode:line.barcode,description:line.description||'',type:line.itemType==='Ormt'?'Ornament':line.itemType||'Ornament',nos:Number(line.qty||0),gross:Number(line.gross||0),stone:Number(line.stone||0),net:Number((Number(line.gross||0)-Number(line.stone||0)).toFixed(3)),stoneMode:line.stoneMode==='Amt'?'Amount':line.stoneMode||'Amount',stoneCharge:Number(line.stoneCharge||0),va:Number(line.va||0)})));
+ const columns=[['entryNo','Entry No'],['refNo','RefNo'],['date','Date'],['itemId','Item ID'],['itemName','Item Name'],['barcode','Barcode'],['description','Description'],['type','Type']].map(([key,label])=>({key,label}));
+ columns.push(qty('nos','Nos'),weight('gross','Gross'),weight('stone','Stone'),weight('net','NetWeight'),{key:'stoneMode',label:'Stn Mode'},weight('stoneCharge','Stn Charge'),{key:'va',label:'Va%',numeric:true,format:value=>numberValue(value,2)});
+ return {rows,columns};
+ }
+ const groups=new Map(),masters=state.itemMasters||[],catalog=barcodeListData();
+ const itemFor=line=>{
+ const code=line.itemId||line.iid;
+ const master=masters.find(m=>code?m.itemId===code:m.itemName.toLowerCase()===String(line.itemName||line.item||line.name||'').toLowerCase());
+ const name=String(line.itemName||line.item||line.name||'').trim();
+ const reference=ITEM_WISE_CLOSING_STOCK.find(item=>item.name.trim().toLowerCase()===name.toLowerCase());
+ return {id:code||master?.itemId||reference?.itemId||name,name:name||master?.itemName||reference?.name||code||''};
+ };
+ const groupFor=line=>{const item=itemFor(line);if(!item.id)return null;if(!groups.has(item.id))groups.set(item.id,{itemId:item.id,itemName:item.name,nos:0,net:0,barcodeNos:0,barcodeNet:0});return groups.get(item.id);};
+ // Item stock is independent of barcode receipts: never add receipt lines to stock a second time.
+ const covered=new Set();
+ (state.stock||[]).filter(line=>within(line.date||line.entryDate||line.transDate)).forEach(line=>{
+ const group=groupFor(line);if(!group)return;covered.add(group.itemId);
+ group.nos+=Number(line.closingNos??line.qty??line.nos??0);
+ const net=Number(line.closingNet??line.net??line.netWeight??(Number(line.closing??line.gross??0)-Number(line.stone||0)));
+ group.net+=Math.round(net*1000);
+ });
+ masters.filter(master=>!covered.has(master.itemId)&&within(master.closingDate||master.openingDate)).forEach(master=>{
+ const nos=Number(master.closingNos||0),net=Number(master.closingNet||0);if(!nos&&!net)return;
+ const group=groupFor(master);group.nos+=nos;group.net+=Math.round(net*1000);
+ });
+ // Reconstruct signed barcode balances, preserving zero quantities and negative discrepancies.
+ const assignedCodes=new Set([...(state.stock||[]).map(line=>line.barcode),...(state.barcodeEntries||[]).flatMap(record=>record.lines.map(line=>line.barcode)),...(state.openingStockEntries||[]).flatMap(record=>(record.lines||[]).map(line=>line.barcode))].filter(Boolean).map(code=>code.toUpperCase()));
+ barcodeMovementData().filter(movement=>within(movement.date)&&(movement.transactionType!=='Barcode Entry'||movement.sourceId||assignedCodes.has(movement.barcode))).forEach(movement=>{
+ const tag=catalog.find(row=>row.barcode.toUpperCase()===movement.barcode.toUpperCase());
+ const group=groupFor({itemId:tag?.iid,itemName:movement.itemName||tag?.name});if(!group)return;
+ const sign=movement.direction==='OUT'?-1:1;
+ group.barcodeNos+=sign*Number(movement.nos||0);
+ group.barcodeNet+=sign*Math.round(Number(movement.net||0)*1000);
+ });
+ const rows=[...groups.values()].map(group=>({...group,net:group.net/1000,barcodeNet:group.barcodeNet/1000,balanceNos:group.nos-group.barcodeNos,balanceNet:(group.net-group.barcodeNet)/1000})).filter(row=>['nos','net','barcodeNos','barcodeNet'].some(key=>row[key]!==0)).sort((a,b)=>a.itemId.localeCompare(b.itemId));
+ return {rows,columns:[{key:'itemId',label:'itemID'},{key:'itemName',label:'item_Name'},qty('nos','Nos'),weight('net','Net_Weight'),qty('barcodeNos','B_Nos'),weight('barcodeNet','B_Net_Weight'),qty('balanceNos','Bal_Nos'),weight('balanceNet','Bal_Weight')]};
+}
+function barcodeReportVisible(){
+ const config=barcodeReportConfig(),key='barcodeReport:'+barcodeReportView;
+ if(!barcodeReportUi.shown)return {...config,rows:[],totals:null};
+ const rows=applyClassicColumnSort(key,applyClassicColumnFilters(key,config.rows,config.columns),config.columns);
+ return {...config,rows,totals:salesTotalsForColumns(rows,config.columns)};
+}
+function barcodeReportsScreen(){
+ const config=barcodeReportVisible(),ui=barcodeReportUi,pages=Math.max(1,Math.ceil(config.rows.length/ui.pageSize));ui.page=Math.min(ui.page,pages-1);
+ const tools=['SHOW','PRINT','DIRECT PRINT','EXCEL','SAVE AS','DATE','FIRST','PREV','NEXT','LAST','VIEW/HIDE','ZOOM IN','DEFAULT','ZOOM OUT','CLOSE'];
+ return `<div class="classic-report-layout focused-classic-report"><section class="classic-stock-report sales-report br-report"><div class="classic-report-toolbar sales-report-toolbar"><div class="classic-tool-buttons">${tools.map(label=>`<button class="classic-tool" data-br-action="${label}" title="${label}"><strong>${label==='SAVE AS'?'▣':toolbarGlyph(label)}</strong><span>${label}</span></button>`).join('')}</div><label class="classic-a4"><input type="checkbox" data-br-a4 ${ui.a4?'checked':''}>A4</label><select class="br-select" aria-label="Barcode report" data-br-view>${barcodeReportViews.map(view=>`<option ${barcodeReportView===view?'selected':''}>${view}</option>`).join('')}</select>${ui.dateOpen?`<div class="sales-date-popup br-dates"><label>From<input type="date" data-br-date="from" value="${toDateInputValue(salesReportOptions.from)}"></label><label>To<input type="date" data-br-date="to" value="${toDateInputValue(salesReportOptions.to)}"></label><button data-br-action="SET DATE">SET</button></div>`:''}</div><header class="classic-report-title sales-report-title br-title" ${ui.hidden?'hidden':''}><h3>MT GOLD LAND</h3><div>MT GOLD LAND</div><h2>${barcodeReportView==='Barcode Entry'?'Barcode Entry List':escapeHtml(barcodeReportView)}</h2><span>${barcodeReportView==='BarCode Reco- Full'?'All Transactions':`From ${escapeHtml(displaySalesDate(salesReportOptions.from))} To ${escapeHtml(displaySalesDate(salesReportOptions.to))}`}</span></header><div class="br-paper ${ui.a4?'br-a4':''}" style="zoom:${ui.zoom}">${reconciliationTable('barcodeReport:'+barcodeReportView,config.rows.slice(ui.page*ui.pageSize,(ui.page+1)*ui.pageSize),config.columns,config.rows,'br-grid',config.totals)}</div><div class="br-page">${ui.shown?`${config.rows.length} records · Page ${ui.page+1} / ${pages}`:'Click SHOW to load the report.'}</div></section></div>`;
+}
+function barcodeReportExport(){
+ if(!barcodeReportUi.shown){toast("Click SHOW before exporting the report.");return;}
+ const config=barcodeReportVisible();
+ downloadCsv(`goldland-${barcodeReportView.toLowerCase().replaceAll(' ','-')}.csv`,[[barcodeReportView],[barcodeReportView==='BarCode Reco- Full'?'All Transactions':`${displaySalesDate(salesReportOptions.from)} to ${displaySalesDate(salesReportOptions.to)}`],config.columns.map(c=>c.label),...config.rows.map(row=>config.columns.map(c=>c.format?c.format(row[c.key]):row[c.key]??'')),config.columns.map((c,i)=>c.total?(c.format?c.format(config.totals[c.key]):config.totals[c.key]):i===0?'TOTAL':'')]);
+}
+function barcodeReportPrint(){
+ if(!barcodeReportUi.shown){toast("Click SHOW before printing the report.");return;}
+ const config=barcodeReportVisible();
+ const markup=`<div class="br-print-root"><h2>MT GOLD LAND</h2><h3>${escapeHtml(barcodeReportView)}</h3><p>${barcodeReportView==='BarCode Reco- Full'?'All Transactions':`${escapeHtml(displaySalesDate(salesReportOptions.from))} to ${escapeHtml(displaySalesDate(salesReportOptions.to))}`}</p>${salesReportTable(config.columns,config.rows,'br-grid',config.totals)}</div>`;
+ document.querySelector('.br-print-root')?.remove();document.body.insertAdjacentHTML('beforeend',markup);window.print();
+}
+window.addEventListener?.('afterprint',()=>document.querySelector('.br-print-root')?.remove());
+document.addEventListener('change',event=>{
+ if(event.target.hasAttribute('data-br-view')){barcodeReportView=event.target.value;barcodeReportUi.shown=false;barcodeReportUi.page=0;classicColumnMenu=null;render();}
+ if(event.target.hasAttribute('data-br-a4')){barcodeReportUi.a4=event.target.checked;render();}
+});
+document.addEventListener('click',event=>{
+ const action=event.target.closest('[data-br-action]')?.dataset.brAction;if(!action)return;
+ const ui=barcodeReportUi,pages=Math.max(1,Math.ceil(barcodeReportVisible().rows.length/ui.pageSize));
+ if(action==='PRINT'||action==='DIRECT PRINT'){barcodeReportPrint();return;}
+ if(action==='EXCEL'||action==='SAVE AS'){barcodeReportExport();return;}
+ if(action==='SHOW'){ui.shown=true;ui.page=0;}
+ if(action==='DATE')ui.dateOpen=!ui.dateOpen;
+ if(action==='SET DATE'){const from=document.querySelector('[data-br-date="from"]').value,to=document.querySelector('[data-br-date="to"]').value;if(!from||!to||from>to){toast('Choose a valid From/To date range.');return;}salesReportOptions.from=from;salesReportOptions.to=to;ui.dateOpen=false;ui.shown=false;ui.page=0;}
+ if(action==='FIRST')ui.page=0;if(action==='PREV')ui.page=Math.max(0,ui.page-1);if(action==='NEXT')ui.page=Math.min(pages-1,ui.page+1);if(action==='LAST')ui.page=pages-1;
+ if(action==='VIEW/HIDE')ui.hidden=!ui.hidden;
+ if(action==='ZOOM IN')ui.zoom=Math.min(1.8,ui.zoom+.1);if(action==='ZOOM OUT')ui.zoom=Math.max(.6,ui.zoom-.1);if(action==='DEFAULT')ui.zoom=1;
+ if(action==='CLOSE'){active='Dashboard';render();return;}render();
+});
+
+function findStockByBarcode(value,rows=state.stock||[]){
+ const code=String(value||'').trim().toUpperCase();if(!code)return null;
+ return rows.find(item=>String(item.barcode||'').toUpperCase()===code)||rows.find(item=>String(item.huid||'').toUpperCase()===code)||null;
+}
+function saleDetailsFromStock(stock){
+ return {...stock,barcode:stock.barcode||stock.huid,itemCode:stock.itemId||stock.itemCode||stock.barcode||stock.huid,itemName:stock.itemName||stock.item,item:stock.itemName||stock.item,qty:Number(stock.qty??stock.nos??1),nos:Number(stock.qty??stock.nos??1),description:stock.description||'',huid:stock.bisUid||stock.huid||'',va:Number(stock.va??stock.vaPerc??0),mcPerGm:Number(stock.mcGram??stock.mcPerGrm??stock.mcPerGm??0),makingCharge:Number(stock.mc??stock.makingCharge??0),stoneCharge:Number(stock.stoneCharge??stock.stnCharge??0),dmdAmount:Number(stock.diamondAmount??stock.dmdAmount??0),taxPct:Number(stock.saleTaxPct??3),rate:activeGoldRate(),goldRate:activeGoldRate()};
+}
+function billStockLines(bill,{purchase=false,view=''}={}){
+ if(/sales order|advance/i.test(view))return [];
+ if(purchase&&/diamond/i.test(view))return [];
+ if(purchase){const lines=bill.lines?.length?bill.lines:(bill.sections?.exchange||[]);return lines.map(line=>({line,sign:/return/i.test(view)?-1:1}));}
+ if(view==='DMD Return/DMD OP'||view==='DMD Sales WholeSales')return [];
+ const rows=[];
+ for(const [section,lines] of Object.entries(bill.sections||{}))for(const line of lines){const sign=section==='sales'?-1:1;rows.push({line,sign});}
+ return rows;
+}
+function postBillStock(bill,context={}){
+ const movements=billStockLines(bill,context);if(!movements.length)return;
+ const rows=structuredClone(state.stock||[]),old=bill.stockPosting?.entries||[],entries=[];
+ const round=value=>Math.round((Number(value)+Number.EPSILON)*1000)/1000;
+ const apply=(stock,delta)=>{
+ stock.qty=round(Number(stock.qty??stock.nos??0)+delta.qty);stock.nos=stock.qty;
+ stock.gross=round(Number(stock.gross||0)+delta.gross);stock.stone=round(Number(stock.stone||0)+delta.stone);stock.net=round(Number(stock.net??stock.netWeight??(Number(stock.closing||0)))+delta.net);
+ stock.closing=stock.net;stock.closingNos=stock.qty;stock.closingNet=stock.net;
+ stock.addition=round(Number(stock.addition||0)+Math.max(0,delta.net));stock.deduction=round(Number(stock.deduction||0)+Math.max(0,-delta.net));
+ stock.status=stock.qty<=0&&Math.abs(stock.net)<.0005?'Sold Out':'Available';
+ };
+ // Roll back this bill's previous posting before validating the replacement, on a private copy.
+ for(const prior of old){const stock=rows.find(row=>row.id===prior.stockId);if(!stock)throw Error('Stock source is missing; reload this bill before saving.');apply(stock,{qty:-prior.qty,gross:-prior.gross,stone:-prior.stone,net:-prior.net});stock.addition=round(Number(stock.addition||0)-Math.abs(prior.net));stock.deduction=round(Number(stock.deduction||0)-Math.abs(prior.net));}
+ const used=new Set([...barcodeEntryUsedCodes(),...rows.map(row=>row.barcode).filter(Boolean).map(code=>code.toUpperCase())]);
+ const assigned=[];
+ for(const {line,sign} of movements){
+ const qty=Number(line.qty??line.nos??1),gross=round(line.gross??line.grossWeight??0),stone=round(line.stone??line.stoneWeight??0),net=round(gross-stone);
+ if(!Number.isFinite(qty)||qty<=0||!Number.isInteger(qty)||![gross,stone,net].every(Number.isFinite)||gross<0||stone<0||net<0)throw Error(`Invalid stock quantity or weight for ${line.itemName||line.barcode||'item'}.`);
+ let code=String(line.barcode||'').trim().toUpperCase();
+ let stock=code?findStockByBarcode(code,rows):null;
+ if(!stock&&!code&&sign<0)stock=rows.find(row=>String(row.itemName||row.item||'').toLowerCase()===String(line.itemName||line.item||'').toLowerCase());
+ if(!stock&&sign<0)throw Error(`No available stock for barcode/item ${code||line.itemName}.`);
+ if(stock&&sign<0&&(stock.stockLocation||"Main Stock")!=="Main Stock")throw Error("This barcode is outside Main Stock. Record its transfer return before selling.");
+ if(!stock){
+ const master=state.itemMasters.find(item=>item.itemId===line.itemId||item.itemId===line.itemCode||item.itemName.toLowerCase()===String(line.itemName||line.item||'').toLowerCase());
+ code ||= barcodeEntryNextCode(master?.itemId||line.itemId||'PU',used);used.add(code);
+ stock={...line,id:crypto.randomUUID(),barcode:code,itemId:master?.itemId||line.itemId||line.itemCode||'',item:line.itemName||line.item,itemName:line.itemName||line.item,qty:0,nos:0,gross:0,stone:0,net:0,opening:0,addition:0,deduction:0,closing:0,purchaseSource:context.purchase?bill.id:undefined,purity:master?.typeWastage||line.goldType||'',category:master?.product||'',date:bill.date};rows.push(stock);
+ }
+ stock.id ||= crypto.randomUUID();
+ if(sign<0&&(Number(stock.qty??stock.nos??0)+.0005<qty||Number(stock.gross||0)+.0005<gross||Number(stock.stone||0)+.0005<stone||Number(stock.net??stock.closing??0)+.0005<net))throw Error(`Insufficient stock for ${code||stock.barcode||line.itemName}. Available: ${stock.qty} pcs, ${Number(stock.net??stock.closing??0).toFixed(3)} g.`);
+ const delta={stockId:stock.id,qty:sign*qty,gross:sign*gross,stone:sign*stone,net:sign*net};apply(stock,delta);entries.push(delta);assigned.push({line,barcode:stock.barcode||code});
+ }
+ if(rows.some(row=>['qty','gross','stone','net'].some(key=>Number(row[key]||0)<-.0005)))throw Error('This change would make stock negative; check later transactions first.');
+ state.stock=rows;
+ for(const item of assigned)if(item.barcode)item.line.barcode=item.barcode;
+ bill.stockPosting={version:1,entries,postedAt:new Date().toISOString()};
+}
+function reverseBillStock(bill){
+ if(bill.dmdStockPosting?.entries?.length){
+   const entries=bill.dmdStockPosting.entries;
+   for(const entry of entries){
+     const item=(state.stock||[]).find(row=>row.id===entry.id);
+     if(!item||JSON.stringify([item.qty,item.gross,item.stone,item.net,item.closing,item.deduction,item.status])!==entry.snapshot)throw Error('This purchase has subsequent stock movements. Reverse them before deleting the receipt.');
+   }
+   const ids=new Set(entries.map(entry=>entry.id));state.stock=state.stock.filter(item=>!ids.has(item.id));delete bill.dmdStockPosting;return;
+ }
+ if(!bill.stockPosting?.entries?.length)return;
+ const rows=structuredClone(state.stock),round=value=>Math.round(Number(value)*1000)/1000;
+ for(const entry of bill.stockPosting.entries){
+ const stock=rows.find(row=>row.id===entry.stockId);if(!stock)throw Error('Stock source is missing. Reload the bill before deleting.');
+ for(const key of ['qty','gross','stone','net'])stock[key]=round(Number(stock[key]??(key==='net'?stock.closing:0)??0)-entry[key]);
+ stock.nos=stock.qty;stock.closingNos=stock.qty;stock.closingNet=stock.net;stock.closing=stock.net;
+ stock.addition=round(Number(stock.addition||0)-Math.max(0,entry.net));stock.deduction=round(Number(stock.deduction||0)-Math.max(0,-entry.net));
+ if(['qty','gross','stone','net'].some(key=>stock[key]<-.0005))throw Error('This receipt has later stock movements. Reverse those transactions before deleting it.');
+ stock.status=stock.qty<=0&&Math.abs(stock.net)<.0005?'Sold Out':'Available';
+ }
+ state.stock=rows;delete bill.stockPosting;
+}
+function capturePendingStockEntry(bill){
+ const normal=(active==='Sales'&&['Sales Invoice','Sales Return'].includes(salesView))||(active==='Purchase'&&['Purchase Invoice','Purchase Return'].includes(purchaseView));
+ if(!normal)return;
+ document.querySelectorAll('.classic-entry-grid tbody tr').forEach(row=>{
+ const code=row.querySelector('[data-line-field="barcode"]')?.value?.trim();
+ const gross=parseEntryNumber(row.querySelector('[data-line-field="gross"]')?.value);
+ if(!code&&gross<=0)return;
+ const section=active==='Purchase'?'exchange':entrySectionForRow(row),line=readEntryLine(row,active==='Purchase'?'purchase':section);
+ bill.sections ||= {sales:[],exchange:[],return:[]};bill.sections[section] ||= [];
+ const index=Number(row.dataset.editLineIndex);
+ if(row.dataset.editLineIndex!==undefined&&Number.isInteger(index)&&index>=0&&index<bill.sections[section].length){line.id=bill.sections[section][index].id;bill.sections[section][index]=line;}else bill.sections[section].push(line);
+ bill.line=line;
+ });
+ if(!Object.values(bill.sections||{}).some(lines=>lines.length))throw Error('Enter at least one item before saving the bill.');
+ applyBillFinancials(bill);
+}
+
+// Exact decimal arithmetic for DMD purchase money, rounded half away from zero to paise.
+function dmdDecimal(value){
+ const text=String(value??0).trim(),match=text.match(/^([+-]?)(\d*)(?:\.(\d*))?(?:e([+-]?\d+))?$/i);
+ if(!match||(!match[2]&&!match[3]))throw Error('Invalid numeric amount.');
+ const exponent=Number(match[4]||0);if(Math.abs(exponent)>30)throw Error('Numeric amount is outside the supported range.');
+ const digits=(match[2]||'0')+(match[3]||''),scale=(match[3]||'').length-exponent;
+ let n=BigInt(digits)*(match[1]==='-'?-1n:1n),d=1n;if(scale>=0)d=10n**BigInt(scale);else n*=10n**BigInt(-scale);
+ return {n,d};
+}
+function dmdDecimalAdd(a,b){const d=a.d>b.d?a.d:b.d;return {n:a.n*(d/a.d)+b.n*(d/b.d),d};}
+function dmdDecimalNumber(value){return Number(value.n)/Number(value.d);}
+function dmdMoneyTerms(terms){
+ let total={n:0n,d:1n};for(const factors of terms){let term={n:1n,d:1n};for(const factor of factors){const part=dmdDecimal(factor);term={n:term.n*part.n,d:term.d*part.d};}total=dmdDecimalAdd(total,term);}
+ const sign=total.n<0n?-1n:1n,absolute=total.n*sign*100n;
+ const rounded=(absolute/total.d+(absolute%total.d*2n>=total.d?1n:0n))*sign;
+ if(rounded>BigInt(Number.MAX_SAFE_INTEGER)||rounded<-BigInt(Number.MAX_SAFE_INTEGER))throw Error('Amount is too large to store accurately.');
+ return Number(rounded)/100;
+}
+function dmdMoneySum(values){return dmdMoneyTerms(values.map(value=>[value]));}
+
+function dmdStonePurchaseWithPending(bill) {
+  const candidate={...bill,lines:[...(bill.lines||[])]};
+  const row=document.querySelector('.dmd-stone-purchase .classic-entry-grid tbody tr');
+  if(!row)return candidate;
+  const line=readDmdStonePurchaseEntryLine(row);
+  if(!line.caratCent&&!line.purchaseRate&&!line.pcs)return candidate;
+  const index=Number(row.dataset.editLineIndex);
+  if(row.dataset.editLineIndex!==undefined&&Number.isInteger(index)&&index>=0&&index<candidate.lines.length)candidate.lines[index]={...line,id:candidate.lines[index].id,barcode:candidate.lines[index].barcode};
+  else candidate.lines.push(line);
+  return candidate;
+}
+function updateDmdStonePurchaseInvoicePreview() {
+  if(active!=='Purchase'||purchaseView!=='DMD Stone Purchase')return;
+  const bill=state.dmdStonePurchases?.[0];if(!bill)return;
+  const totals=dmdStonePurchaseFinancials(dmdStonePurchaseWithPending(bill));
+  const values={'Bill Amount':totals.billAmount,'Invoice Total':totals.invoiceTotal,'Balance':totals.balance};
+  document.querySelectorAll('.dmd-stone-purchase-bottom .readout').forEach(readout=>{
+    const label=readout.querySelector('span')?.textContent,target=readout.querySelector('strong');
+    if(target&&Object.hasOwn(values,label))target.textContent=money(values[label]);
+  });
+}
+
+function dmdDiamondWeightCents(stones) {
+  const total=stones.reduce((sum,stone)=>{
+    const weight=dmdDecimal(stone.caratCent||0);
+    if(String(stone.ct||'Cnt').toLowerCase()==='ct')weight.n*=100n;
+    return dmdDecimalAdd(sum,weight);
+  },{n:0n,d:1n});
+  return dmdDecimalNumber(total);
+}
+
+// Work Orders / Stock: atomic source documents and reversible stock movements.
+function workflowRound(value, digits=6) {
+  const part=dmdDecimal(value),factor=10n**BigInt(digits),sign=part.n<0n?-1n:1n,n=part.n*sign*factor;
+  return Number((n/part.d+(n%part.d*2n>=part.d?1n:0n))*sign)/Number(factor);
+}
+function workflowSum(lines,key){return workflowRound(lines.reduce((sum,line)=>sum+Number(line[key]||0),0));}
+function workflowKey(value){return String(value||'').trim().toUpperCase();}
+function operationalConfig(kind) {
+  const configs={
+    smith:['smithWorkOrders',()=>smithWorkDraft,v=>smithWorkDraft=v,normalizeSmithWorkOrder,defaultSmithWorkOrder,smithWorkFinancials,'Smith','.smith-work-entry',readSmithWorkEntryLine],
+    jeweller:['jewellerWorkOrders',()=>jewellerWorkDraft,v=>jewellerWorkDraft=v,normalizeJewellerWorkOrder,defaultJewellerWorkOrder,jewellerWorkFinancials,'Jeweller','.jeweller-work-entry',readJewellerWorkEntryLine],
+    cashSmith:['cashWeightSmiths',()=>cashWeightSmithDraft,v=>cashWeightSmithDraft=v,normalizeCashWeightSmith,defaultCashWeightSmith,cashWeightSmithFinancials,'Smith','.cash-smith-entry',readCashWeightSmithEntryLine],
+    cashJeweller:['cashWeightJewellers',()=>cashWeightJewellerDraft,v=>cashWeightJewellerDraft=v,normalizeCashWeightJeweller,defaultCashWeightJeweller,cashWeightJewellerFinancials,'Jeweller','.cash-jeweller-entry',readCashWeightJewellerEntryLine],
+    adjustment:['stockAdjustments',()=>stockAdjustmentDraft,v=>stockAdjustmentDraft=v,normalizeStockAdjustment,defaultStockAdjustment,()=>({}),'Stock','.stock-adjustment-entry',readStockAdjustmentEntryLine],
+    opening:['openingStockEntries',()=>openingStockDraft,v=>openingStockDraft=v,normalizeOpeningStockEntry,defaultOpeningStockEntry,openingStockTotals,'Stock'],
+    deposit:['goldDeposits',()=>goldDepositDraft,v=>goldDepositDraft=v,v=>normalizeGoldDeposit(v,'Deposit'),()=>defaultGoldDeposit('Deposit'),goldDepositFinancials,'Stock','.gold-deposit-entry',readGoldDepositEntryLine],
+    withdrawal:['goldWithdrawals',()=>goldWithdrawalDraft,v=>goldWithdrawalDraft=v,v=>normalizeGoldDeposit(v,'Withdrawal'),()=>defaultGoldDeposit('Withdrawal'),goldDepositFinancials,'Stock','.gold-deposit-entry',readGoldDepositEntryLine],
+    sampleIssue:['sampleIssues',()=>sampleIssueDraft,v=>sampleIssueDraft=v,v=>normalizeSample(v,'Issue'),()=>defaultSample('Issue'),sampleFinancials,'Sample','.sample-entry',readSampleEntryLine],
+    sampleReturn:['sampleReturns',()=>sampleReturnDraft,v=>sampleReturnDraft=v,v=>normalizeSample(v,'Return'),()=>defaultSample('Return'),sampleFinancials,'Sample','.sample-entry',readSampleEntryLine],
+    polishing:['polishingEntries',()=>polishingDraft,v=>polishingDraft=v,normalizePolishingEntry,defaultPolishingEntry,polishingFinancials,'Polishing','.polishing-item-entry',readPolishingEntryLine],
+    serviceNew:['serviceJobs',()=>serviceNewDraft,v=>serviceNewDraft=v,v=>normalizeServiceJob(v,'New'),()=>defaultServiceJob('New'),serviceFinancials,'Service / Job','.service-job-entry',readServiceEntryLine],
+    serviceClose:['serviceClosures',()=>serviceCloseDraft,v=>serviceCloseDraft=v,v=>normalizeServiceJob(v,'Close'),()=>defaultServiceJob('Close'),serviceFinancials,'Service / Job','.service-job-entry',readServiceEntryLine],
+    refineryIssue:['refineryIssues',()=>refineryIssueDraft,v=>refineryIssueDraft=v,normalizeRefineryIssue,defaultRefineryIssue,refineryIssueFinancials,'Refiner','.refinery-issue-entry',readRefineryIssueEntryLine],
+    refineryReturn:['refineryReturns',()=>refineryReturnDraft,v=>refineryReturnDraft=v,normalizeRefineryReturn,defaultRefineryReturn,refineryReturnFinancials,'Refiner'],
+    refineryFinal:['refineryFinalReturns',()=>refineryFinalDraft,v=>refineryFinalDraft=v,normalizeRefineryFinalReturn,defaultRefineryFinalReturn,refineryFinalFinancials,'Refiner'],
+    meltingIssue:['meltingIssues',()=>meltingIssueDraft,v=>meltingIssueDraft=v,normalizeMeltingIssue,defaultMeltingIssue,meltingIssueFinancials,'Refiner','.melting-issue-entry',readMeltingIssueEntryLine],
+    meltingReturn:['meltingReturns',()=>meltingReturnDraft,v=>meltingReturnDraft=v,normalizeMeltingReturn,defaultMeltingReturn,meltingReturnFinancials,'Refiner'],
+    transfer:['itemTransfers',()=>itemTransferDraft,v=>itemTransferDraft=v,normalizeItemTransfer,()=>normalizeItemTransfer({entryNo:String((state.itemTransfers||[]).length+1),lines:[]}),itemTransferTotals,'Stock']
+  };
+  const c=configs[kind];if(!c)throw Error('Unknown work/stock document.');
+  return {collection:c[0],get:c[1],set:c[2],normalize:c[3],fresh:c[4],totals:c[5],workflow:c[6],selector:c[7],reader:c[8]};
+}
+function operationalRecordKey(kind,record){return kind+':'+record.id;}
+function operationalParty(record){return workflowKey(record.smithCode||record.jewellerCode||record.partyAccount||record.jewellerName||record.smithName||record.partyName||record.refinerName||record.salesman||operationalPartyName(record)||'SHOP');}
+function operationalNumber(value,label,{integer=false,positive=false,max=Infinity}={}) {
+  const n=Number(value??0);
+  if(!Number.isFinite(n)||n<0||n>max||(integer&&!Number.isInteger(n))||(positive&&n<=0))throw Error(label+' has an invalid value.');return n;
+}
+function captureOperationalPending(kind,record) {
+  const config=operationalConfig(kind);
+  const capture=(selector,reader,key='lines')=>{
+    if(!selector||!reader)return;
+    const row=document.querySelector(selector+' .classic-entry-grid tbody tr');if(!row)return;
+    // Ignore rate, default quantities and default select options on an untouched entry row.
+    const meaningful=[...row.querySelectorAll('[data-line-field]')].some(input=>{
+      const key=input.dataset.lineField;
+      return ['barcode','itemName','itemId','description','gross','weight','amount','caratCent','nosAdd','grossAdd','nosLess','grossLess'].includes(key)&&String(input.value||'').trim()!==''&&(!['gross','weight','amount','caratCent','nosAdd','grossAdd','nosLess','grossLess'].includes(key)||Number(input.value)!==0);
+    });
+    if(!meaningful)return;
+    if(['deposit','withdrawal'].includes(kind)&&!['gross','amount'].some(key=>Number(row.querySelector('[data-line-field=\"'+key+'\"]')?.value||0)!==0))return;
+    const line=reader(row),index=Number(row.dataset.editLineIndex);record[key] ||= [];
+    if(row.dataset.editLineIndex!==undefined&&Number.isInteger(index)&&index>=0&&index<record[key].length)record[key][index]={...line,id:record[key][index].id};else record[key].push(line);
+  };
+  capture(config.selector,config.reader);
+  if(kind==='polishing')capture('.polishing-stone-entry',readPolishingStoneEntryLine,'stones');
+  return record;
+}
+function validateOperationalRecord(kind,record) {
+  if(isTransactionDateLocked(record.date||record.openingDate))throw Error('This transaction date is locked.');
+  const lines=(record.lines||[]).filter(line=>line.active!==false);
+  if(!lines.length)throw Error('Add at least one item before saving.');
+  if(!['opening','adjustment','transfer'].includes(kind)&&!(kind==='polishing'&&!record.hasParty)&&!operationalPartyName(record))throw Error('Select the party before saving.');
+  for(const line of [...lines,...(record.stones||[])]){
+    for(const [key,value] of Object.entries(line))if(typeof value==='number')operationalNumber(value,key,{integer:['qty','nos','pcs','nosAdd','nosLess','closingNos'].includes(key)});
+    for(const key of ['touch','percent','expectedTouch','vaPercent','taxPct','wastage'])if(line[key]!==undefined)operationalNumber(line[key],key,{max:100});
+    if(line.gross!==undefined&&Number(line.stone||0)+Number(line.mudLess||line.mudless||0)>Number(line.gross)+.000001)throw Error('Stone and mud deductions cannot exceed gross weight.');
+    if(line.weight!==undefined&&line.description&&Number(line.stone||0)>Number(line.weight))throw Error('Opening stone weight cannot exceed gross weight.');
+    if(line.mode&&!['IN','OUT'].includes(line.mode))throw Error('Select IN or OUT for the movement.');
+    if(['deposit','withdrawal'].includes(kind)&&record.byAmount){operationalNumber(line.amount,'Amount',{positive:true});operationalNumber(line.rate,'Rate',{positive:true});}
+    if(kind.startsWith('cash')){operationalNumber(line.amount,'Amount',{positive:true});operationalNumber(line.rate,'Rate',{positive:true});operationalNumber(line.convert,'Conversion',{positive:true});if(Math.abs(Number(line.weight)*Number(line.rate)-Number(line.amount))>.011)throw Error('Cash weight must match amount divided by rate.');}
+  }
+  for(const key of ['addition','discount','cashPayment','cashPaid','advance','approxAmount','refinerCharge','dueDays','gstPct','expectedTouch'])if(record[key]!==undefined)operationalNumber(record[key],key,{max:['gstPct','expectedTouch'].includes(key)?100:Infinity});
+  if(kind==='serviceClose'){
+    const job=(state.serviceJobs||[]).find(job=>job.id===record.sourceJobId);if(!job)throw Error('Select an open service job to close.');
+    if(toDateInputValue(record.date)<toDateInputValue(job.date))throw Error('Service closing date cannot precede the job date.');
+    if((state.serviceClosures||[]).some(c=>c.id!==record.id&&c.sourceJobId===job.id))throw Error('This service job has already been closed.');
+    if(Number(record.advance||0)!==Number(job.advance||0))throw Error('Use the advance from the selected service job.');
+    if(workflowKey(job.partyName)!==workflowKey(record.partyName))throw Error('Service closing party must match the original job.');
+  }
+  if(['refineryReturn','refineryFinal','meltingReturn'].includes(kind))validateRefiningReturn(kind,record);
+  const totals=operationalConfig(kind).totals(record);
+  const monetaryBase=totals.totalAmt??totals.totalAmount??totals.refinedAmount??totals.amount;
+  if(record.discount&&monetaryBase!==undefined&&Number(record.discount)>dmdMoneySum([monetaryBase,record.addition||0,record.refinerCharge||0]))throw Error('Discount exceeds the amount plus additions.');
+}
+function operationalPartyName(record){const issue=record.pendingIssueId?[...(state.refineryIssues||[]),...(state.meltingIssues||[])].find(issue=>issue.id===record.pendingIssueId||issue.entryNo===record.pendingIssueId):null;return record.smithName||record.jewellerName||record.partyName||record.refinerName||issue?.refinerName||'';}
+function validateRefiningReturn(kind,record) {
+  const melting=kind==='meltingReturn',issue=melting?selectedMeltingIssue(record.pendingIssueId):selectedRefineryIssue(record.pendingIssueId);
+  if(!issue)throw Error('Select a saved issue before recording its return.');
+  if(toDateInputValue(record.date)<toDateInputValue(issue.date))throw Error('Return date cannot precede its issue date.');
+  const collection=kind==='refineryFinal'?'refineryFinalReturns':melting?'meltingReturns':'refineryReturns';
+  if((state[collection]||[]).some(other=>other.id!==record.id&&(other.pendingIssueId===issue.id||other.pendingIssueId===issue.entryNo)))throw Error('This issue already has a return at this stage. Edit that return instead.');
+  if(kind==='refineryFinal'&&!selectedRefineryReturn(issue.id))throw Error('Save the refinery test return before the final return.');
+  const source=kind==='refineryFinal'?selectedRefineryReturn(issue.id).lines:issue.lines;
+  if(record.lines.length!==source.length)throw Error('Return rows must match the selected issue.');
+  record.lines.forEach((line,index)=>{
+    const original=source[index],limit=Number(original.receivedWeight??original.net??0),issued=Number(line.issuedWeight??line.receivedWeight??0);
+    if(Math.abs(issued-limit)>.000001)throw Error('Return issue weight does not match its source.');
+    const returned=kind==='refineryFinal'?Number(line.testWeight||0):Number(line.receivedWeight||0);
+    const losses=Number(line.meltingLoss||line.acidingLoss||0),bottle=Number(line.bottleStockWeight||0),reissue=Number(line.reissueWeight||0);
+    if(kind==='refineryFinal'&&bottle>Number(original.bottleStockWeight||0)+.000001)throw Error('Bottle stock exceeds the recorded test return.');
+    if(returned+(kind==='refineryFinal'?0:bottle)+reissue+losses>limit+.000001)throw Error('Returned weight, losses, bottle stock and reissue exceed the issued weight.');
+    if(Math.abs(returned+(kind==='refineryFinal'?0:bottle)+reissue+losses-limit)>.000001)throw Error('Account for the full issued weight using return, loss, bottle stock or reissue.');
+    if(Number(line.testWeight||0)>limit+.000001)throw Error('Test weight exceeds issued weight.');
+  });
+}
+function operationalSnapshot(item){return item?JSON.stringify([item.qty??0,item.gross??0,item.stone??0,item.net??item.closing??0,item.closing??0,item.addition??0,item.deduction??0,item.status||'',item.stockLocation||'Main Stock']):null;}
+function reverseOperationalPosting(key) {
+  const posting=state.operationalPostings?.[key];if(!posting)return;
+  for(const entry of posting.entries){const item=(state.stock||[]).find(item=>item.id===entry.stockId);if(operationalSnapshot(item)!==entry.afterSnapshot)throw Error('This document has later stock movements. Reverse those movements before changing or deleting it.');}
+  for(const entry of posting.entries){const index=state.stock.findIndex(item=>item.id===entry.stockId);if(entry.before)state.stock[index]=structuredClone(entry.before);else if(index>=0)state.stock.splice(index,1);}
+  delete state.operationalPostings[key];
+}
+function operationalFindStock(line,rows=state.stock||[]) {
+  const code=workflowKey(line.barcode);
+  if(code)return rows.find(item=>workflowKey(item.barcode||item.huid)===code||workflowKey(item.huid)===code)||null;
+  const itemId=workflowKey(line.itemId),name=workflowKey(line.itemName||line.description);
+  const matches=rows.filter(item=>itemId&&workflowKey(item.itemId)===itemId||name&&workflowKey(item.item||item.itemName)===name);
+  if(matches.length>1)throw Error('More than one stock item matches. Enter its barcode.');return matches[0]||null;
+}
+function operationalCustodyBalance(key,exclude='') {
+  const result={qty:0,gross:0,stone:0,net:0};
+  for(const [id,posting] of Object.entries(state.operationalPostings||{}))if(id!==exclude)for(const move of posting.moves||[])if(move.custodyKey===key)for(const field of Object.keys(result))result[field]=workflowRound(result[field]-move.sign*Number(move[field]||0));
+  return result;
+}
+function operationalMoves(kind,record) {
+  const lines=record.lines.filter(line=>line.active!==false),party=operationalParty(record);
+  const moves=[];
+  for(const line of lines){
+    let sign=0,custody='',data=line;
+    if(['smith','jeweller'].includes(kind))sign=line.mode==='OUT'?-1:1;
+    if(kind==='sampleIssue'||kind==='sampleReturn'){sign=kind==='sampleIssue'?-1:1;custody='Sample';}
+    if(kind==='polishing'){sign=record.movement==='Return'?1:-1;custody='Polishing';}
+    if(kind==='refineryIssue'||kind==='meltingIssue')sign=-1;
+    if(kind==='meltingReturn'||kind==='refineryFinal'){
+      sign=1;const weight=kind==='meltingReturn'?Number(line.receivedWeight||0):Number(line.testWeight||0);
+      // Refined output is new bulk metal, not the original ornament tag.
+      data={...line,itemName:record.outputItemName||'Refined Gold',barcode:'',itemId:'REFINED-GOLD',qty:0,gross:weight,stone:0,net:weight};
+    }
+    if(kind==='deposit'||kind==='withdrawal'){sign=kind==='deposit'?1:-1;data={...line,barcode:record.depositStockCode||'DEPOSIT-'+workflowKey(record.partyName)+'-'+workflowKey(line.itemId||line.itemName)};}
+    if(!sign)continue;
+    const qty=Number(data.qty??data.nos??0),gross=Number(data.gross||0),stone=Number(data.stone||0),net=workflowRound(gross-stone-Number(data.mudLess||data.mudless||0));
+    if(!qty&&!gross)throw Error('Enter a quantity or weight for each stock movement.');
+    const tag=workflowKey(data.barcode||data.itemId||data.itemName);
+    moves.push({line:data,original:line,sign,qty,gross,stone,net,custodyKey:custody?custody+':'+party+':'+tag:''});
+  }
+  return moves;
+}
+function postOperationalStock(kind,record) {
+  const key=operationalRecordKey(kind,record),moves=operationalMoves(kind,record);
+  const fingerprint=JSON.stringify({kind,party:operationalParty(record),pendingIssueId:record.pendingIssueId,sourceJobId:record.sourceJobId,lines:record.lines,movement:record.movement});
+  if(state.operationalPostings?.[key]?.fingerprint===fingerprint)return;
+  reverseOperationalPosting(key);
+  state.operationalPostings ||= {};
+  const custodyDeltas=new Map();
+  const originals=new Map(),remember=item=>{if(!originals.has(item.id))originals.set(item.id,structuredClone(item));};
+  for(const move of moves){
+    let stock=operationalFindStock(move.line);
+    if(!stock&&move.sign<0)throw Error('Item is not available in stock: '+(move.line.barcode||move.line.itemName));
+    if(move.custodyKey){
+      move.custodyKey=move.custodyKey.split(':')[0]+':'+operationalParty(record)+':'+(stock?.id||workflowKey(move.line.barcode));
+      const balance=operationalCustodyBalance(move.custodyKey,key),delta=custodyDeltas.get(move.custodyKey)||{qty:0,gross:0,stone:0,net:0};
+      for(const field of ['qty','gross','stone','net']){if(move.sign>0&&move[field]>balance[field]+delta[field]+.000001)throw Error('Return exceeds the outstanding issue for this party.');delta[field]=workflowRound(delta[field]-move.sign*move[field]);}
+      custodyDeltas.set(move.custodyKey,delta);
+    }
+    if(stock&&move.sign<0&&(stock.stockLocation||'Main Stock')!=='Main Stock')throw Error('Return this barcode to Main Stock before issuing it.');
+    if(!stock){
+      const code=move.line.barcode||'WK-'+crypto.randomUUID().replaceAll('-','').slice(0,12).toUpperCase();
+      stock=normalizeStock({...move.line,id:crypto.randomUUID(),item:move.line.itemName||move.line.itemId,itemId:move.line.itemId||'',barcode:code,huid:move.line.bisUid||'',qty:0,gross:0,stone:0,net:0,opening:0,addition:0,deduction:0,closing:0,status:'Available'});
+      state.stock.push(stock);originals.set(stock.id,null);
+      if(move.line===move.original){move.original.barcode=code;move.line.barcode=code;}
+    }else remember(stock);
+    for(const field of ['qty','gross','stone','net']){const opening=Number(stock[field]??(field==='net'?stock.closing:0)??0),next=workflowRound(opening+move.sign*move[field]);if(next<-.000001)throw Error('Insufficient '+field+' for '+(move.line.barcode||move.line.itemName));stock[field]=Math.max(0,next);}
+    stock.closing=stock.net;stock.nos=stock.qty;stock.closingNos=stock.qty;stock.closingNet=stock.net;
+    stock.addition=workflowRound(Number(stock.addition||0)+(move.sign>0?move.net:0));stock.deduction=workflowRound(Number(stock.deduction||0)+(move.sign<0?move.net:0));
+    stock.status=stock.qty===0&&stock.net===0?(move.custodyKey?'Issued for '+move.custodyKey.split(':')[0]:'Issued'):'Available';
+    move.stockId=stock.id;
+  }
+  // Fingerprint includes any generated barcode to keep a repeat save idempotent.
+  const finalFingerprint=JSON.stringify({kind,party:operationalParty(record),pendingIssueId:record.pendingIssueId,sourceJobId:record.sourceJobId,lines:record.lines,movement:record.movement});
+  const entries=[...originals].map(([stockId,before])=>({stockId,before,afterSnapshot:operationalSnapshot(state.stock.find(item=>item.id===stockId))}));
+  state.operationalPostings[key]={fingerprint:finalFingerprint,kind,sourceId:record.id,entries,moves:moves.map(({line,original,...move})=>move),party:operationalParty(record)};
+}
+function freshOperationalRecord(config){
+  const fresh=config.fresh(),match=String(fresh.entryNo||'').match(/^(.*?)(\d+)$/);
+  if(match){const next=Math.max(Number(match[2]),...(state[config.collection]||[]).map(item=>Number(String(item.entryNo||'').match(/\d+$/)?.[0]||0)+1));fresh.entryNo=match[1]+String(next).padStart(match[2].length,'0');}
+  return fresh;
+}
+function assertOperationalDependencies(kind,record) {
+  const links=kind==='refineryIssue'?['refineryReturns','refineryFinalReturns']:kind==='refineryReturn'?['refineryFinalReturns']:kind==='meltingIssue'?['meltingReturns']:kind==='serviceNew'?['serviceClosures']:[];
+  if(links.some(collection=>(state[collection]||[]).some(child=>[record.id,record.entryNo].includes(child.pendingIssueId)||child.sourceJobId===record.id)))throw Error('This document has a linked return or closing entry. Reverse that entry first.');
+}
+function commitOperationalRecord(kind,input) {
+  const before=state;state=structuredClone(state);
+  try{
+    const config=operationalConfig(kind);
+    for(const line of input.lines||[])for(const [field,value] of Object.entries(line))if(typeof value==='number'&&!Number.isFinite(value))throw Error(field+' must be finite.');
+    const record=config.normalize(structuredClone(input));
+    state[config.collection] ||= [];
+    const previous=state[config.collection].find(item=>item.id===record.id||(kind==='opening'&&item.openingDate===record.openingDate));
+    if(previous)record.id=previous.id;
+    if(previous&&!state.operationalPostings?.[operationalRecordKey(kind,record)]&&!['serviceNew','serviceClose','cashSmith','cashJeweller','refineryReturn'].includes(kind))throw Error('This historical entry has no posting journal. Start a new entry; reconcile this older document before editing it.');
+    if(state[config.collection].some(item=>item.id!==record.id&&String(item.entryNo)===String(record.entryNo)&&kind!=='opening'))throw Error('Entry number already exists. Use a unique entry number.');
+    validateOperationalRecord(kind,record);
+    if(previous&&JSON.stringify([previous.lines,previous.advance,previous.approxAmount,previous.cashPayment,operationalParty(previous)])!==JSON.stringify([record.lines,record.advance,record.approxAmount,record.cashPayment,operationalParty(record)]))assertOperationalDependencies(kind,record);
+    if(['adjustment','opening'].includes(kind))postOperationalBalance(kind,record);else if(kind==='transfer')postOperationalTransfer(record);else postOperationalStock(kind,record);
+    if(kind==='serviceClose'){const job=state.serviceJobs.find(job=>job.id===record.sourceJobId);record.originalJobStatus=previous?.originalJobStatus||job.jobStatus;job.jobStatus='Closed';}
+    record.createdAt=previous?.createdAt||record.createdAt||new Date().toISOString();
+    record.saved=true;record.updatedAt=new Date().toISOString();
+    state[config.collection]=[record,...state[config.collection].filter(item=>item.id!==record.id)];
+    const totals=config.totals(record),key=operationalRecordKey(kind,record),moves=state.operationalPostings?.[key]?.moves||[];
+    state.workLogs=(state.workLogs||[]).filter(log=>log.sourceKey!==key);
+    state.workLogs.unshift({...normalizeWorkLog({refNo:record.entryNo||record.openingDate,date:record.date||record.openingDate,workflow:config.workflow,action:kind,party:operationalPartyName(record),item:record.lines[0]?.itemName||record.lines[0]?.description||kind,qty:workflowSum(record.lines,'qty')||workflowSum(record.lines,'nos'),gross:workflowSum(record.lines,'gross'),issue:workflowRound(moves.filter(move=>move.sign<0).reduce((sum,move)=>sum+move.net,0)),receive:workflowRound(moves.filter(move=>move.sign>0).reduce((sum,move)=>sum+move.net,0)),balance:totals.closing??totals.balance??0,status:'Posted'}),sourceKey:key,sourceId:record.id});
+    state.audit.unshift(audit('Saved '+kind+' '+(record.entryNo||record.openingDate)));
+    return record;
+  }catch(error){state=before;throw error;}
+}
+function saveOperationalRecord(kind) {
+  const config=operationalConfig(kind),draft=config.get()||config.fresh();
+  try{const input=captureOperationalPending(kind,structuredClone(draft));commitOperationalRecord(kind,input);config.set(freshOperationalRecord(config));saveState();render();toast(kind.startsWith('service')?'Service job saved.':kind.startsWith('cash')?'Settlement saved.':'Saved. Stock and balances updated.');return true;}
+  catch(error){toast(error.message);return false;}
+}
+function removeOperationalRecord(kind,record) {
+  const before=state;state=structuredClone(state);
+  try{const config=operationalConfig(kind);if(!state.operationalPostings?.[operationalRecordKey(kind,record)]&&!['serviceNew','serviceClose','cashSmith','cashJeweller','refineryReturn'].includes(kind))throw Error('This historical entry must be reconciled before deletion.');if(isTransactionDateLocked(record.date||record.openingDate))throw Error('This transaction date is locked.');assertOperationalDependencies(kind,record);reverseOperationalPosting(operationalRecordKey(kind,record));state[config.collection]=(state[config.collection]||[]).filter(item=>item.id!==record.id);if(kind==='serviceClose'){const job=(state.serviceJobs||[]).find(job=>job.id===record.sourceJobId);if(job)job.jobStatus=record.originalJobStatus||'Pending';}state.workLogs=(state.workLogs||[]).filter(log=>log.sourceKey!==operationalRecordKey(kind,record));state.audit.unshift(audit('Deleted '+kind+' '+(record.entryNo||record.openingDate)));}
+  catch(error){state=before;throw error;}
+}
+function deleteOperationalRecord(kind) {
+  const config=operationalConfig(kind),draft=config.get();
+  try{if(draft){const saved=(state[config.collection]||[]).find(item=>item.id===draft.id);if(saved)removeOperationalRecord(kind,saved);}config.set(freshOperationalRecord(config));saveState();render();toast('Entry deleted.');return true;}
+  catch(error){toast(error.message);return false;}
+}
+function servicePendingJobSelector(){return '<label class="classic-field"><span>Service job</span><select data-service-source><option value="">Select job to close</option>'+(state.serviceJobs||[]).filter(job=>!(state.serviceClosures||[]).some(close=>close.sourceJobId===job.id&&close.id!==serviceCloseDraft?.id)).map(job=>'<option value="'+escapeHtml(job.id)+'" '+(serviceCloseDraft?.sourceJobId===job.id?'selected':'')+'>'+escapeHtml(job.entryNo+' — '+job.partyName)+'</option>').join('')+'</select></label>';}
+document.addEventListener('change',event=>{
+  if(event.target.hasAttribute('data-polishing-movement')){polishingDraft={...(polishingDraft||defaultPolishingEntry()),movement:event.target.value};}
+  if(event.target.hasAttribute('data-service-source')){if(loadServiceJobForClose(event.target.value))render();}
+});
+function postOperationalBalance(kind,record) {
+  const key=operationalRecordKey(kind,record),fingerprint=JSON.stringify({kind,lines:record.lines});
+  if(state.operationalPostings?.[key]?.fingerprint===fingerprint)return;
+  reverseOperationalPosting(key);state.operationalPostings ||= {};
+  const entries=[];
+  const active=record.lines.filter(line=>line.active!==false&&(kind!=='opening'||line.weight||line.stone||line.amount));
+  if(!active.length)throw Error('Enter at least one stock balance or adjustment.');
+  const touched=new Set();
+  for(const line of active){
+    let stock=operationalFindStock(kind==='opening'?{itemName:line.description}:line);
+    if(stock&&touched.has(stock.id))throw Error('Use one adjustment row per stock item.');
+    const before=stock?structuredClone(stock):null;
+    if(!stock){stock=normalizeStock({id:crypto.randomUUID(),item:line.itemName||line.description,barcode:line.barcode||'',huid:'',qty:0,gross:0,stone:0,net:0,opening:0,addition:0,deduction:0,closing:0});state.stock.push(stock);}
+    touched.add(stock.id);
+    if(kind==='opening'){
+      if(before&&(Number(before.addition||0)!==0||Number(before.deduction||0)!==0))throw Error('Opening stock cannot replace a balance with posted movements. Use Stock Adjustments to correct it.');
+      stock.addition=0;stock.deduction=0;
+      stock.opening=Number(line.netWeight||0);stock.gross=Number(line.weight||0);stock.stone=Number(line.stone||0);stock.net=workflowRound(stock.gross-stock.stone);stock.closing=stock.net;
+      stock.rate=line.rate;stock.pureWeight=line.pureWeight;stock.openingAmount=line.amount;
+      if(/nos/i.test(line.description))stock.qty=line.weight;
+    }else{
+      const nos=Number(stock.qty||0)+Number(line.nosAdd||0)-Number(line.nosLess||0),gross=Number(stock.gross||0)+Number(line.grossAdd||0)-Number(line.grossLess||0),stone=Number(stock.stone||0)+Number(line.stoneAdd||0)-Number(line.stoneLess||0),net=workflowRound(gross-stone);
+      if([nos,gross,stone,net].some(value=>value<-.000001))throw Error('Adjustment would create negative stock.');
+      if(!Number.isInteger(nos))throw Error('Closing quantity must be a whole number.');
+      Object.assign(stock,{qty:nos,gross:workflowRound(gross),stone:workflowRound(stone),net,closing:net,addition:workflowRound(Number(stock.addition||0)+Math.max(0,Number(line.grossAdd||0)-Number(line.stoneAdd||0))+Math.max(0,Number(line.stoneLess||0)-Number(line.grossLess||0))),deduction:workflowRound(Number(stock.deduction||0)+Math.max(0,Number(line.grossLess||0)-Number(line.stoneLess||0))+Math.max(0,Number(line.stoneAdd||0)-Number(line.grossAdd||0)))});
+      Object.assign(line,{closingNos:nos,closingGross:stock.gross,closingStone:stock.stone,closingNet:net});
+    }
+    stock.nos=stock.qty;stock.closingNos=stock.qty;stock.closingNet=stock.net;stock.status='Available';
+    entries.push({stockId:stock.id,before,afterSnapshot:operationalSnapshot(stock)});
+  }
+  state.operationalPostings[key]={kind,sourceId:record.id,fingerprint:JSON.stringify({kind,lines:record.lines}),entries,moves:[]};
+}
+function postOperationalTransfer(record) {
+  const key=operationalRecordKey('transfer',record),fingerprint=JSON.stringify({lines:record.lines,stockLocation:record.stockLocation,salesman:record.salesman});
+  if(state.operationalPostings?.[key]?.fingerprint===fingerprint)return;
+  reverseOperationalPosting(key);state.operationalPostings ||= {};
+  const entries=[];
+  for(const line of record.lines){
+    const stock=operationalFindStock(line);if(!stock)throw Error('Select an existing barcode to transfer.');
+    if(entries.some(entry=>entry.stockId===stock.id))throw Error('Use one transfer row per barcode.');
+    if(Number(line.qty)!==Number(stock.qty)||Math.abs(Number(line.gross)-Number(stock.gross))>.000001||Math.abs(Number(line.stone)-Number(stock.stone||0))>.000001)throw Error('Transfer the complete barcode quantity and weight. Split it into separate tags before a partial transfer.');
+    if(Number(stock.qty||0)<=0&&Number(stock.net||0)<=0)throw Error('Sold or issued stock cannot be transferred.');
+    const before=structuredClone(stock),location=stock.stockLocation||'Main Stock';
+    if(line.mode==='OUT'){if(location!=='Main Stock')throw Error('This tag is already outside Main Stock.');if(!record.stockLocation||record.stockLocation==='Main Stock')throw Error('Choose the receiving stock location.');stock.stockLocation=record.stockLocation;}
+    else {if(location==='Main Stock')throw Error('This tag is already in Main Stock.');if(record.stockLocation&&record.stockLocation!==location)throw Error('Return location does not match the tag location.');stock.stockLocation='Main Stock';}
+    entries.push({stockId:stock.id,before,afterSnapshot:operationalSnapshot(stock)});
+  }
+  state.operationalPostings[key]={kind:'transfer',sourceId:record.id,fingerprint,entries,moves:[]};
+}
+function operationalPartyOpening(kind,record) {
+  const smith=kind==='smith',name=smith?(record.smithName||record.partyName):(record.jewellerName||record.partyName),master=(state.parties||[]).find(p=>p.name===name&&p.type===(smith?'Smith':'Jeweller'));
+  let opening=Number(master?.openingWeight||0);
+  const collection=smith?'smithWorkOrders':'jewellerWorkOrders',weight=smith?'smWeight':'jwWeight';
+  for(const prior of state[collection]||[])if(prior.id!==record.id&&operationalIsPrior(prior,record)&&(smith?prior.smithName:prior.jewellerName)===name)for(const line of prior.lines||[])opening+=Number(line[weight]||0)*(line.mode==='OUT'?1:-1);
+  const cashCollection=smith?'cashWeightSmiths':'cashWeightJewellers';
+  for(const prior of state[cashCollection]||[])if(prior.id!==record.id&&operationalIsPrior(prior,record)&&prior.partyName===name)opening+=workflowSum(prior.lines||[],'netWeight')*(prior.mode==='Receipt'?1:-1);
+  return workflowRound(opening);
+}
+function renderOperationalKeepingEntry() {
+  const rows=[...document.querySelectorAll('.classic-entry-grid tbody tr')].map(row=>({kind:row.closest('[data-entry-kind]')?.dataset.entryKind,dataset:{...row.dataset},values:[...row.querySelectorAll('[data-line-field]')].map(field=>({key:field.dataset.lineField,value:field.value}))}));
+  render();
+  for(const saved of rows){if(!saved.kind)continue;const row=document.querySelector('[data-entry-kind="'+saved.kind+'"] .classic-entry-grid tbody tr');if(!row)continue;Object.assign(row.dataset,saved.dataset);for(const value of saved.values){const field=row.querySelector('[data-line-field="'+value.key+'"]');if(field)field.value=value.value;}const field=row.querySelector('[data-line-field="gross"]');if(field)field.dispatchEvent(new Event('input',{bubbles:true}));}
+}
+function currentOperationalKind() {
+ if(active==='Stock')return {'Stock Adjustments':'adjustment',[OPENING_STOCK_VIEW]:'opening','Gold Deposit':'deposit','Gold Withdrawal':'withdrawal','Item Transfer':'transfer'}[stockView]||null;
+ if(active!=='Work Orders')return null;
+ if(workOrderView==='Smith')return smithWorkView==='Cash for Weight Smith'?'cashSmith':'smith';
+ if(workOrderView==='Jeweller')return smithWorkView==='Cash for Weight Jeweller'?'cashJeweller':'jeweller';
+ if(workOrderView==='Sample')return sampleWorkView==='Sample Return'?'sampleReturn':'sampleIssue';
+ if(workOrderView==='Polishing')return 'polishing';
+ if(workOrderView==='Service / Job')return serviceWorkView==='Close Service / Job'?'serviceClose':'serviceNew';
+ if(workOrderView==='Refining')return {'Refinery Issue':'refineryIssue','Refinery Return':'refineryReturn','Refinery Final Return':'refineryFinal','Melting Issue':'meltingIssue','Melting Return':'meltingReturn'}[refineryView]||'refineryIssue';
+ return null;
+}
+function operationalNavigate(direction){
+ const kind=currentOperationalKind();if(!kind)return false;
+ const config=operationalConfig(kind),records=state[config.collection]||[];if(!records.length){toast('No saved entries.');return true;}
+ const index=records.findIndex(record=>record.id===config.get()?.id),next=index<0?0:Math.max(0,Math.min(records.length-1,index+(direction==='previous'?1:-1)));
+ config.set(config.normalize(structuredClone(records[next])));render();return true;
+}
+function editableItemTransferScreen() {
+ const config=operationalConfig('transfer');itemTransferDraft ||= freshOperationalRecord(config);
+ const record=itemTransferDraft,totals=itemTransferTotals(record);
+ const field=(key,label,type='text')=>'<label><span>'+label+'</span><input data-transfer-field="'+key+'" type="'+type+'" value="'+escapeHtml(type==='date'?toDateInputValue(record[key]):String(record[key]||''))+'"></label>';
+ const input=(line,index,key,type='text')=>'<input data-transfer-line="'+key+'" data-index="'+index+'" type="'+type+'" '+(type==='number'?'min="0" step="'+(key==='qty'?'1':'0.001')+'"':'')+' value="'+escapeHtml(String(line[key]??''))+'">';
+ return '<section class="panel item-transfer-detail-window"><div class="entry-actions body-toolbar">'+[['New','transfer-new'],['Update','transfer-save'],['Refresh','transfer-refresh'],['Edit','edit-current-bill'],['Delete','transfer-delete'],['Previous','transfer-previous'],['Next','transfer-next'],['Close','close-item-transfer-detail']].map(([label,action])=>toolbarButton(label,action)).join('')+'</div><div class="item-transfer-detail-header">'+field('entryNo','Entry No')+field('salesman','S.man')+field('date','Entry Date','date')+field('time','Time','time')+field('stockLocation','Other stock location')+field('remark','Remark')+'</div><div class="item-transfer-detail-table-wrap"><table><thead><tr>'+['Sl','Barcode','Item','Mode','Nos','Weight','Stone','B.codeWght','Remove'].map(label=>'<th>'+label+'</th>').join('')+'</tr></thead><tbody>'+record.lines.map((line,index)=>'<tr><td>'+(index+1)+'</td><td>'+input(line,index,'barcode')+'</td><td>'+escapeHtml(line.itemName||'')+'</td><td><select data-transfer-line="mode" data-index="'+index+'"><option '+(line.mode==='OUT'?'selected':'')+'>OUT</option><option '+(line.mode==='IN'?'selected':'')+'>IN</option></select></td><td>'+input(line,index,'qty','number')+'</td><td>'+input(line,index,'gross','number')+'</td><td>'+input(line,index,'stone','number')+'</td><td>'+numberValue(line.barcodeWeight||line.gross,3)+'</td><td><button data-transfer-remove="'+index+'">X</button></td></tr>').join('')+'</tbody></table></div><button class="secondary" data-action="transfer-add">Add barcode</button><footer class="item-transfer-detail-totals"><span>Total IN</span><strong>'+totals.inQty+'</strong><strong>'+numberValue(totals.inGross,3)+'</strong><strong>'+numberValue(totals.inStone,3)+'</strong><span>Total OUT</span><strong>'+totals.outQty+'</strong><strong>'+numberValue(totals.outGross,3)+'</strong><strong>'+numberValue(totals.outStone,3)+'</strong></footer></section>';
+}
+document.addEventListener('input',event=>{
+ const field=event.target.dataset.transferField;if(field&&itemTransferDraft)itemTransferDraft[field]=event.target.value;
+ const key=event.target.dataset.transferLine;if(key&&itemTransferDraft){const line=itemTransferDraft.lines[Number(event.target.dataset.index)];if(line){line[key]=['qty','gross','stone'].includes(key)?Number(event.target.value):event.target.value;if(key==='barcode')updateTransferBarcodeRow(event.target,line);}}
+});
+document.addEventListener('change',event=>{
+ const key=event.target.dataset.transferLine;if(!key||!itemTransferDraft)return;
+ const line=itemTransferDraft.lines[Number(event.target.dataset.index)];if(!line)return;
+ line[key]=['qty','gross','stone'].includes(key)?Number(event.target.value):event.target.value;
+ if(key==='barcode')updateTransferBarcodeRow(event.target,line);
+});
+document.addEventListener('click',event=>{const remove=event.target.closest('[data-transfer-remove]');if(remove&&itemTransferDraft){itemTransferDraft.lines.splice(Number(remove.dataset.transferRemove),1);render();}});
+function commitComplimentaryRecord(type,input,{remove=false}={}) {
+ const before=state;state=structuredClone(state);
+ try{
+   const purchase=type==='purchase',collection=purchase?'complimentaryPurchases':'complimentaryIssues',normalizer=purchase?normalizeComplimentaryPurchase:normalizeComplimentaryIssue;
+   const record=normalizer(structuredClone(input));
+   if(isTransactionDateLocked(record.date))throw Error('This transaction date is locked.');
+   if(!remove){
+     record.lines=record.lines.filter(line=>line.itemName||Number(line.quantity||0));
+     if(!record.lines.length)throw Error('Add at least one complimentary item.');
+     for(const line of record.lines){if(!line.itemName)throw Error('Select an item for every row.');operationalNumber(line.quantity,'Quantity',{positive:true,integer:workflowKey(line.unit)==='NOS'});if(purchase){operationalNumber(line.foc,'Free quantity',{max:line.quantity});operationalNumber(line.price,'Price');}}
+     operationalNumber(record.addition,'Addition');operationalNumber(record.discount,'Discount');
+     if(purchase&&complimentaryPurchaseFinancials(record).invoiceTotal<0)throw Error('Discount exceeds purchase amount.');
+     if((state[collection]||[]).some(other=>other.id!==record.id&&other.entryNo===record.entryNo))throw Error('Entry number already exists.');
+   }
+   state[collection]=(state[collection]||[]).filter(other=>other.id!==record.id);
+   if(!remove)state[collection].unshift(record);
+   rebuildComplimentaryStock();if(state.complimentaryStock.some(item=>item.balance<-.000001))throw Error('Insufficient complimentary stock. Reverse the related issue before changing this purchase.');
+   state.audit.unshift(audit((remove?'Deleted ':'Saved ')+'complimentary '+type+' '+record.entryNo));return record;
+ }catch(error){state=before;throw error;}
+}
+function saveComplimentaryDocument(type) {
+ try{commitComplimentaryRecord(type,type==='purchase'?complimentaryPurchaseDraft:complimentaryIssueDraft);if(type==='purchase'){complimentaryPurchaseDraft=defaultComplimentaryPurchase();complimentaryPurchaseSelectedRow=0;}else{complimentaryIssueDraft=defaultComplimentaryIssue();complimentaryIssueSelectedRow=0;}saveState();render();toast('Complimentary '+type+' saved.');return true;}catch(error){toast(error.message);return false;}
+}
+function removeComplimentaryDocument(type) {
+ try{const draft=type==='purchase'?complimentaryPurchaseDraft:complimentaryIssueDraft;if(draft)commitComplimentaryRecord(type,draft,{remove:true});if(type==='purchase')complimentaryPurchaseDraft=defaultComplimentaryPurchase();else complimentaryIssueDraft=defaultComplimentaryIssue();saveState();render();toast('Complimentary entry deleted.');return true;}catch(error){toast(error.message);return false;}
+}
+function operationalBarcodeDetails(kind,record,stock) {
+ const returning=kind==='sampleReturn'||kind==='polishing'&&record.movement==='Return'||['smith','jeweller'].includes(kind)&&document.querySelector((kind==='smith'?'.smith-work-entry':'.jeweller-work-entry')+' [data-line-field="mode"]')?.value==='IN';
+ let available={qty:Number(stock.qty||0),gross:Number(stock.gross||0),stone:Number(stock.stone||0),net:Number(stock.net??stock.closing??0)};
+ if(returning){
+   const family=kind.startsWith('sample')?'Sample':kind==='polishing'?'Polishing':kind,party=operationalParty(record),issued={qty:0,gross:0,stone:0,net:0};
+   for(const posting of Object.values(state.operationalPostings||{}))if(posting.party===party)for(const move of posting.moves||[])if(move.stockId===stock.id&&(family==='Sample'?move.custodyKey?.startsWith('Sample:'):family==='Polishing'?move.custodyKey?.startsWith('Polishing:'):posting.kind===family))for(const key of Object.keys(issued))issued[key]=workflowRound(issued[key]-move.sign*Number(move[key]||0));
+   if(issued.qty>0||issued.net>0)available=issued;
+ }
+ return {barcode:stock.barcode||stock.huid,itemId:stock.itemId||'',itemName:stock.item||stock.itemName,...available,rate:Number(stock.rate??activeGoldRate()),mcGram:Number(stock.mcGram??stock.mcPerGrm??0),stoneCharge:Number(stock.stoneCharge||0)};
+}
+function updateOperationalTotalsPreview() {
+ const kind=currentOperationalKind();if(!kind||['opening','transfer','adjustment'].includes(kind))return;
+ try{
+   const config=operationalConfig(kind),draft=config.get();if(!draft)return;
+   const record=config.normalize(captureOperationalPending(kind,structuredClone(draft))),totals=config.totals(record);
+   const values={'Stone Amt':totals.stoneAmt,'Total Amt':totals.totalAmt??totals.totalAmount,'Smith MC':totals.smithMc,'Jeweller MC':totals.jewellerMc,'Total Amount':totals.totalAmount,'Net Total':totals.netTotal,'Balance':totals.balance,'Stone Amount':totals.stoneAmount,'Total Net Weight':totals.net,'Total Gross Weight':totals.gross,'Total Stone Weight':totals.stone,'Total Qty':totals.qty,'Total':totals.total,'Refined Amt':totals.refinedAmount};
+   document.querySelectorAll('.smith-work-bottom label,.sample-bottom label,.polishing-bottom label,.service-bottom label,.refinery-work-bottom label').forEach(label=>{
+     const name=label.querySelector('span')?.textContent?.trim(),value=values[name];if(value===undefined)return;
+     const target=label.querySelector('input[readonly],output,strong');if(target){if(target.tagName==='INPUT')target.value=Number(value).toFixed(['Total Net Weight','Total Gross Weight','Total Stone Weight'].includes(name)?3:2);else target.textContent=money(value);}
+   });
+ }catch{/* Incomplete typed values are validated on Save; do not discard the entry row. */}
+}
+document.addEventListener('input',event=>{
+ if(event.target.dataset.lineField==='barcode'&&active==='Work Orders'){
+   const kind=currentOperationalKind(),row=event.target.closest('tr'),stock=findStockByBarcode(event.target.value);
+   if(kind&&row&&stock&&!['serviceNew','serviceClose'].includes(kind)){
+     const config=operationalConfig(kind),draft=config.get()||config.fresh(),details=operationalBarcodeDetails(kind,draft,stock);
+     for(const [key,value] of Object.entries(details)){const field=row.querySelector('[data-line-field="'+key+'"]');if(field)field.value=value;}
+     row.querySelector('[data-line-field="gross"]')?.dispatchEvent(new Event('input',{bubbles:true}));
+   }
+ }
+ if(active==='Work Orders'||active==='Stock')updateOperationalTotalsPreview();
+});
+function goldDepositAmountWeights(line) {
+ const next={...line};
+ if(Number(next.amount||0)>0&&Number(next.rate||0)>0){
+   next.partyWeight=workflowRound(Number(next.amount)/Number(next.rate));
+   next.net=workflowRound(Number(next.touch||0)>0?next.partyWeight*100/Number(next.touch):next.partyWeight);
+   next.gross=workflowRound(next.net+Number(next.stone||0)+Number(next.mudless||0));
+ }
+ return next;
+}
+function operationalIsPrior(prior,current){
+ const first=toDateInputValue(prior.date||''),second=toDateInputValue(current.date||'');
+ if(first&&second&&first!==second)return first<second;
+ if(prior.createdAt&&current.createdAt)return prior.createdAt<current.createdAt;
+ return true;
+}
+function updateTransferBarcodeRow(field,line) {
+ const stock=findStockByBarcode(line.barcode);if(!stock)return;
+ Object.assign(line,{barcode:stock.barcode||stock.huid,itemId:stock.itemId,itemName:stock.item||stock.itemName,qty:Number(stock.qty||0),gross:Number(stock.gross||0),stone:Number(stock.stone||0),net:Number(stock.net??stock.closing??0),barcodeWeight:Number(stock.gross||0)});
+ const row=field.closest('tr');if(!row)return;
+ for(const key of ['qty','gross','stone']){const input=row.querySelector('[data-transfer-line="'+key+'"]');if(input)input.value=line[key];}
+ if(row.children[2])row.children[2].textContent=line.itemName;
+ if(row.children[7])row.children[7].textContent=numberValue(line.barcodeWeight,3);
+ const totals=itemTransferTotals(itemTransferDraft),footer=document.querySelector('.item-transfer-detail-totals');
+ if(footer)footer.innerHTML='<span>Total IN</span><strong>'+totals.inQty+'</strong><strong>'+numberValue(totals.inGross,3)+'</strong><strong>'+numberValue(totals.inStone,3)+'</strong><span>Total OUT</span><strong>'+totals.outQty+'</strong><strong>'+numberValue(totals.outGross,3)+'</strong><strong>'+numberValue(totals.outStone,3)+'</strong>';
+}
+function loadServiceJobForClose(id) {
+ const job=(state.serviceJobs||[]).find(job=>job.id===id);if(!job)return false;
+ const current=serviceCloseDraft;
+ const draft=current?.sourceJobId===job.id?current:freshOperationalRecord(operationalConfig('serviceClose'));
+ serviceCloseDraft=normalizeServiceJob({...draft,sourceJobId:job.id,partyName:job.partyName,partyAccount:job.partyAccount,place:job.place||'',contactNo:job.contactNo||'',advance:job.advance,approxAmount:job.approxAmount,lines:structuredClone(job.lines),jobStatus:'Closed'},'Close');return true;
+}
+function operationalPendingCount() {
+ const legacy=(state.workLogs||[]).filter(log=>!log.sourceKey&&log.status!=='Closed'&&log.status!=='Received').length;
+ const custody=new Map(),parties=new Map();
+ for(const posting of Object.values(state.operationalPostings||{})){
+   for(const move of posting.moves||[])if(move.custodyKey)custody.set(move.custodyKey,workflowRound((custody.get(move.custodyKey)||0)-move.sign*(move.net||move.qty||0)));
+   if(['smith','jeweller','cashSmith','cashJeweller'].includes(posting.kind)){
+     const config=operationalConfig(posting.kind),record=(state[config.collection]||[]).find(record=>record.id===posting.sourceId);if(!record)continue;
+     const family=posting.kind.toLowerCase().includes('smith')?'Smith':'Jeweller',key=family+':'+posting.party;
+     const delta=posting.kind.startsWith('cash')?workflowSum(record.lines,'netWeight')*(record.mode==='Receipt'?1:-1):record.lines.reduce((sum,line)=>sum+Number(line.smWeight??line.jwWeight??0)*(line.mode==='OUT'?1:-1),0);
+     parties.set(key,workflowRound((parties.get(key)||0)+delta));
+   }
+ }
+ const services=(state.serviceJobs||[]).filter(job=>state.operationalPostings?.['serviceNew:'+job.id]&&!['Closed','Cancelled'].includes(job.jobStatus)&&!(state.serviceClosures||[]).some(close=>close.sourceJobId===job.id)).length;
+ const refining=(state.refineryIssues||[]).filter(issue=>state.operationalPostings?.['refineryIssue:'+issue.id]&&!(state.refineryFinalReturns||[]).some(ret=>ret.pendingIssueId===issue.id||ret.pendingIssueId===issue.entryNo)).length;
+ const melting=(state.meltingIssues||[]).filter(issue=>state.operationalPostings?.['meltingIssue:'+issue.id]&&!(state.meltingReturns||[]).some(ret=>ret.pendingIssueId===issue.id||ret.pendingIssueId===issue.entryNo)).length;
+ return legacy+services+refining+melting+[...custody.values()].filter(value=>value>.000001).length+[...parties.values()].filter(value=>Math.abs(value)>.000001).length;
 }

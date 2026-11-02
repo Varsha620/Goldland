@@ -165,7 +165,9 @@ assert(app.includes("open-work-cash-smith"), "Cash for Weight Smith workflow act
 assert(app.includes("open-work-jeweller"), "Jeweller workflow action is missing");
 assert(app.includes("open-work-cash-jeweller"), "Cash for Weight Jeweller workflow action is missing");
 assert(app.includes("open-work-refiner"), "Refiner workflow action is missing");
-assert(app.includes("Stock Workflow Register"), "Stock workflow register is missing");
+const stockRegisterSource = app.slice(app.indexOf("function stockRegisterScreen()"), app.indexOf("function management()"));
+assert(stockRegisterSource.includes("stock-register-table"), "Main stock register table is missing");
+assert(!stockRegisterSource.includes("Stock Workflow Register") && !stockRegisterSource.includes("workflow("), "Stock register should contain only the main balance table");
 for (const smithFeature of ["smithWorkOrderScreen", "cashForWeightSmithScreen", "readSmithWorkEntryLine", "readCashWeightSmithEntryLine", "saveSmithWork", "saveCashWeightSmith", "smithWorkFinancials", "cashWeightSmithFinancials"]) {
   assert(app.includes(smithFeature), `Missing Smith workflow feature ${smithFeature}`);
 }
@@ -178,19 +180,19 @@ for (const jewellerFeature of ["jewellerWorkOrderScreen", "cashForWeightJeweller
 for (const jewellerField of ["Jeweller Touch", "Cash for Weight Jeweller", "JW Wght", "JwWght", "MC Amt", "Pure Wght", "AccRepost", "Auto Barcode", "Ledger Post", "Bar Slno", "GType", "IType"]) {
   assert(app.includes(jewellerField), `Missing Jeweller workflow field ${jewellerField}`);
 }
-for (const stockAdjustmentFeature of ["stockAdjustmentScreen", "readStockAdjustmentEntryLine", "saveStockAdjustment", "applyStockAdjustmentLineToStock"]) {
+for (const stockAdjustmentFeature of ["stockAdjustmentScreen", "readStockAdjustmentEntryLine", "saveStockAdjustment", "postOperationalBalance"]) {
   assert(app.includes(stockAdjustmentFeature), `Missing Stock Adjustment feature ${stockAdjustmentFeature}`);
 }
 for (const stockAdjustmentField of ["Nos Add", "Gross Add", "Stone Add", "Nos Less", "Gross Less", "Stone Less", "Closing Nos", "Closing Gross", "Closing Stone"]) {
   assert(app.includes(stockAdjustmentField), `Missing Stock Adjustment field ${stockAdjustmentField}`);
 }
-for (const goldDepositFeature of ["goldDepositScreen", "readGoldDepositEntryLine", "saveGoldDeposit", "applyGoldDepositLineToStock", "goldDepositFinancials"]) {
+for (const goldDepositFeature of ["goldDepositScreen", "readGoldDepositEntryLine", "saveGoldDeposit", "postOperationalStock", "goldDepositFinancials"]) {
   assert(app.includes(goldDepositFeature), `Missing Gold Deposit feature ${goldDepositFeature}`);
 }
 for (const goldDepositField of ["Gold Deposit", "Gold Deposit Withdrawal", "By Amount", "PrtyWgt", "Balance Weight/Amount", "Total Weight/Amount"]) {
   assert(app.includes(goldDepositField), `Missing Gold Deposit field ${goldDepositField}`);
 }
-for (const sampleFeature of ["sampleWorkOrders", "sampleScreen", "readSampleEntryLine", "saveSample", "sampleFinancials", "applySampleLineToStock"]) {
+for (const sampleFeature of ["sampleWorkOrders", "sampleScreen", "readSampleEntryLine", "saveSample", "sampleFinancials", "postOperationalStock"]) {
   assert(app.includes(sampleFeature), `Missing Sample workflow feature ${sampleFeature}`);
 }
 for (const sampleField of ["Sample Issue", "Sample Return", "Jeweller", "Show Rate", "Total Amount", "HMC"]) {
@@ -199,7 +201,7 @@ for (const sampleField of ["Sample Issue", "Sample Return", "Jeweller", "Show Ra
 for (const polishingFeature of ["polishingScreen", "setupPolishingScreen", "readPolishingEntryLine", "readPolishingStoneEntryLine", "savePolishing", "polishingFinancials", "appendPolishingLine", "appendPolishingStone"]) {
   assert(app.includes(polishingFeature), `Missing polishing feature ${polishingFeature}`);
 }
-for (const polishingField of ["Party Name", "Net Wght", "Color Type", "Color Scale", "Seive", "Total Net Weight", "Stone Amount", "Polishing entry updated"]) {
+for (const polishingField of ["Party Name", "Net Wght", "Color Type", "Color Scale", "Seive", "Total Net Weight", "Stone Amount", "Return from polishing"]) {
   assert(app.includes(polishingField), `Missing polishing field ${polishingField}`);
 }
 for (const polishingTable of ["create table polishing_entries", "create table polishing_lines", "create table polishing_stones"]) {
