@@ -81,3 +81,7 @@ This is still a local-first prototype. A production build should keep the valida
 - Local API layer
 - PostgreSQL or another durable local database
 - Backup/sync strategy for owner access and disaster recovery
+
+## Staff testing branch
+
+`codex/staff-testing-v1` runs **STAFF-TEST 0.3** at http://localhost:4174/ by default. The main checkout stays on http://localhost:4173/. Work Orders, Barcode and Stock are enabled with the shared calculation and inventory safeguards. Testing records/login are isolated from main browser storage. See [STAFF_TESTING_GUIDE.md](STAFF_TESTING_GUIDE.md) for starter barcodes and the review checklist.
