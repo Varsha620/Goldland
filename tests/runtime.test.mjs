@@ -2426,3 +2426,32 @@ const barcodeEditBalanceAudit=vm.runInContext(`(()=>{
  return true;
  }finally{state=saved.state;barcodeEntryDraft=saved.barcodeEntryDraft;barcodeEntryLine=saved.barcodeEntryLine;barcodeItemEditDraft=saved.barcodeItemEditDraft;barcodeItemEditSource=saved.barcodeItemEditSource;barcodeItemEditScan=saved.barcodeItemEditScan;saveState();}
 })()`,context);assert(barcodeEditBalanceAudit);console.log('Barcode weight edits recalculate per-gram making charges and preserve stock balance.');
+
+// Reference Local Purchase: .500g at 9280, .010 diamond at 800/cent.
+const localDmdExample = vm.runInContext(`(() => {
+ const bill=normalizeDmdReturnBill({returnType:'Local Purchase',taxPct:3,ornamentLines:[{gross:.5,stone:0,goldRate:9280,nos:1}],diamondLines:[{caratCent:.010,ct:'Cnt',pcs:1,purchaseRate:800,sellingRate:1000,amount:99999}]});
+ const result=dmdReturnFinancials(bill);
+ return {result,changed:dmdReturnFinancials({...bill,diamondLines:[{...bill.diamondLines[0],purchaseRate:900}]}),sales:dmdReturnFinancials({...bill,returnType:'Sales Return'}),ct:dmdLocalStoneAmount({caratCent:.01,ct:'Ct',purchaseRate:800})};
+})()`,context);
+assert.equal(localDmdExample.result.billAmount,4640);
+assert.equal(localDmdExample.result.diamondAmount,800);
+assert.equal(localDmdExample.result.taxable,5440);
+assert.equal(localDmdExample.result.gst,163.2);
+assert.equal(localDmdExample.result.roundOff,-.2);
+assert.equal(localDmdExample.result.invoiceTotal,5603);
+assert.equal(localDmdExample.result.balance,5603);
+assert.equal(localDmdExample.changed.diamondAmount,900,'Local Purchase must recalculate purchase rate, ignoring cached amount');
+assert.equal(localDmdExample.sales.diamondAmount,99999,'Sales Return cached calculation must remain unchanged');
+console.log('Local DMD Purchase reference totals and unchanged Sales Return passed.');
+
+const weightFormattingCheck=vm.runInContext(`(() => {
+ const field=(key,value)=>({tagName:'INPUT',type:'text',name:'',id:'',dataset:{lineField:key},value,getAttribute(){return null},closest(){return null}});
+ const values={};
+ for(const key of ['gross','stone','net','netWeight','smWeight','dmdWgt','caratCent','wastage','diamondWtCent','closingGross','stoneAdd','grossLess']){const input=field(key,'1');formatWeightEntry(input);values[key]=input.value;}
+ for(const key of ['qty','nos','goldRate','stonePrice','stoneCharge','amount','barcode','weightRate']){const input=field(key,'1');formatWeightEntry(input);if(input.value!=='1')throw Error('Non-weight formatted: '+key);}
+ const blank=field('gross','');formatWeightEntry(blank);if(blank.value!=='')throw Error('Blank weight changed');
+ const decimal=field('gross','.125');formatWeightEntry(decimal);if(decimal.value!=='0.1250')throw Error('Fraction incorrect');
+ return values;
+})()`,context);
+for(const value of Object.values(weightFormattingCheck))assert.equal(value,'1.0000');
+console.log('Shared four-decimal weight entry formatting and non-weight exclusions passed.');
