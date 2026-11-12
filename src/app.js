@@ -2025,7 +2025,7 @@ function calculateDmdWholesaleLine(line = {}, options = {}) {
     const returnType = DMD_RETURN_TYPES.includes(options.returnType || line.returnType) ? (options.returnType || line.returnType) : "Sales Return";
     const baseTotal = goldAmount + vaAmount + stoneAmount + diamondAmount;
     const returnMaking = returnType === "Sales Return" ? salesMaking : purchaseMaking;
-    const total = Math.round(baseTotal + returnMaking);
+    const total = returnType === "Local Purchase" ? dmdMoneySum([baseTotal, returnMaking]) : Math.round(baseTotal + returnMaking);
     return { ...line, returnType, netWeight, goldAmount, vaAmount, stoneAmount, diamondAmount, purchaseMaking, salesMaking, total, salesAmt: 0, amount: total };
   }
   const salesAmt = Math.round(goldAmount + vaAmount + stoneAmount + diamondAmount + salesMaking);
@@ -20143,7 +20143,7 @@ function dmdStoneRow(line, index) {
 }
 
 function dmdReturnStoneRow(line, index) {
-  const amount = Number(line.amount || line.caratCent * line.sellingRate || 0);
+  const amount = state.dmdReturns?.[0]?.returnType === "Local Purchase" ? dmdLocalStoneAmount(line) : Number(line.amount || line.caratCent * line.sellingRate || 0);
   return [deleteLineButton("dmdReturnStone", line.id, "dmd-return"), index + 1, line.colorType || "-", line.barcode || "-", line.colorType || "-", line.colorScale || "-", line.shape || "-", line.cut || "-", line.clarity || "-", line.sieveSize || "-", numericValue(line.caratCent), line.ct, line.pcs, money(line.purchaseRate), money(line.sellingRate), money(amount)];
 }
 
@@ -20211,7 +20211,26 @@ function purchaseFinancials(rows, bill = purchaseBill()) {
  return {billAmount,addition,discount,gstVat,cess,tdsTcs,invoiceTotal,roundOff,payment,accountBalance:invoiceTotal-payment};
 }
 
+// Local Purchase rates are entered per cent (no legacy two-zero workaround).
+// Cnt values retain the reference screen's fractional-carat convention: .010 = 1 cent.
+function dmdLocalStoneAmount(line, rateKey = "purchaseRate") {
+  return dmdMoneyTerms([[line.caratCent || 0, line[rateKey] || 0, 100]]);
+}
+
 function dmdReturnFinancials(bill) {
+  if (bill.returnType === "Local Purchase") {
+    const ornamentAmount = dmdMoneySum((bill.ornamentLines || []).map(line => normalizeDmdWholesaleLine(line, { returnMode: true, returnType: "Local Purchase" }).total));
+    const diamondAmount = dmdMoneySum((bill.diamondLines || []).map(line => dmdLocalStoneAmount(line)));
+    const addition = Number(bill.addition || 0), discount = Number(bill.discount || 0);
+    const taxable = dmdMoneySum([ornamentAmount, diamondAmount, addition, -discount]);
+    const gst = dmdMoneyTerms([[taxable, bill.gstPct ?? bill.taxPct ?? 0, .01]]);
+    const unroundedTotal = dmdMoneySum([taxable, gst]);
+    const invoiceTotal = Math.round(unroundedTotal);
+    const roundOff = dmdMoneySum([invoiceTotal, -unroundedTotal]);
+    const cashPayment = Number(bill.cashPayment ?? bill.cash ?? 0);
+    return { ornamentAmount, billAmount: ornamentAmount, addition, discount, diamondAmount, taxable, gst, unroundedTotal, roundOff, invoiceTotal, cashPayment, balance: dmdMoneySum([invoiceTotal, -cashPayment]) };
+  }
+
   const ornamentAmount = (bill.ornamentLines || []).reduce((sum, line) => sum + Number(line.salesAmt || line.amount || 0), 0);
   const diamondAmount = (bill.diamondLines || []).reduce((sum, line) => sum + Number(line.amount || (line.caratCent * line.sellingRate) || 0), 0);
   const billAmount = ornamentAmount + diamondAmount;
@@ -20429,6 +20448,7 @@ function dmdWholesaleTotals(totals, bill = state.dmdReturns?.[0]) {
         ${readout("Diamond Amount", money(totals.diamondAmount))}
         ${billAdjustmentField("GST %", "gstPct", bill?.gstPct ?? 3)}
         ${readout("Gst", money(totals.gst))}
+        ${bill?.returnType === "Local Purchase" ? readout("Round Off", money(totals.roundOff)) : ""}
         ${readout("Invoice Total", money(totals.invoiceTotal))}
         ${billAdjustmentField("Cash Payment", "cashPayment", totals.cashPayment, "record")}
         ${readout("Balance", money(totals.balance))}
@@ -21029,7 +21049,37 @@ function select(name, label, options, selectedValue = "") {
   return `<label><span>${label}</span><select name="${name}">${options.map((option) => `<option ${String(option) === String(selectedValue) ? "selected" : ""}>${option}</option>`).join("")}</select></label>`;
 }
 
+function isWeightEntryKey(key = "") {
+  const name = String(key).replace(/[^a-z]/gi, "").toLowerCase();
+  if (/(rate|price|amount|percent|percentage|pct|mode|type|code|name|date|id)$/.test(name)) return false;
+  return /(?:weight|wght|wgt|wt)$/.test(name) || /^(opening|closing|total)?(gross|stone|net)(add|less)?$/.test(name) || ["gross","stone","net","wastage","wstage","wstn","lessweight","mudless","carat","caratcent","dmdcarat","diamondwtcent","colourstonewt","colorstonewt","dmdwgt","diamondwgt","pure","fine","shortage"].includes(name);
+}
+
+function formatWeightEntry(input) {
+  if (!input || input.tagName !== "INPUT" || ["checkbox","radio","date","password","hidden"].includes(input.type)) return;
+  const keys = [input.name, input.id, ...Object.values(input.dataset || {}), input.getAttribute("aria-label")];
+  const label = input.closest("label")?.querySelector("span");
+  if (label) keys.push(label.textContent);
+  if (!keys.some(isWeightEntryKey)) return;
+  const raw = String(input.value || "").trim();
+  if (!raw || !/^[+-]?(?:[\d,]+(?:\.\d*)?|\.\d+)$/.test(raw)) return;
+  const value = Number(raw.replace(/,/g, ""));
+  if (Number.isFinite(value)) input.value = value.toFixed(4);
+}
+
+function setupWeightEntryFormatting() {
+  document.querySelectorAll("input").forEach(input => {
+    if (input !== document.activeElement) formatWeightEntry(input);
+  });
+  // Capture also covers inputs in dialogs inserted after the screen was rendered.
+  if (!setupWeightEntryFormatting.bound) {
+    document.addEventListener("blur", event => formatWeightEntry(event.target), true);
+    setupWeightEntryFormatting.bound = true;
+  }
+}
+
 function bindEvents() {
+  setupWeightEntryFormatting();
   document.querySelectorAll("[data-staff-test-action]").forEach(button=>button.addEventListener("click",()=>{
     const action=button.dataset.staffTestAction;
     if(action==='guide')openStaffTestGuide();
@@ -24720,7 +24770,7 @@ function readDmdStoneEntryLine(row) {
     purchaseRate: readNumber("purchaseRate"),
     sellingRate: readNumber("sellingRate")
   });
-  line.amount = Math.round(Number(line.caratCent || 0) * Number(line.sellingRate || 0));
+  line.amount = row.closest(".dmd-return-stone") && state.dmdReturns?.[0]?.returnType === "Local Purchase" ? dmdLocalStoneAmount(line) : Math.round(Number(line.caratCent || 0) * Number(line.sellingRate || 0));
   return line;
 }
 
